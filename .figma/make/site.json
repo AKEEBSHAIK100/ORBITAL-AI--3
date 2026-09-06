@@ -1,0 +1,10 @@
+{
+  "description": "Orbital-AI streamlines AI-driven solutions for businesses, enhancing decision-making and automating workflows to boost efficiency and innovation.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
