@@ -12,9 +12,9 @@ export const client = new OpenAI({
 // In-memory; resets on process restart. Console-logged so you can monitor
 // usage during testing without opening the Anthropic dashboard.
 let totalCallsThisDeployment = 0
-export function incrementCallCounter(): number {
-  totalCallsThisDeployment += 1
-  console.log(`[Orbital-AI] API call #${totalCallsThisDeployment} (deployment total)`)
+export function incrementCallCounter(amount = 1): number {
+  totalCallsThisDeployment += amount
+  console.log(`[Orbital-AI] API calls: +${amount} (#${totalCallsThisDeployment} deployment total)`)
   return totalCallsThisDeployment
 }
 export function getTotalCalls(): number {
@@ -46,12 +46,14 @@ export function getCachedImage(sessionId: string): string | null {
 export const systemPrompt = `You are Orbital-AI, an expert remote sensing and geospatial computer vision assistant.
 Analyze the supplied satellite/aerial imagery with high scientific rigor.
 Guidelines:
-1. Building Footprint Count: Visually inspect structural rooftop footprints visible in the image. If resolution allows direct enumeration (e.g. 0 to ~150 structures), provide the exact count. If a high-density metropolitan grid with hundreds/thousands of structures, provide a calibrated structural estimate based on rooftop footprint density per hectare. Always provide an explicit integer in "building_count".
+1. Building Footprint Count & General Counting: When asked to count discrete objects (buildings, vehicles, water bodies, fields, trees, etc.), mentally divide the image into a 3×3 or 4×4 grid (choose based on object density) and count objects in each section separately before summing. Note any objects that are ambiguous due to occlusion (tree cover, shadows, low resolution) or cut off at the image edge. Always return a range (low estimate, high estimate) rather than a single exact number, plus a best_estimate middle value. Populate count_estimate with {low, high, best_estimate} and list uncertainty sources in count_uncertainty_factors.
 2. Land Use & Classification: Determine dominant terrain class (Urban, Agricultural, Hydrological, or Arid).
 3. Coverage Percentages: Calculate realistic visual percentage estimates for land coverage, water coverage, and vegetation.
-4. Plain Language: Use plain English sentences distinguishing confident observations from ambiguity.
-Return valid JSON only with answer, building_count, confidence, confidence_reason, detected_features,
-estimated_coverage_percent, water_coverage_percent, vegetation_percent, data_limitation_note, region, label, and suggested_followups.`
+4. Plain Language: Use plain English sentences distinguishing confident observations from ambiguity. Never claim a count is exact — always describe it as an AI visual estimate.
+Return valid JSON only with answer, building_count, count_estimate, count_uncertainty_factors, confidence, confidence_reason, detected_features,
+estimated_coverage_percent, water_coverage_percent, vegetation_percent, data_limitation_note, region, label, and suggested_followups.
+- count_estimate: { low: number, high: number, best_estimate: number } | null  (populate only for counting questions)
+- count_uncertainty_factors: string[]  (e.g. ["tree cover obscuring several rooftops", "buildings cut off at image edge"])`
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 export function parseDataUrl(value: unknown) {

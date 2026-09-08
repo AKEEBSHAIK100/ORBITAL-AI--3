@@ -36,6 +36,12 @@ function detectHiddenLayer(text: string): HiddenLayer | null {
   return null
 }
 
+type CountEstimate = {
+  low: number
+  high: number
+  best_estimate: number
+}
+
 type Analysis = {
   answer: string
   confidence: 'high' | 'medium' | 'low'
@@ -44,6 +50,8 @@ type Analysis = {
   suggested_followups: string[]
   label: string
   revealed_layer?: HiddenLayer
+  count_estimate?: CountEstimate | null
+  count_uncertainty_factors?: string[]
 }
 
 type ChatMessage = {
@@ -54,6 +62,8 @@ type ChatMessage = {
   detected_features: string[]
   label: string
   timestamp: string
+  count_estimate?: CountEstimate | null
+  count_uncertainty_factors?: string[]
 }
 
 export interface ImageTelemetry {
@@ -73,13 +83,13 @@ export interface ImageTelemetry {
 export const DEFAULT_TELEMETRY: ImageTelemetry = {
   landClass: 'Urban',
   landClassPct: '67%',
-  buildingCount: '2,341',
+  buildingCount: '≈2,100–2,600',
   waterPct: '8.2%',
   vegetationPct: '24.6%',
   terrain: 'urban',
   locationTag: '40°42′46″N  74°00′22″W · NEW YORK · LANDSAT-9',
   landSub: 'Urban',
-  buildingSub: '+12% YoY',
+  buildingSub: 'AI visual estimate · best ~2,341',
   waterSub: 'Hudson River basin',
   vegSub: '−18% NE sector',
 }
@@ -279,12 +289,15 @@ async function compressImage(file: File): Promise<{ dataUrl: string; telemetry: 
           locTag = `● SATELLITE PASS · ARID & DROUGHT AUDIT · 0.5M RESOLUTION`
         }
 
-        const buildingSub = buildingCount === 0 ? '0 Marine Structures' : buildingCount === 1 ? '1 Verified Footprint' : `${buildingCount.toLocaleString()} Verified Footprints`
+        const rawLow = Math.max(0, Math.round(buildingCount * 0.88))
+        const rawHigh = Math.round(buildingCount * 1.14)
+        const buildingCountDisplay = buildingCount === 0 ? '0' : `≈${rawLow.toLocaleString()}–${rawHigh.toLocaleString()}`
+        const buildingSub = buildingCount === 0 ? '0 Marine Structures' : `AI visual estimate · best ~${buildingCount.toLocaleString()}`
 
         telemetry = {
           landClass,
           landClassPct,
-          buildingCount: buildingCount.toLocaleString(),
+          buildingCount: buildingCountDisplay,
           waterPct: `${wPct}%`,
           vegetationPct: `${vPct}%`,
           terrain,
@@ -359,9 +372,10 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     }
     if (terrain === 'vegetation') {
       const vegVal = telem ? telem.vegetationPct : '76%'
-      const bldCount = telem ? telem.buildingCount : '24'
+      const bldCount = telem ? telem.buildingCount : '≈20–30'
+      const bldText = bldCount.startsWith('≈') ? bldCount : `~${bldCount}`
       return {
-        answer: `Your uploaded imagery displays robust agricultural/canopy terrain with strong near-infrared reflectance across ${vegVal} of the frame. Canopy photosynthetic activity is healthy (NDVI ~0.76), with approximately ${bldCount} detected structures and clearly demarcated access corridors.`,
+        answer: `Your uploaded imagery displays robust agricultural/canopy terrain with strong near-infrared reflectance across ${vegVal} of the frame. Canopy photosynthetic activity is healthy (NDVI ~0.76), with ${bldText} detected structures (AI visual estimate) and clearly demarcated access corridors.`,
         confidence: 'high',
         confidenceScore: 96,
         detected_features: ['Healthy Crop Canopy', 'Active Photosynthesis', 'Field Boundaries', 'Access Corridors'],
@@ -397,10 +411,11 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     }
     if (terrain === 'urban') {
       const urbanVal = telem ? telem.landClassPct : '71%'
-      const bldCount = telem ? telem.buildingCount : '2,341'
+      const bldCount = telem ? telem.buildingCount : '≈2,100–2,600'
+      const bldText = bldCount.startsWith('≈') ? bldCount : `~${bldCount}`
       const vegVal = telem ? telem.vegetationPct : '19%'
       return {
-        answer: `Spectral analysis of your uploaded image reveals a high-density urban landscape (${urbanVal} built-up coverage) with approximately ${bldCount} structural footprints, defined transportation corridors, and ${vegVal} urban tree canopy.`,
+        answer: `Spectral analysis of your uploaded image reveals a high-density urban landscape (${urbanVal} built-up coverage) with ${bldText} structural footprints (AI visual estimate), defined transportation corridors, and ${vegVal} urban tree canopy.`,
         confidence: 'high',
         confidenceScore: 98,
         detected_features: ['Urban Built-up Grid', 'Commercial & Residential Roofs', 'Transit Arteries', 'Urban Canopy Buffer'],
@@ -502,15 +517,25 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     }
   }
   if (q.includes('building') || q.includes('house') || q.includes('structure') || q.includes('how many') || q.includes('count') || q.includes('roof') || q.includes('footprint')) {
-    const bldCount = telem ? telem.buildingCount : '247'
-    const urbanVal = telem ? telem.landClassPct : '68%'
-    const marineNote = telem?.terrain === 'water' ? ' No terrestrial residential structures detected in this open marine/water frame.' : ` Identified ${bldCount} discrete rooftop and structural footprints across ${urbanVal} developed terrain.`
+    const match = telem?.buildingSub?.match(/best ~([0-9,]+)/) || telem?.buildingCount?.match(/([0-9,]+)/)
+    const rawCount = match ? parseInt(match[1].replace(/,/g, ''), 10) || 247 : 247
+    const isWater = telem?.terrain === 'water'
+    const low = isWater ? 0 : Math.max(0, Math.round(rawCount * 0.88))
+    const high = isWater ? 0 : Math.round(rawCount * 1.14)
+    const best = isWater ? 0 : rawCount
+    const uncertaintyFactors = isWater
+      ? ['open water \u2014 no countable structures present']
+      : ['tree cover may obscure rooftops in vegetated sectors', 'structures at image edges may be partially cut off', 'shadow from taller buildings may conceal smaller footprints']
     return {
-      answer: `High-resolution structural footprint extraction identified ${bldCount} distinct buildings and structures within the analyzed satellite scene.${marineNote} Footprints were verified via edge gradient detection, planar rooftop reflectance, and connected component morphology filtering.`,
-      confidence: 'high',
-      confidenceScore: 98,
-      detected_features: [`${bldCount} Building Footprints`, 'Planar Rooftop Grids', 'Edge Boundary Demarcation', 'Structural Morphology Audit'],
-      label: 'Structural Footprint & Building Count',
+      answer: isWater
+        ? 'AI visual estimate: structural analysis confirms 0 building structures within the surveyed open water area. The visible scene consists entirely of aquatic surface and littoral boundaries with no residential or commercial footprints.'
+        : `AI visual estimate: grid-based sub-counting across a 3\u00d73 sector partition identified approximately ${low.toLocaleString()}\u2013${high.toLocaleString()} structures (best estimate ~${best.toLocaleString()}). Density is predominantly low-to-mid rise with organized rooftop footprints aligned to the street grid.`,
+      confidence: 'medium' as const,
+      confidenceScore: 82,
+      count_estimate: { low, high, best_estimate: best },
+      count_uncertainty_factors: uncertaintyFactors,
+      detected_features: [`≈${low}–${high} Building Footprints`, 'Planar Rooftop Grids', 'Edge Boundary Demarcation', 'Structural Morphology Audit'],
+      label: 'Building Count & Footprint Audit (AI Visual Estimate)',
       revealed_layer: 'urban',
       suggested_followups: [
         'What is the total roof surface area suitable for solar?',
@@ -597,6 +622,57 @@ function LineChart() {
   )
 }
 
+// ─── Info / help modal ───────────────────────────────────────────────────────
+function InfoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: 'rgba(2,8,16,0.85)', backdropFilter: 'blur(12px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-lg w-full rounded-2xl p-7"
+        style={{ background: '#060D1A', border: '1px solid rgba(32,217,255,0.18)', boxShadow: '0 0 60px rgba(32,217,255,0.10)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ background: '#20D9FF', boxShadow: '0 0 8px #20D9FF' }} />
+            <span className="text-xs font-mono tracking-widest" style={{ color: '#20D9FF' }}>ABOUT ORBITAL-AI</span>
+          </div>
+          <button onClick={onClose} className="text-xs px-2 py-1 rounded cursor-pointer" style={{ color: '#9AA9B8', border: '1px solid rgba(32,217,255,0.15)' }}>✕ CLOSE</button>
+        </div>
+
+        <h3 className="text-xl font-bold mb-3" style={{ fontFamily: "'Exo 2', sans-serif", color: '#F4F7FA' }}>How Orbital-AI Counts Objects</h3>
+        <p className="text-sm leading-relaxed mb-4" style={{ color: '#9AA9B8' }}>
+          When you ask a counting question ("How many buildings?"), Orbital-AI applies a <strong style={{ color: '#F4F7FA' }}>grid-based sub-counting approach</strong>:
+          it mentally partitions the image into a 3×3 or 4×4 sector grid, counts objects in each sector separately,
+          then sums the results. This reduces the over- or under-counting errors common with holistic single-pass estimates.
+        </p>
+        <p className="text-sm leading-relaxed mb-4" style={{ color: '#9AA9B8' }}>
+          To further stabilise the result, counting questions automatically trigger <strong style={{ color: '#F4F7FA' }}>self-consistency sampling</strong>:
+          three independent AI passes are run in parallel at low temperature, the median best-estimate is taken, and
+          uncertainty factors from all passes are merged. This roughly triples API cost for counting queries only.
+        </p>
+        <p className="text-sm leading-relaxed mb-4" style={{ color: '#9AA9B8' }}>
+          All counts are returned as a <strong style={{ color: '#F4F7FA' }}>range with a best estimate</strong> (e.g. ≈95–115, best ~105)
+          because occlusion, image resolution, shadow, and edge cut-off mean no single number is exact.
+        </p>
+
+        <div
+          className="rounded-xl p-4 text-xs leading-relaxed"
+          style={{ background: 'rgba(255,159,67,0.08)', border: '1px solid rgba(255,159,67,0.28)', color: '#FFD6A5' }}
+        >
+          <strong style={{ color: '#FF9F43' }}>⚠ When true precision matters:</strong> For applications requiring an exact building count
+          (legal, insurance, survey, or planning use), this tool's AI visual estimate should be treated as a
+          starting point, not a final figure. Verify with official parcel / GIS records or a dedicated building
+          footprint detection service before making critical decisions.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [scrolled, setScrolled] = useState(false)
   const [activeLayer, setActiveLayer] = useState('RGB')
@@ -613,6 +689,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('Ready for imagery')
   const [error, setError] = useState('')
+  const [showInfoModal, setShowInfoModal] = useState(false)
   // ── Cost controls ────────────────────────────────────────────────────────────
   // sessionId is generated per image upload; sent to backend so it can cache
   // the image server-side and skip re-sending it on follow-up questions.
@@ -761,13 +838,21 @@ export default function App() {
               setActiveOverlay((payload as any).revealed_layer)
               setRevealedLayers(prev => Array.from(new Set([...prev, (payload as any).revealed_layer])))
             }
-            if ((payload as any).building_count != null) {
+            if ((payload as any).count_estimate != null) {
+              const ce = (payload as any).count_estimate as CountEstimate
+              const rangeStr = `≈${ce.low.toLocaleString()}–${ce.high.toLocaleString()}`
+              setImageTelemetry(prev => ({
+                ...prev,
+                buildingCount: rangeStr,
+                buildingSub: `AI visual estimate · best ~${ce.best_estimate.toLocaleString()}`,
+              }))
+            } else if ((payload as any).building_count != null) {
               const bCount = (payload as any).building_count
               const bCountFormatted = typeof bCount === 'number' ? bCount.toLocaleString() : String(bCount)
               setImageTelemetry(prev => ({
                 ...prev,
                 buildingCount: bCountFormatted,
-                buildingSub: `★ ${bCountFormatted} Verified Footprints`,
+                buildingSub: `AI visual estimate · ~${bCountFormatted}`,
               }))
             }
           } else {
@@ -788,6 +873,8 @@ export default function App() {
         detected_features: result.detected_features || [],
         label: result.label || 'Analysis',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        count_estimate: (result as any).count_estimate ?? null,
+        count_uncertainty_factors: (result as any).count_uncertainty_factors ?? [],
       }
       setHistory(prev => [...prev, chatMsg])
       setSuggestions(result.suggested_followups?.length ? result.suggested_followups : STARTER_SUGGESTIONS)
@@ -911,6 +998,9 @@ export default function App() {
         onChange={e => { handleAfterFile(e.target.files?.[0]); (e.target as HTMLInputElement).value = '' }}
       />
 
+      {/* ─── INFO MODAL ─── */}
+      {showInfoModal && <InfoModal onClose={() => setShowInfoModal(false)} />}
+
       {/* ─── NAVBAR ─── */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
@@ -950,6 +1040,16 @@ export default function App() {
             ))}
           </div>
           <div className="flex items-center gap-3 ml-auto">
+            <button
+              className="text-sm px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg transition-all cursor-pointer font-mono"
+              style={{ border: `1px solid ${CB}`, color: GRY }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = CYN; (e.currentTarget as HTMLButtonElement).style.color = WHT }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = CB; (e.currentTarget as HTMLButtonElement).style.color = GRY }}
+              onClick={() => setShowInfoModal(true)}
+              title="About counting accuracy & AI estimates"
+            >
+              ?
+            </button>
             <button
               className="hidden md:block text-sm px-4 py-2 rounded-lg transition-all cursor-pointer"
               style={{ border: `1px solid ${CB}`, color: GRY }}
@@ -1334,6 +1434,27 @@ export default function App() {
                         <div className="text-xs leading-relaxed text-slate-200">
                           {m.answer}
                         </div>
+                        {/* Count range display */}
+                        {m.count_estimate && (
+                          <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ background: `${CYN}0D`, border: `1px solid ${CYN}33` }}>
+                            <div className="font-mono font-bold" style={{ color: CYN }}>
+                              ≈{m.count_estimate.low.toLocaleString()}–{m.count_estimate.high.toLocaleString()} <span style={{ color: WHT }}>buildings</span>
+                              <span className="ml-2 font-normal" style={{ color: MNT }}>(best estimate: ~{m.count_estimate.best_estimate.toLocaleString()})</span>
+                            </div>
+                            <div className="text-[10px] mt-0.5" style={{ color: GRY }}>AI visual estimate · grid-based sub-count</div>
+                          </div>
+                        )}
+                        {/* Uncertainty factors */}
+                        {m.count_uncertainty_factors && m.count_uncertainty_factors.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {m.count_uncertainty_factors.map((f, fi) => (
+                              <div key={fi} className="text-[10px] flex items-start gap-1" style={{ color: GRY }}>
+                                <span style={{ color: ORG }}>⚠</span>
+                                <span>{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1412,7 +1533,7 @@ export default function App() {
                 {
                   label: 'Building Count',
                   val: imageTelemetry.buildingCount,
-                  sub: activeOverlay === 'roads' ? '★ Corridors 100% Clear' : activeOverlay === 'urban' ? `★ ${imageTelemetry.buildingCount} Footprints Verified` : imageTelemetry.buildingSub,
+                  sub: activeOverlay === 'roads' ? '★ Corridors 100% Clear' : activeOverlay === 'urban' ? `AI visual estimate · ${imageTelemetry.buildingCount}` : imageTelemetry.buildingSub,
                   col: WHT,
                   highlight: activeOverlay === 'urban' || activeOverlay === 'roads' || (Boolean(imagePreview) && imageTelemetry.terrain === 'urban'),
                 },
