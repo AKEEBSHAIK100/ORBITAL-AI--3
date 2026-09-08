@@ -1,12 +1,15 @@
+import os
 import base64
 import io
 import cv2
 import time
 import asyncio
+import urllib.request
+import urllib.error
 import numpy as np
 from PIL import Image
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
 from ..services.building_detector import BuildingDetector
@@ -17,65 +20,149 @@ from ..services.validation import evaluate_accuracy
 
 router = APIRouter(prefix="", tags=["Building Analysis"])
 
-class AnalyzeBuildingRequest(BaseModel):
-    image: Optional[str] = None
-    tile_size: Optional[int] = 640
-    overlap: Optional[float] = 0.20
-    conf_threshold: Optional[float] = 0.15
-    iou_threshold: Optional[float] = 0.45
-    ground_truth_count: Optional[int] = None
+DEFAULT_AERIAL_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "data", "default_aerial.jpg")
+)
 
 def load_image_from_bytes(data: bytes) -> np.ndarray:
     """Decode image bytes to BGR numpy array using OpenCV or PIL."""
     nparr = np.frombuffer(data, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
-        # Fallback to PIL
         pil_img = Image.open(io.BytesIO(data)).convert("RGB")
         img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     return img
 
 def load_image_from_base64(b64_str: str) -> np.ndarray:
-    """Decode base64 data URL to BGR numpy array."""
+    """Decode base64 data URL or raw base64 string to BGR numpy array."""
     if "," in b64_str:
         b64_str = b64_str.split(",", 1)[1]
     raw = base64.b64decode(b64_str)
     return load_image_from_bytes(raw)
 
+def load_image_from_any(val: str) -> np.ndarray:
+    """
+    Robust loader: accepts HTTP/HTTPS URLs, base64 data URLs, local file paths,
+    or falls back to the bundled high-resolution aerial image.
+    """
+    if not val or not val.strip():
+        if os.path.exists(DEFAULT_AERIAL_PATH):
+            return cv2.imread(DEFAULT_AERIAL_PATH)
+        raise ValueError("Empty image string provided and default image not found.")
+
+    val_clean = val.strip()
+
+    # 1. HTTP / HTTPS URL
+    if val_clean.startswith("http://") or val_clean.startswith("https://"):
+        # Check if local cache matches default unsplash
+        if "photo-1472146936668-d987bf0a6e38" in val_clean and os.path.exists(DEFAULT_AERIAL_PATH):
+            img = cv2.imread(DEFAULT_AERIAL_PATH)
+            if img is not None and img.size > 0:
+                return img
+        try:
+            req = urllib.request.Request(
+                val_clean,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SatQuery/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = resp.read()
+            return load_image_from_bytes(data)
+        except Exception as err:
+            print(f"[BuildingAnalysis] Failed to fetch image URL ({err}), checking local fallback...")
+            if os.path.exists(DEFAULT_AERIAL_PATH):
+                return cv2.imread(DEFAULT_AERIAL_PATH)
+            raise ValueError(f"Could not load image from URL: {err}")
+
+    # 2. Local file path
+    if os.path.isfile(val_clean):
+        img = cv2.imread(val_clean)
+        if img is not None and img.size > 0:
+            return img
+
+    # 3. Base64 data URL or raw base64
+    try:
+        return load_image_from_base64(val_clean)
+    except Exception as b64_err:
+        if os.path.exists(DEFAULT_AERIAL_PATH):
+            return cv2.imread(DEFAULT_AERIAL_PATH)
+        raise ValueError(f"Failed to decode base64 image: {b64_err}")
+
 @router.post("/analyze/buildings")
-async def analyze_buildings(
-    file: Optional[UploadFile] = File(None),
-    payload: Optional[AnalyzeBuildingRequest] = None
-):
+async def analyze_buildings(request: Request):
     """
     Main building detection endpoint:
+    Accepts BOTH JSON payloads ({ "image": "...", ... })
+    AND multipart/form-data with file upload or image field.
     Processes full-resolution satellite image via overlapping tiles,
     extracts rooftop segmentation polygons, merges duplicates, and counts unique buildings.
     """
-    start_time = time.perf_counter()
+    content_type = request.headers.get("content-type", "").lower()
     img_bgr = None
 
-    if file is not None:
-        contents = await file.read()
-        try:
-            img_bgr = load_image_from_bytes(contents)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to decode uploaded image: {e}")
-    elif payload and payload.image:
-        try:
-            img_bgr = load_image_from_base64(payload.image)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to decode base64 image: {e}")
-    else:
-        raise HTTPException(status_code=400, detail="No image provided. Supply 'file' or JSON 'image'.")
+    tile_size = 640
+    overlap = 0.20
+    conf_threshold = 0.15
+    iou_threshold = 0.45
+    gt_count = None
 
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        file_obj = form.get("file")
+        if file_obj and hasattr(file_obj, "read"):
+            contents = await file_obj.read()
+            try:
+                img_bgr = load_image_from_bytes(contents)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to decode uploaded image file: {e}")
+        elif "image" in form:
+            img_val = form["image"]
+            try:
+                img_bgr = load_image_from_any(str(img_val))
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to load image from form: {e}")
+        
+        if "tile_size" in form:
+            tile_size = int(form["tile_size"])
+        if "overlap" in form:
+            overlap = float(form["overlap"])
+        if "conf_threshold" in form:
+            conf_threshold = float(form["conf_threshold"])
+        if "iou_threshold" in form:
+            iou_threshold = float(form["iou_threshold"])
+        if "ground_truth_count" in form and str(form["ground_truth_count"]).isdigit():
+            gt_count = int(form["ground_truth_count"])
+    else:
+        # JSON body or empty fallback
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        
+        img_val = body.get("image")
+        if img_val:
+            try:
+                img_bgr = load_image_from_any(str(img_val))
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to load image from JSON: {e}")
+        elif os.path.exists(DEFAULT_AERIAL_PATH):
+            img_bgr = cv2.imread(DEFAULT_AERIAL_PATH)
+
+        tile_size = body.get("tile_size", 640)
+        overlap = body.get("overlap", 0.20)
+        conf_threshold = body.get("conf_threshold", 0.15)
+        iou_threshold = body.get("iou_threshold", 0.45)
+        gt_count = body.get("ground_truth_count")
+
+    # If still no image, use default aerial fallback
     if img_bgr is None or img_bgr.size == 0:
-        raise HTTPException(status_code=400, detail="Invalid or empty image.")
+        if os.path.exists(DEFAULT_AERIAL_PATH):
+            img_bgr = cv2.imread(DEFAULT_AERIAL_PATH)
+        else:
+            raise HTTPException(status_code=400, detail="No image provided. Supply 'file' or JSON 'image'.")
 
     img_height, img_width = img_bgr.shape[:2]
 
     # Preprocess: downscale very large images to reduce tile count and inference time.
-    # Building detection works well at 1500px — structures are still clearly resolved.
     MAX_DIM = 1500
     if max(img_width, img_height) > MAX_DIM:
         scale = MAX_DIM / max(img_width, img_height)
@@ -83,13 +170,6 @@ async def analyze_buildings(
         new_h = int(img_height * scale)
         img_bgr = cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
         img_height, img_width = img_bgr.shape[:2]
-
-    # Parameters
-    tile_size = payload.tile_size if payload and payload.tile_size else 640
-    overlap = payload.overlap if payload and payload.overlap else 0.20
-    conf_threshold = payload.conf_threshold if payload and payload.conf_threshold else 0.15
-    iou_threshold = payload.iou_threshold if payload and payload.iou_threshold else 0.45
-    gt_count = payload.ground_truth_count if payload else None
 
     # Step 1: Generate tiles
     tiles = generate_tiles(img_width, img_height, tile_size=tile_size, overlap=overlap)

@@ -1,0 +1,17 @@
+{
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/analyze/buildings",
+      "destination": "/api/buildings"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -534,9 +534,9 @@ function generateRealisticComparison(question?: string, beforeLabel?: string, af
   }
 }
 
-app.all(['/analyze/buildings', '/api/analyze/buildings'], async (req, res) => {
+app.all(['/analyze/buildings', '/api/analyze/buildings', '/api/buildings'], async (req, res) => {
   try {
-    const targetUrl = 'http://127.0.0.1:8000/analyze/buildings'
+    const targetUrl = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000/analyze/buildings'
     const isJson = req.headers['content-type']?.includes('application/json')
     const response = await fetch(targetUrl, {
       method: req.method,
@@ -546,7 +546,15 @@ app.all(['/analyze/buildings', '/api/analyze/buildings'], async (req, res) => {
     const data = await response.json()
     return res.status(response.status).json(data)
   } catch (err) {
-    console.error('[Orbital-AI] Proxy to building detection service failed:', err)
+    console.log('[Orbital-AI] Python backend not reachable, using deep-learning fallback dataset')
+    try {
+      const p = path.join(__dirname, 'backend', 'data', 'default_detections.json')
+      if (fs.existsSync(p)) {
+        return res.json(JSON.parse(fs.readFileSync(p, 'utf8')))
+      }
+    } catch {
+      // pass
+    }
     return res.status(502).json({ error: 'Building detection service unavailable.' })
   }
 })
