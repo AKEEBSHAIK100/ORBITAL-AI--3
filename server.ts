@@ -534,6 +534,23 @@ function generateRealisticComparison(question?: string, beforeLabel?: string, af
   }
 }
 
+app.all(['/analyze/buildings', '/api/analyze/buildings'], async (req, res) => {
+  try {
+    const targetUrl = 'http://127.0.0.1:8000/analyze/buildings'
+    const isJson = req.headers['content-type']?.includes('application/json')
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers: { 'Content-Type': req.headers['content-type'] || 'application/json' },
+      body: req.method === 'POST' ? (isJson ? JSON.stringify(req.body) : req.body) : undefined,
+    })
+    const data = await response.json()
+    return res.status(response.status).json(data)
+  } catch (err) {
+    console.error('[Orbital-AI] Proxy to building detection service failed:', err)
+    return res.status(502).json({ error: 'Building detection service unavailable.' })
+  }
+})
+
 app.post('/api/compare', async (req, res) => {
   try {
     if (!checkRateLimit(req.ip || 'unknown')) {

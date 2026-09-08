@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': 'http://localhost:8787',
+        '/analyze/buildings': 'http://localhost:8000',
       },
       watch: { ignored: ['**/.figma/**'] },
     },

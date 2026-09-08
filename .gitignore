@@ -18,3 +18,16 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pt
+!backend/models/building_model.pt
+
+# Test & scratch images
+*.jpg
+*.jpeg
+*.png
+!public/**

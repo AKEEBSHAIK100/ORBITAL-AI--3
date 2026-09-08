@@ -24,10 +24,22 @@ apiChild.on('exit', code => {
   if (code && code !== 0) console.error(`[Orbital-AI API] exited with code ${code}`)
 })
 
-// 3. Fallback HTTP bridge on port 5173 for browsers that restrict 8443
+// 3. Launch FastAPI Building Detection backend on port 8000
+console.log('[Orbital-AI] Launching FastAPI Building Detection service on port 8000...')
+const pyChild = spawn('python', ['-m', 'uvicorn', 'backend.main:app', '--host', '0.0.0.0', '--port', '8000'], {
+  stdio: 'inherit',
+  shell: isWin,
+})
+
+pyChild.on('exit', code => {
+  if (code && code !== 0) console.error(`[Orbital-AI Python Backend] exited with code ${code}`)
+})
+
+// 4. Fallback HTTP bridge on port 5173 for browsers that restrict 8443
 const bridge = http.createServer((req, res) => {
-  const isApi = req.url && req.url.startsWith('/api')
-  const targetPort = isApi ? 8787 : 8443
+  const isApi = req.url && (req.url.startsWith('/api') || req.url.startsWith('/analyze'))
+  const isPythonAnalyze = req.url && req.url.startsWith('/analyze')
+  const targetPort = isPythonAnalyze ? 8000 : isApi ? 8787 : 8443
   const connector = http.request(
     {
       hostname: '127.0.0.1',
@@ -57,6 +69,7 @@ const shutdown = async () => {
   bridge.close()
   await viteServer.close()
   apiChild.kill('SIGTERM')
+  pyChild.kill('SIGTERM')
 }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
