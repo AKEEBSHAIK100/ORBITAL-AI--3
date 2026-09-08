@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         messages: [
           {
             role: 'system',
-            content: `${systemPrompt}\nFor two images, additionally return alignment_confidence and change_regions. Each change region must include description, confidence, region, and label. If alignment is low, state that plainly.`,
+            content: `${systemPrompt}\nFor two images, additionally return alignment_confidence ('high'|'medium'|'low'), confidence_percent (0-100), and change_regions. Each change region must include description, confidence, region, and label. If alignment is low, state that plainly.`,
           },
           {
             role: 'user',
@@ -56,9 +56,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
       const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      if (!parsed.confidenceScore) {
-        parsed.confidenceScore = 96
+      if (typeof parsed.confidence_percent !== 'number') {
+        parsed.confidence_percent = parsed.confidence === 'high' ? 95 : parsed.confidence === 'medium' ? 78 : 58
       }
+      parsed.confidence_percent = Math.max(0, Math.min(100, Math.round(parsed.confidence_percent)))
+      parsed.confidenceScore = parsed.confidence_percent
       return res.status(200).json(parsed)
     } catch (apiError) {
       const { userMessage, logTag } = classifyError(apiError)

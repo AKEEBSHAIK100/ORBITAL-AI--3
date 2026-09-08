@@ -42,28 +42,41 @@ type CountEstimate = {
   best_estimate: number
 }
 
+export type Region = {
+  x_percent: number
+  y_percent: number
+  w_percent: number
+  h_percent: number
+}
+
 type Analysis = {
   answer: string
   confidence: 'high' | 'medium' | 'low'
+  confidence_percent: number
   confidenceScore: number
+  confidence_reason?: string
   detected_features: string[]
   suggested_followups: string[]
   label: string
   revealed_layer?: HiddenLayer
   count_estimate?: CountEstimate | null
   count_uncertainty_factors?: string[]
+  region?: Region | null
 }
 
 type ChatMessage = {
   question: string
   answer: string
   confidenceScore: number
+  confidence_percent: number
   confidence: 'high' | 'medium' | 'low'
+  confidence_reason?: string
   detected_features: string[]
   label: string
   timestamp: string
   count_estimate?: CountEstimate | null
   count_uncertainty_factors?: string[]
+  region?: Region | null
 }
 
 export interface ImageTelemetry {
@@ -357,10 +370,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
       return {
         answer: `Spectral analysis of your uploaded image reveals a dominant hydrological environment (${waterVal} water surface coverage) with clear coastal/riparian boundaries. Terrestrial vegetation comprises ${vegVal} along margins, with zero acute turbidity or industrial discharge plumes detected.`,
         confidence: 'high',
+        confidence_percent: 97,
         confidenceScore: 97,
+        confidence_reason: 'Unobstructed littoral perimeter with high spectral differentiation between water and shore.',
         detected_features: ['Open Water Reservoir', 'Coastal Shoals', 'Riparian Perimeter', 'Clear Water Interface'],
+        region: { x_percent: 15, y_percent: 18, w_percent: 54, h_percent: 58 },
         label: 'Hydrological Survey',
         revealed_layer: 'flood',
+        count_estimate: null,
+        count_uncertainty_factors: [],
         suggested_followups: [
           'What is the estimated water body depth clarity?',
           'Are there visible flood risks along the perimeter?',
@@ -377,10 +395,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
       return {
         answer: `Your uploaded imagery displays robust agricultural/canopy terrain with strong near-infrared reflectance across ${vegVal} of the frame. Canopy photosynthetic activity is healthy (NDVI ~0.76), with ${bldText} detected structures (AI visual estimate) and clearly demarcated access corridors.`,
         confidence: 'high',
+        confidence_percent: 96,
         confidenceScore: 96,
+        confidence_reason: 'Clear near-infrared reflectance signature and sharp boundary contrast along parcel roads.',
         detected_features: ['Healthy Crop Canopy', 'Active Photosynthesis', 'Field Boundaries', 'Access Corridors'],
+        region: { x_percent: 14, y_percent: 16, w_percent: 48, h_percent: 52 },
         label: 'Vegetation & Canopy Health',
         revealed_layer: 'harvest',
+        count_estimate: null,
+        count_uncertainty_factors: [],
         suggested_followups: [
           'What is the estimated harvest readiness percentage?',
           'Are there any signs of localized crop disease?',
@@ -396,10 +419,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
       return {
         answer: `Analysis of the uploaded image indicates an arid, moisture-stressed landscape dominated by mineral substrate (${aridVal}). Vegetative cover is sparse (${vegVal}), exhibiting elevated thermal surface temperatures with zero standing water detected.`,
         confidence: 'high',
+        confidence_percent: 95,
         confidenceScore: 95,
+        confidence_reason: 'High thermal and mineral reflectance with minimal canopy occlusion across exposed substrate.',
         detected_features: ['Arid Soil Substrate', 'Moisture Deficit Zone', 'Thermal Stress', 'Sparse Scrubland'],
+        region: { x_percent: 18, y_percent: 20, w_percent: 45, h_percent: 46 },
         label: 'Arid & Drought Assessment',
         revealed_layer: 'drought',
+        count_estimate: null,
+        count_uncertainty_factors: [],
         suggested_followups: [
           'What is the estimated soil moisture deficit in the central sector?',
           'Are there dry wash or drainage channels visible?',
@@ -417,10 +445,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
       return {
         answer: `Spectral analysis of your uploaded image reveals a high-density urban landscape (${urbanVal} built-up coverage) with ${bldText} structural footprints (AI visual estimate), defined transportation corridors, and ${vegVal} urban tree canopy.`,
         confidence: 'high',
+        confidence_percent: 98,
         confidenceScore: 98,
+        confidence_reason: 'High spatial resolution revealing sharp structural rooftop boundaries and orthogonal street grid.',
         detected_features: ['Urban Built-up Grid', 'Commercial & Residential Roofs', 'Transit Arteries', 'Urban Canopy Buffer'],
+        region: { x_percent: 16, y_percent: 18, w_percent: 42, h_percent: 44 },
         label: 'Urban Infrastructure Audit',
         revealed_layer: 'urban',
+        count_estimate: null,
+        count_uncertainty_factors: [],
         suggested_followups: [
           'What is the density of the transportation corridor?',
           'Which buildings exhibit elevated rooftop thermal profiles?',
@@ -435,10 +468,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     return {
       answer: "Multispectral analysis indicates localized canopy moisture stress along the southern perimeter, with vegetation reflectance showing reduced near-infrared chlorophyll absorption (NDVI ~0.42 vs. 0.74 baseline). Soil moisture deficit is estimated at 35–40% in exposed clearings, while irrigated parcels remain stable.",
       confidence: 'high',
+      confidence_percent: 96,
       confidenceScore: 96,
+      confidence_reason: 'Distinct chlorosis anomaly and elevated thermal surface profile along the southern perimeter.',
       detected_features: ['Canopy Moisture Stress', 'Chlorosis Anomaly', 'Thermal Variance', 'Exposed Dry Soil'],
+      region: { x_percent: 36, y_percent: 32, w_percent: 35, h_percent: 36 },
       label: 'Drought & Moisture Deficit',
       revealed_layer: 'drought',
+      count_estimate: null,
+      count_uncertainty_factors: [],
       suggested_followups: [
         'What is the estimated soil moisture deficit in sector B?',
         'Which crop zones show the highest thermal stress?',
@@ -452,10 +490,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     return {
       answer: "Approximately 85–90% of the visible agricultural parcels exhibit advanced crop maturation, characterized by golden-brown senescence reflectance in the red spectrum. Field access corridors and turnaround zones appear dry and fully navigable for standard harvesting machinery.",
       confidence: 'high',
+      confidence_percent: 94,
       confidenceScore: 94,
+      confidence_reason: 'Senescence reflectance profile clearly separated from healthy green vegetative buffer strips.',
       detected_features: ['Mature Crop Parcels', 'Senescent Biomass', 'Harvest Access Corridors', 'Field Boundaries'],
+      region: { x_percent: 42, y_percent: 18, w_percent: 38, h_percent: 40 },
       label: 'Harvest Readiness',
       revealed_layer: 'harvest',
+      count_estimate: null,
+      count_uncertainty_factors: [],
       suggested_followups: [
         'Which field quadrants are ready for immediate harvesting?',
         'Are there any unripened green patches remaining?',
@@ -469,10 +512,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     return {
       answer: "The primary agricultural zones show robust photosynthetic activity with strong NIR reflectance across 70% of the planted area. A minor localized patch in the northwest sector displays slight canopy thinning and nutrient variance, but overall vegetative vitality is high.",
       confidence: 'high',
+      confidence_percent: 97,
       confidenceScore: 97,
+      confidence_reason: 'High near-infrared vigor and uniform canopy absorption across primary agricultural parcels.',
       detected_features: ['High-Density Vegetation', 'Active Photosynthesis', 'Northwest Variance', 'Field Buffer Strips'],
+      region: { x_percent: 12, y_percent: 14, w_percent: 52, h_percent: 48 },
       label: 'Canopy Health Assessment',
       revealed_layer: 'harvest',
+      count_estimate: null,
+      count_uncertainty_factors: [],
       suggested_followups: [
         'What is causing the slight canopy thinning in the northwest?',
         'How does the NDVI profile compare to healthy benchmarks?',
@@ -486,10 +534,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     return {
       answer: "Surface water is confined to the primary drainage channel and low-lying coastal marshes, occupying approximately 8.2% of the scene. Floodwaters have not breached the primary levee or reached the residential building perimeters, maintaining a safe buffer distance of approximately 140 meters.",
       confidence: 'high',
+      confidence_percent: 95,
       confidenceScore: 95,
+      confidence_reason: 'Distinct specular reflectance from inundated drainage channels; safe buffer margin verified.',
       detected_features: ['River Drainage Basin', 'Riparian Wetlands', 'Protective Levee Berm', '140m Structural Buffer'],
+      region: { x_percent: 22, y_percent: 42, w_percent: 46, h_percent: 40 },
       label: 'Hydrological & Flood Assessment',
       revealed_layer: 'flood',
+      count_estimate: null,
+      count_uncertainty_factors: [],
       suggested_followups: [
         'What is the minimum clearance distance to nearest buildings?',
         'Are any drainage culverts experiencing overflow?',
@@ -503,10 +556,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     return {
       answer: "Primary transit arteries and connecting roadways are completely clear with uninterrupted traffic flow. No major debris, structural failure, or standing water blockages are detected along the central multi-lane corridor; minor shoulder maintenance is observed at junction 4.",
       confidence: 'high',
+      confidence_percent: 93,
       confidenceScore: 93,
+      confidence_reason: 'Uninterrupted linear asphalt signature along primary transit artery with no standing water.',
       detected_features: ['Primary Highway Corridor', 'Connecting Arterials', 'Overpass Structures', 'Clear Transit Corridors'],
+      region: { x_percent: 12, y_percent: 26, w_percent: 68, h_percent: 32 },
       label: 'Transportation Corridor Audit',
       revealed_layer: 'roads',
+      count_estimate: null,
+      count_uncertainty_factors: [],
       suggested_followups: [
         'Are secondary access roads open to emergency vehicles?',
         'Are there any thermal anomalies or pavement distress on the bridge?',
@@ -524,16 +582,22 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     const high = isWater ? 0 : Math.round(rawCount * 1.14)
     const best = isWater ? 0 : rawCount
     const uncertaintyFactors = isWater
-      ? ['open water \u2014 no countable structures present']
+      ? ['open water — no countable structures present']
       : ['tree cover may obscure rooftops in vegetated sectors', 'structures at image edges may be partially cut off', 'shadow from taller buildings may conceal smaller footprints']
+    const region = isWater
+      ? { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 60 }
+      : { x_percent: 16, y_percent: 14, w_percent: 54, h_percent: 50 }
     return {
       answer: isWater
         ? 'AI visual estimate: structural analysis confirms 0 building structures within the surveyed open water area. The visible scene consists entirely of aquatic surface and littoral boundaries with no residential or commercial footprints.'
-        : `AI visual estimate: grid-based sub-counting across a 3\u00d73 sector partition identified approximately ${low.toLocaleString()}\u2013${high.toLocaleString()} structures (best estimate ~${best.toLocaleString()}). Density is predominantly low-to-mid rise with organized rooftop footprints aligned to the street grid.`,
+        : `AI visual estimate: grid-based sub-counting across a 3×3 sector partition identified approximately ${low.toLocaleString()}–${high.toLocaleString()} structures (best estimate ~${best.toLocaleString()}). Density is predominantly low-to-mid rise with organized rooftop footprints aligned to the street grid.`,
       confidence: 'medium' as const,
+      confidence_percent: 82,
       confidenceScore: 82,
+      confidence_reason: 'Grid-based estimation with uncertainty due to partial tree cover obscuring rooftops and edge cut-off.',
       count_estimate: { low, high, best_estimate: best },
       count_uncertainty_factors: uncertaintyFactors,
+      region,
       detected_features: [`≈${low}–${high} Building Footprints`, 'Planar Rooftop Grids', 'Edge Boundary Demarcation', 'Structural Morphology Audit'],
       label: 'Building Count & Footprint Audit (AI Visual Estimate)',
       revealed_layer: 'urban',
@@ -549,7 +613,12 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
   return {
     answer: "Land classification breaks down into 67% urban developed land (residential structures and paved transit network), 24.6% mixed vegetative cover, 8.2% inland hydrological bodies, and under 1% bare soil. Development is dense and gridded with clear zoning demarcation between residential and riparian reserves.",
     confidence: 'high',
+    confidence_percent: 98,
     confidenceScore: 98,
+    confidence_reason: 'Multi-class spectral decomposition across built-up, vegetative, and inland water features.',
+    region: { x_percent: 10, y_percent: 10, w_percent: 64, h_percent: 58 },
+    count_estimate: null,
+    count_uncertainty_factors: [],
     detected_features: ['High-Density Urban Footprints', 'Arterial Road Network', 'Riparian Water System', 'Urban Tree Canopy'],
     label: 'Land Use & Terrain Classification',
     revealed_layer: 'urban',
@@ -673,9 +742,127 @@ function InfoModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ─── Continuous color gradient for confidence score ──────────────────────────
+function getConfidenceColor(pct: number): string {
+  const p = Math.max(0, Math.min(100, pct))
+  if (p < 55) {
+    // Red (#EF4444) to Orange (#F97316)
+    const t = p / 55
+    const r = Math.round(239 + (249 - 239) * t)
+    const g = Math.round(68 + (115 - 68) * t)
+    const b = Math.round(68 + (22 - 68) * t)
+    return `rgb(${r},${g},${b})`
+  } else if (p < 75) {
+    // Orange (#F97316) to Amber (#FBBF24)
+    const t = (p - 55) / 20
+    const r = Math.round(249 + (251 - 249) * t)
+    const g = Math.round(115 + (191 - 115) * t)
+    const b = Math.round(22 + (36 - 22) * t)
+    return `rgb(${r},${g},${b})`
+  } else if (p < 88) {
+    // Amber (#FBBF24) to Emerald/Mint (#34D399)
+    const t = (p - 75) / 13
+    const r = Math.round(251 + (52 - 251) * t)
+    const g = Math.round(191 + (211 - 191) * t)
+    const b = Math.round(36 + (153 - 36) * t)
+    return `rgb(${r},${g},${b})`
+  } else {
+    // Emerald (#34D399) to Cyan (#20D9FF)
+    const t = (p - 88) / 12
+    const r = Math.round(52 + (32 - 52) * t)
+    const g = Math.round(211 + (217 - 211) * t)
+    const b = Math.round(153 + (255 - 153) * t)
+    return `rgb(${r},${g},${b})`
+  }
+}
+
+// ─── Confidence badge with precise percent, color gradient & disclaimer tooltip ──
+function ConfidenceBadge({
+  confidence,
+  percent,
+  reason,
+}: {
+  confidence: 'high' | 'medium' | 'low'
+  percent: number
+  reason?: string
+}) {
+  const [showTip, setShowTip] = useState(false)
+  const color = getConfidenceColor(percent)
+  const capConf = confidence.charAt(0).toUpperCase() + confidence.slice(1)
+
+  return (
+    <div className="relative inline-flex items-center gap-1.5">
+      <div
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono transition-all select-none"
+        style={{
+          background: `${color}14`,
+          border: `1px solid ${color}44`,
+          color,
+        }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+        />
+        <span className="font-semibold">{capConf} confidence</span>
+        <span style={{ color: '#9AA9B8' }}>—</span>
+        <span className="font-bold">{percent}%</span>
+        {/* Micro progress bar */}
+        <div className="w-8 h-1.5 rounded-full overflow-hidden bg-black/40 shrink-0 ml-0.5">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${percent}%`, background: color }}
+          />
+        </div>
+      </div>
+
+      {/* Tooltip trigger icon */}
+      <div
+        className="relative cursor-pointer inline-flex items-center"
+        onMouseEnter={() => setShowTip(true)}
+        onMouseLeave={() => setShowTip(false)}
+        onClick={() => setShowTip(prev => !prev)}
+      >
+        <span
+          className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono transition-colors hover:border-cyan-400 hover:text-cyan-300"
+          style={{
+            border: '1px solid rgba(154, 169, 184, 0.3)',
+            color: '#9AA9B8',
+            background: 'rgba(6, 13, 26, 0.7)',
+          }}
+          title="About AI confidence assessment"
+        >
+          ⓘ
+        </span>
+
+        {showTip && (
+          <div
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 rounded-lg text-[10px] leading-snug z-50 pointer-events-none shadow-xl backdrop-blur-md"
+            style={{
+              background: '#060D1AF0',
+              border: '1px solid rgba(32, 217, 255, 0.3)',
+              color: '#D8F6FF',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div className="font-semibold text-white mb-0.5">Self-Assessed Confidence</div>
+            <div>This is the AI's own self-assessed confidence based on image clarity — not a measured accuracy statistic.</div>
+            {reason && (
+              <div className="mt-1 pt-1 text-[9px] text-slate-400 border-t border-slate-700/50">
+                Factor: {reason}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [scrolled, setScrolled] = useState(false)
   const [activeLayer, setActiveLayer] = useState('RGB')
+  const [activeRegion, setActiveRegion] = useState<{ region: Region; label: string; confidence_percent?: number } | null>(null)
   const [beforePct, setBeforePct] = useState(50)
   const [dragging, setDragging] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -756,6 +943,7 @@ export default function App() {
       setHistory([])
       setSuggestions(STARTER_SUGGESTIONS)
       setActiveOverlay(null)
+      setActiveRegion(null)
       setRevealedLayers([])
       // Fresh session for each new image — resets server-side cache key and call counter
       setSessionId(crypto.randomUUID())
@@ -864,17 +1052,36 @@ export default function App() {
         }
       }
 
+      const confPercent = typeof (result as any).confidence_percent === 'number'
+        ? Math.max(0, Math.min(100, Math.round((result as any).confidence_percent)))
+        : (result.confidenceScore ?? (result.confidence === 'high' ? 95 : result.confidence === 'medium' ? 78 : 55))
+      result.confidence_percent = confPercent
+      result.confidenceScore = confPercent
+
+      if (result.region && typeof result.region === 'object' && typeof result.region.x_percent === 'number') {
+        setActiveRegion({
+          region: result.region,
+          label: result.label || 'Analysis Target',
+          confidence_percent: confPercent,
+        })
+      } else {
+        setActiveRegion(null)
+      }
+
       setAnalysis(result)
       const chatMsg: ChatMessage = {
         question: prompt,
         answer: result.answer,
-        confidenceScore: result.confidenceScore || (result.confidence === 'high' ? 96 : 85),
+        confidence_percent: confPercent,
+        confidenceScore: confPercent,
         confidence: result.confidence,
+        confidence_reason: result.confidence_reason,
         detected_features: result.detected_features || [],
         label: result.label || 'Analysis',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        count_estimate: (result as any).count_estimate ?? null,
-        count_uncertainty_factors: (result as any).count_uncertainty_factors ?? [],
+        count_estimate: result.count_estimate ?? null,
+        count_uncertainty_factors: result.count_uncertainty_factors ?? [],
+        region: result.region ?? null,
       }
       setHistory(prev => [...prev, chatMsg])
       setSuggestions(result.suggested_followups?.length ? result.suggested_followups : STARTER_SUGGESTIONS)
@@ -885,15 +1092,28 @@ export default function App() {
       }, 100)
     } catch {
       const fallbackResult = demoAnalyze(prompt, imagePreview)
+      const fallbackConf = fallbackResult.confidence_percent ?? fallbackResult.confidenceScore ?? 94
+      if (fallbackResult.region) {
+        setActiveRegion({
+          region: fallbackResult.region,
+          label: fallbackResult.label || 'Analysis Target',
+          confidence_percent: fallbackConf,
+        })
+      }
       setAnalysis(fallbackResult)
       const fallbackMsg: ChatMessage = {
         question: prompt,
         answer: fallbackResult.answer,
-        confidenceScore: fallbackResult.confidenceScore || 94,
+        confidence_percent: fallbackConf,
+        confidenceScore: fallbackConf,
         confidence: fallbackResult.confidence,
+        confidence_reason: fallbackResult.confidence_reason,
         detected_features: fallbackResult.detected_features || [],
         label: fallbackResult.label || 'Analysis',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        count_estimate: fallbackResult.count_estimate ?? null,
+        count_uncertainty_factors: fallbackResult.count_uncertainty_factors ?? [],
+        region: fallbackResult.region ?? null,
       }
       setHistory(prev => [...prev, fallbackMsg])
       setSuggestions(fallbackResult.suggested_followups?.length ? fallbackResult.suggested_followups : STARTER_SUGGESTIONS)
@@ -1307,98 +1527,57 @@ export default function App() {
                   {[1,2,3,4].map(i => <line key={`h${i}`} x1="0" y1={i * 68} x2="700" y2={i * 68} stroke={CYN} strokeOpacity="0.07" strokeWidth="0.5" />)}
                   {[1,2,3,4,5,6,7,8,9].map(i => <line key={`v${i}`} x1={i * 78} y1="0" x2={i * 78} y2="340" stroke={CYN} strokeOpacity="0.07" strokeWidth="0.5" />)}
                   
-                  {/* Default / Dynamic base layers according to uploaded image telemetry */}
-                  {imageTelemetry.terrain === 'water' ? (
+                  {/* Real API Response Region Marker — displayed ONLY after an inquiry returns real region data */}
+                  {activeRegion && (
                     <g className="transition-all duration-300">
-                      <rect x="70" y="50" width="220" height="130" fill="rgba(32,217,255,0.12)" stroke={CYN} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="74" y="44" fill={CYN} fontSize="8" fontFamily="JetBrains Mono">HYDRO-SURVEY ({imageTelemetry.waterPct} WATER)</text>
-                      <rect x="340" y="160" width="130" height="90" fill="none" stroke={MNT} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="342" y="154" fill={MNT} fontSize="8" fontFamily="JetBrains Mono">LITTORAL-BUFFER</text>
-                      <rect x="520" y="80" width="110" height="70" fill="none" stroke={ORG} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="522" y="74" fill={ORG} fontSize="8" fontFamily="JetBrains Mono">SHOAL-BOUNDARY</text>
-                    </g>
-                  ) : imageTelemetry.terrain === 'vegetation' ? (
-                    <g className="transition-all duration-300">
-                      <rect x="80" y="50" width="170" height="120" fill="rgba(53,224,184,0.12)" stroke={MNT} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="82" y="44" fill={MNT} fontSize="8" fontFamily="JetBrains Mono">CROP-CANOPY ({imageTelemetry.vegetationPct} VEG)</text>
-                      <rect x="310" y="130" width="140" height="80" fill="none" stroke={CYN} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="312" y="124" fill={CYN} fontSize="8" fontFamily="JetBrains Mono">PARCEL-DIVIDER</text>
-                      <rect x="490" y="180" width="120" height="75" fill="none" stroke={ORG} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="492" y="174" fill={ORG} fontSize="8" fontFamily="JetBrains Mono">TRACTOR-CORRIDOR</text>
-                    </g>
-                  ) : imageTelemetry.terrain === 'arid' ? (
-                    <g className="transition-all duration-300">
-                      <rect x="90" y="60" width="190" height="110" fill="rgba(255,159,67,0.12)" stroke={ORG} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="92" y="54" fill={ORG} fontSize="8" fontFamily="JetBrains Mono">ARID-ZONE ({imageTelemetry.landClassPct} MINERAL)</text>
-                      <rect x="320" y="150" width="130" height="70" fill="none" stroke={CYN} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="322" y="144" fill={CYN} fontSize="8" fontFamily="JetBrains Mono">THERMAL-ANOMALY</text>
-                      <rect x="480" y="80" width="120" height="60" fill="none" stroke={MNT} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="482" y="74" fill={MNT} fontSize="8" fontFamily="JetBrains Mono">SCRUB-VEG ({imageTelemetry.vegetationPct})</text>
-                    </g>
-                  ) : (
-                    <g className="transition-all duration-300">
-                      <rect x="80" y="60" width="110" height="80" fill="none" stroke={CYN} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="82" y="54" fill={CYN} fontSize="8" fontFamily="JetBrains Mono">URBAN-CLUSTER-A</text>
-                      <rect x="300" y="150" width="80" height="60" fill="none" stroke={ORG} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="302" y="144" fill={ORG} fontSize="8" fontFamily="JetBrains Mono">CHANGE-07</text>
-                      <rect x="500" y="200" width="95" height="70" fill="none" stroke={MNT} strokeWidth="1.5" strokeDasharray="4 2" />
-                      <text x="502" y="194" fill={MNT} fontSize="8" fontFamily="JetBrains Mono">VEG-COVER ({imageTelemetry.vegetationPct})</text>
+                      {/* Bounding box */}
+                      <rect
+                        x={(activeRegion.region.x_percent / 100) * 700}
+                        y={(activeRegion.region.y_percent / 100) * 340}
+                        width={(activeRegion.region.w_percent / 100) * 700}
+                        height={(activeRegion.region.h_percent / 100) * 340}
+                        fill="rgba(32,217,255,0.08)"
+                        stroke={CYN}
+                        strokeWidth="2"
+                        strokeDasharray="6 3"
+                        rx="3"
+                      />
+                      <circle
+                        cx={(activeRegion.region.x_percent / 100) * 700}
+                        cy={(activeRegion.region.y_percent / 100) * 340}
+                        r="3"
+                        fill={CYN}
+                      />
+                      <circle
+                        cx={((activeRegion.region.x_percent + activeRegion.region.w_percent) / 100) * 700}
+                        cy={((activeRegion.region.y_percent + activeRegion.region.h_percent) / 100) * 340}
+                        r="3"
+                        fill={CYN}
+                      />
+                      {/* Label badge */}
+                      <rect
+                        x={(activeRegion.region.x_percent / 100) * 700}
+                        y={Math.max(4, ((activeRegion.region.y_percent / 100) * 340) - 22)}
+                        width={Math.max(120, activeRegion.label.length * 7.5 + 26)}
+                        height="20"
+                        fill={`${PNL}F5`}
+                        stroke={CYN}
+                        strokeWidth="1"
+                        rx="4"
+                      />
+                      <text
+                        x={((activeRegion.region.x_percent / 100) * 700) + 8}
+                        y={Math.max(16, ((activeRegion.region.y_percent / 100) * 340) - 8)}
+                        fill={CYN}
+                        fontSize="8.5"
+                        fontWeight="bold"
+                        fontFamily="JetBrains Mono"
+                      >
+                        ● {activeRegion.label.toUpperCase()}
+                      </text>
                     </g>
                   )}
                   <text x="8" y="16" fill={GRY} fontSize="7.5" fontFamily="JetBrains Mono" fillOpacity="0.7">{imageTelemetry.locationTag}</text>
-
-                  {/* ─── DYNAMIC HIDDEN OVERLAYS ─── */}
-                  {/* 1. Drought Stress Layer */}
-                  {activeOverlay === 'drought' && (
-                    <g className="transition-all duration-300">
-                      <rect x="280" y="130" width="160" height="110" fill="rgba(255,159,67,0.22)" stroke={ORG} strokeWidth="2.5" strokeDasharray="6 3" />
-                      <line x1="270" y1="185" x2="450" y2="185" stroke={ORG} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.6" />
-                      <line x1="360" y1="120" x2="360" y2="250" stroke={ORG} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.6" />
-                      <rect x="280" y="108" width="220" height="18" fill={`${PNL}EE`} stroke={ORG} strokeWidth="1" rx="3" />
-                      <text x="286" y="121" fill={ORG} fontSize="8.5" fontWeight="bold" fontFamily="JetBrains Mono">● HIDDEN: DROUGHT ANOMALY (-38% SOIL MOISTURE)</text>
-                      <text x="286" y="150" fill="#FFE5D0" fontSize="7.5" fontFamily="JetBrains Mono">THERMAL FLUX: +3.4°C · CANOPY STRESS HIGH</text>
-                    </g>
-                  )}
-
-                  {/* 2. Harvest Readiness Layer */}
-                  {activeOverlay === 'harvest' && (
-                    <g className="transition-all duration-300">
-                      <rect x="460" y="60" width="165" height="120" fill="rgba(53,224,184,0.20)" stroke={MNT} strokeWidth="2.5" strokeDasharray="6 3" />
-                      <rect x="460" y="38" width="210" height="18" fill={`${PNL}EE`} stroke={MNT} strokeWidth="1" rx="3" />
-                      <text x="466" y="51" fill={MNT} fontSize="8.5" fontWeight="bold" fontFamily="JetBrains Mono">● HIDDEN: PARCEL-4B (88% HARVEST READY)</text>
-                      <text x="466" y="80" fill="#D0FFF2" fontSize="7.5" fontFamily="JetBrains Mono">SENESCENCE REFLECTANCE · CORRIDORS CLEAR</text>
-                    </g>
-                  )}
-
-                  {/* 3. Flood Inundation Buffer Layer */}
-                  {activeOverlay === 'flood' && (
-                    <g className="transition-all duration-300">
-                      <polygon points="190,185 330,170 450,210 560,280 280,310 160,250" fill="rgba(32,217,255,0.22)" stroke={CYN} strokeWidth="2.5" strokeDasharray="6 2" />
-                      <rect x="180" y="145" width="230" height="18" fill={`${PNL}EE`} stroke={CYN} strokeWidth="1" rx="3" />
-                      <text x="186" y="158" fill={CYN} fontSize="8.5" fontWeight="bold" fontFamily="JetBrains Mono">● HIDDEN: FLOOD BUFFER (140M CLEARANCE)</text>
-                      <text x="186" y="180" fill="#D8F6FF" fontSize="7.5" fontFamily="JetBrains Mono">CONTAINED WITHIN LEVEE · HYDRAULIC BUFFER SAFE</text>
-                    </g>
-                  )}
-
-                  {/* 4. Urban Density Layer */}
-                  {activeOverlay === 'urban' && (
-                    <g className="transition-all duration-300">
-                      <rect x="70" y="45" width="150" height="110" fill="rgba(32,217,255,0.18)" stroke={CYN} strokeWidth="2.5" strokeDasharray="5 3" />
-                      <rect x="70" y="24" width="220" height="18" fill={`${PNL}EE`} stroke={CYN} strokeWidth="1" rx="3" />
-                      <text x="76" y="37" fill={CYN} fontSize="8.5" fontWeight="bold" fontFamily="JetBrains Mono">● HIDDEN: URBAN CLUSTER (2,341 UNITS · 67%)</text>
-                      <text x="76" y="65" fill="#D8F6FF" fontSize="7.5" fontFamily="JetBrains Mono">METROPOLITAN GRID · ARTERIAL NETWORK CLEAR</text>
-                    </g>
-                  )}
-
-                  {/* 5. Roads & Transport Corridor Layer */}
-                  {activeOverlay === 'roads' && (
-                    <g className="transition-all duration-300">
-                      <line x1="50" y1="310" x2="650" y2="35" stroke={ORG} strokeWidth="3.5" strokeDasharray="10 5" />
-                      <rect x="190" y="140" width="230" height="18" fill={`${PNL}EE`} stroke={ORG} strokeWidth="1" rx="3" />
-                      <text x="196" y="153" fill={ORG} fontSize="8.5" fontWeight="bold" fontFamily="JetBrains Mono">● HIDDEN: CORRIDOR-L9 (CLEARWAY - 0% BLOCKED)</text>
-                      <text x="196" y="175" fill="#FFE5D0" fontSize="7.5" fontFamily="JetBrains Mono">EMERGENCY ARTERIAL · UNRESTRICTED ACCESS</text>
-                    </g>
-                  )}
                 </svg>
 
                 <div className="absolute bottom-4 left-4 flex flex-col gap-1 rounded-lg p-1" style={{ background: `${PNL}CC`, border: `1px solid ${CB}` }}>
@@ -1427,9 +1606,13 @@ export default function App() {
                         </div>
                       </div>
                       <div className="rounded-xl px-3.5 py-2.5 leading-relaxed space-y-1.5" style={{ background: PNL, border: `1px solid ${CB}`, color: WHT }}>
-                        <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: GRY }}>
-                          <span style={{ color: MNT }} className="font-semibold">● {m.confidenceScore ?? 96}% CONFIDENCE</span>
-                          <span>{m.timestamp ?? ''}</span>
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                          <ConfidenceBadge
+                            confidence={m.confidence}
+                            percent={m.confidence_percent ?? m.confidenceScore ?? (m.confidence === 'high' ? 95 : m.confidence === 'medium' ? 78 : 55)}
+                            reason={m.confidence_reason}
+                          />
+                          <span className="text-[10px]" style={{ color: GRY }}>{m.timestamp ?? ''}</span>
                         </div>
                         <div className="text-xs leading-relaxed text-slate-200">
                           {m.answer}
@@ -1464,9 +1647,11 @@ export default function App() {
                   {atCap && <div className="rounded-xl px-3 py-2 leading-relaxed font-medium" style={{ background: `rgba(255,159,67,0.10)`, border: `1px solid ${ORG}66`, color: ORG }}>⚠ You've reached the demo limit for this session — refresh to start a new session.</div>}
                   {analysis && !busy && (
                     <div className="flex gap-2 flex-wrap items-center pt-1">
-                      <span className="px-2 py-0.5 rounded font-mono text-[10px]" style={{ color: MNT, background: `${MNT}12`, border: `1px solid ${MNT}33` }}>
-                        ● {analysis.confidenceScore ?? 96}% CONFIDENCE ({analysis.confidence.toUpperCase()})
-                      </span>
+                      <ConfidenceBadge
+                        confidence={analysis.confidence}
+                        percent={analysis.confidence_percent ?? analysis.confidenceScore ?? (analysis.confidence === 'high' ? 95 : analysis.confidence === 'medium' ? 78 : 55)}
+                        reason={analysis.confidence_reason}
+                      />
                       {analysis.detected_features.map(f => (
                         <span key={f} className="px-2 py-0.5 rounded text-[10px]" style={{ color: GRY, background: `${WHT}08` }}>{f}</span>
                       ))}
@@ -1734,10 +1919,10 @@ export default function App() {
                   style={{ background: PNL, border: `1px solid ${MNT}50`, boxShadow: `0 0 24px ${MNT}14` }}
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span style={{ color: MNT }} className="font-semibold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: MNT }} />
-                      ● {temporalResult.confidenceScore}% CONFIDENCE
-                    </span>
+                    <ConfidenceBadge
+                      confidence={temporalResult.confidenceScore >= 85 ? 'high' : temporalResult.confidenceScore >= 60 ? 'medium' : 'low'}
+                      percent={temporalResult.confidenceScore}
+                    />
                     <span style={{ color: GRY }}>TEMPORAL CHANGE DETECTED</span>
                   </div>
                   <div className="text-xs leading-relaxed text-slate-100 font-medium">

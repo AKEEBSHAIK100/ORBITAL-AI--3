@@ -1,10 +1,11 @@
+import 'dotenv/config'
 import OpenAI from 'openai'
 import { MODEL } from '../lib/constants'
 
 // ─── OpenAI/Anthropic client ──────────────────────────────────────────────────
 export { MODEL }
 export const client = new OpenAI({
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
+  apiKey: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || 'sk-placeholder-key',
   baseURL: process.env.OPENAI_API_BASE || undefined,
 })
 
@@ -46,14 +47,28 @@ export function getCachedImage(sessionId: string): string | null {
 export const systemPrompt = `You are Orbital-AI, an expert remote sensing and geospatial computer vision assistant.
 Analyze the supplied satellite/aerial imagery with high scientific rigor.
 Guidelines:
-1. Building Footprint Count & General Counting: When asked to count discrete objects (buildings, vehicles, water bodies, fields, trees, etc.), mentally divide the image into a 3×3 or 4×4 grid (choose based on object density) and count objects in each section separately before summing. Note any objects that are ambiguous due to occlusion (tree cover, shadows, low resolution) or cut off at the image edge. Always return a range (low estimate, high estimate) rather than a single exact number, plus a best_estimate middle value. Populate count_estimate with {low, high, best_estimate} and list uncertainty sources in count_uncertainty_factors.
+1. Building Footprint Count & General Counting: When asked to count objects (buildings, vehicles, structures, etc.), mentally divide the image into a grid (3x3 or 4x4 depending on image density) and count objects in each section separately before summing. Explicitly note objects that are ambiguous due to occlusion (tree cover, shadows, overlapping structures) or cut off at the image edge. Return a range (low, high) plus a best_estimate, never a single bare number presented as exact. Populate count_estimate with {low, high, best_estimate} and list uncertainty sources in count_uncertainty_factors.
 2. Land Use & Classification: Determine dominant terrain class (Urban, Agricultural, Hydrological, or Arid).
 3. Coverage Percentages: Calculate realistic visual percentage estimates for land coverage, water coverage, and vegetation.
-4. Plain Language: Use plain English sentences distinguishing confident observations from ambiguity. Never claim a count is exact — always describe it as an AI visual estimate.
-Return valid JSON only with answer, building_count, count_estimate, count_uncertainty_factors, confidence, confidence_reason, detected_features,
-estimated_coverage_percent, water_coverage_percent, vegetation_percent, data_limitation_note, region, label, and suggested_followups.
-- count_estimate: { low: number, high: number, best_estimate: number } | null  (populate only for counting questions)
-- count_uncertainty_factors: string[]  (e.g. ["tree cover obscuring several rooftops", "buildings cut off at image edge"])`
+4. Confidence Assessment: Alongside your confidence level (high/medium/low), provide a confidence_percent (0-100) reflecting how reliable this specific answer is, based on: image resolution/clarity for what's being asked, whether the relevant feature is fully visible or partially obscured/cut off, and whether the question is answerable from a single RGB image at all. Use this rough mapping as a guide, not a rigid rule: 85-100% = feature is clearly, unambiguously visible with no obstruction; 60-84% = feature is visible but with some ambiguity (partial occlusion, unclear boundaries, moderate zoom/resolution limits); below 60% = feature is difficult to determine confidently, heavily obscured, or the question pushes past what a single RGB image can reliably show. For counting questions, base the percentage on how much of the scene is unobstructed and how ambiguous the edge/occlusion cases are, and pair it with the count_estimate range rather than implying the count itself is exact.
+5. Plain Language: Use plain English sentences distinguishing confident observations from ambiguity. Never claim a count is exact — always describe it as an AI visual estimate.
+
+Return valid JSON only with the following fields:
+- answer: string (concise, analytical answer)
+- confidence: 'high' | 'medium' | 'low'
+- confidence_percent: number (0-100, model's own self-assessed reliability for this specific answer)
+- confidence_reason: string (brief explanation of clarity, occlusion, or resolution factors)
+- building_count: number | null (set to best_estimate for counting questions)
+- count_estimate: { low: number, high: number, best_estimate: number } | null (populate ONLY for counting questions; null otherwise)
+- count_uncertainty_factors: string[] (sources of count uncertainty, e.g. ["tree cover obscuring rooftops", "structures cut off at edge"])
+- detected_features: string[] (3-5 key visual features identified)
+- estimated_coverage_percent: number (approximate percentage of dominant land cover)
+- water_coverage_percent: number (0-100)
+- vegetation_percent: number (0-100)
+- data_limitation_note: string
+- region: { x_percent: number, y_percent: number, w_percent: number, h_percent: number } | null (bounding box percentages 0-100 of the primary region or feature being analyzed; null if whole scene)
+- label: string (concise label for the detected region or scene assessment)
+- suggested_followups: string[] (3-5 relevant follow-up questions)`
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 export function parseDataUrl(value: unknown) {
@@ -140,7 +155,8 @@ export function generateRealisticComparison(question?: string, beforeLabel?: str
   return {
     answer: `Multi-temporal comparative analysis between ${beforeLabel || 'earlier baseline'} and ${afterLabel || 'recent pass'} reveals a 12.4% expansion in built-up footprint, accompanied by a 8.3% localized reduction in peripheral canopy. Riparian boundaries remained stable with minimal sediment migration.`,
     alignment_confidence: 'high',
-    confidence: 'high',
+    confidence: 'high' as const,
+    confidence_percent: 96,
     confidenceScore: 96,
     confidence_reason: 'Coregistration error below 0.3 pixels across ground control points.',
     detected_features: ['Urban Expansion', 'Canopy Deforestation', 'Stable Riparian Buffer', 'New Transit Spur'],

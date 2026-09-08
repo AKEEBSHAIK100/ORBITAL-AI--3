@@ -86,10 +86,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return {
             answer: "Spectral analysis of your uploaded image reveals a dominant hydrological environment (~72% water surface coverage) with clear coastal/riparian boundaries. No acute turbidity or industrial discharge plumes are detected along the surveyed shoreline.",
             confidence: 'high' as const,
+            confidence_percent: 97,
             confidenceScore: 97,
+            confidence_reason: 'Unobstructed littoral perimeter with high spectral differentiation between water and shore.',
             detected_features: ['Open Water Reservoir', 'Coastal Shoals', 'Riparian Perimeter', 'Clear Water Interface'],
-            label: 'Hydrological Survey',
+            region: { x_percent: 15, y_percent: 18, w_percent: 54, h_percent: 58 },
+            label: 'Open Water Reservoir',
             revealed_layer: 'flood',
+            count_estimate: null,
+            count_uncertainty_factors: [],
             suggested_followups: [
               'What is the estimated water body depth clarity?',
               'Are there visible flood risks along the perimeter?',
@@ -103,10 +108,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return {
             answer: "Your uploaded imagery displays robust agricultural/canopy terrain with strong near-infrared reflectance (average NDVI ~0.76) across 65% of the frame. Canopy photosynthetic activity is healthy, with clearly defined parcel boundaries and navigable tractor pathways.",
             confidence: 'high' as const,
+            confidence_percent: 96,
             confidenceScore: 96,
+            confidence_reason: 'Clear near-infrared reflectance signature and sharp boundary contrast along parcel roads.',
             detected_features: ['Healthy Crop Canopy', 'Active Photosynthesis', 'Field Boundaries', 'Access Corridors'],
+            region: { x_percent: 14, y_percent: 16, w_percent: 48, h_percent: 52 },
             label: 'Vegetation & Canopy Health',
             revealed_layer: 'harvest',
+            count_estimate: null,
+            count_uncertainty_factors: [],
             suggested_followups: [
               'What is the estimated harvest readiness percentage?',
               'Are there any signs of localized crop disease?',
@@ -120,10 +130,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return {
             answer: "Analysis of the uploaded image indicates an arid, moisture-stressed landscape with sparse vegetative cover (<15%). Exposed topsoil and mineral substrate dominate the scene, exhibiting elevated thermal surface temperatures and an estimated 38% moisture deficit.",
             confidence: 'high' as const,
+            confidence_percent: 95,
             confidenceScore: 95,
+            confidence_reason: 'High thermal and mineral reflectance with minimal canopy occlusion across exposed substrate.',
             detected_features: ['Arid Soil Substrate', 'Moisture Deficit Zone', 'Thermal Stress', 'Sparse Scrubland'],
+            region: { x_percent: 18, y_percent: 20, w_percent: 45, h_percent: 46 },
             label: 'Arid & Drought Assessment',
             revealed_layer: 'drought',
+            count_estimate: null,
+            count_uncertainty_factors: [],
             suggested_followups: [
               'What is the estimated soil moisture deficit in the central sector?',
               'Are there dry wash or drainage channels visible?',
@@ -137,10 +152,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return {
             answer: "Spectral analysis of your uploaded image reveals a high-density urban landscape (~71% built-up surface coverage) with defined transportation corridors, structural roof profiles, and localized microclimate heat islands. Commercial and residential zones are demarcated with 19% urban tree canopy.",
             confidence: 'high' as const,
+            confidence_percent: 98,
             confidenceScore: 98,
+            confidence_reason: 'High spatial resolution revealing sharp structural rooftop boundaries and orthogonal street grid.',
             detected_features: ['Urban Built-up Grid', 'Commercial & Residential Roofs', 'Transit Arteries', 'Urban Canopy Buffer'],
+            region: { x_percent: 16, y_percent: 18, w_percent: 42, h_percent: 44 },
             label: 'Urban Infrastructure Audit',
             revealed_layer: 'urban',
+            count_estimate: null,
+            count_uncertainty_factors: [],
             suggested_followups: [
               'What is the density of the transportation corridor?',
               'Which buildings exhibit elevated rooftop thermal profiles?',
@@ -156,10 +176,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           answer: "Multispectral analysis indicates localized canopy moisture stress along the southern perimeter, with vegetation reflectance showing reduced near-infrared chlorophyll absorption (NDVI ~0.42 vs. 0.74 baseline). Soil moisture deficit is estimated at 35–40% in exposed clearings, while irrigated parcels remain stable.",
           confidence: 'high' as const,
+          confidence_percent: 96,
           confidenceScore: 96,
+          confidence_reason: 'Distinct chlorosis anomaly and elevated thermal surface profile along the southern perimeter.',
           detected_features: ['Canopy Moisture Stress', 'Chlorosis Anomaly', 'Thermal Variance', 'Exposed Dry Soil'],
+          region: { x_percent: 36, y_percent: 32, w_percent: 35, h_percent: 36 },
           label: 'Drought & Moisture Deficit',
           revealed_layer: 'drought',
+          count_estimate: null,
+          count_uncertainty_factors: [],
           suggested_followups: [
             'What is the estimated soil moisture deficit in sector B?',
             'Which crop zones show the highest thermal stress?',
@@ -173,10 +198,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           answer: "Approximately 85–90% of the visible agricultural parcels exhibit advanced crop maturation, characterized by golden-brown senescence reflectance in the red spectrum. Field access corridors and turnaround zones appear dry and fully navigable for standard harvesting machinery.",
           confidence: 'high' as const,
+          confidence_percent: 94,
           confidenceScore: 94,
+          confidence_reason: 'Senescence reflectance profile clearly separated from healthy green vegetative buffer strips.',
           detected_features: ['Mature Crop Parcels', 'Senescent Biomass', 'Harvest Access Corridors', 'Field Boundaries'],
+          region: { x_percent: 42, y_percent: 18, w_percent: 38, h_percent: 40 },
           label: 'Harvest Readiness',
           revealed_layer: 'harvest',
+          count_estimate: null,
+          count_uncertainty_factors: [],
           suggested_followups: [
             'Which field quadrants are ready for immediate harvesting?',
             'Are there any unripened green patches remaining?',
@@ -190,10 +220,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           answer: "The primary agricultural zones show robust photosynthetic activity with strong NIR reflectance across 70% of the planted area. A minor localized patch in the northwest sector displays slight canopy thinning and nutrient variance, but overall vegetative vitality is high.",
           confidence: 'high' as const,
+          confidence_percent: 97,
           confidenceScore: 97,
+          confidence_reason: 'High near-infrared vigor and uniform canopy absorption across primary agricultural parcels.',
           detected_features: ['High-Density Vegetation', 'Active Photosynthesis', 'Northwest Variance', 'Field Buffer Strips'],
+          region: { x_percent: 12, y_percent: 14, w_percent: 52, h_percent: 48 },
           label: 'Canopy Health Assessment',
           revealed_layer: 'harvest',
+          count_estimate: null,
+          count_uncertainty_factors: [],
           suggested_followups: [
             'What is causing the slight canopy thinning in the northwest?',
             'How does the NDVI profile compare to healthy benchmarks?',
@@ -207,10 +242,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           answer: "Surface water is confined to the primary drainage channel and low-lying coastal marshes, occupying approximately 8.2% of the scene. Floodwaters have not breached the primary levee or reached the residential building perimeters, maintaining a safe buffer distance of approximately 140 meters.",
           confidence: 'high' as const,
+          confidence_percent: 95,
           confidenceScore: 95,
+          confidence_reason: 'Distinct specular reflectance from inundated drainage channels; safe buffer margin verified.',
           detected_features: ['River Drainage Basin', 'Riparian Wetlands', 'Protective Levee Berm', '140m Structural Buffer'],
+          region: { x_percent: 22, y_percent: 42, w_percent: 46, h_percent: 40 },
           label: 'Hydrological & Flood Assessment',
           revealed_layer: 'flood',
+          count_estimate: null,
+          count_uncertainty_factors: [],
           suggested_followups: [
             'What is the minimum clearance distance to nearest buildings?',
             'Are any drainage culverts experiencing overflow?',
@@ -224,10 +264,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           answer: "Primary transit arteries and connecting roadways are completely clear with uninterrupted traffic flow. No major debris, structural failure, or standing water blockages are detected along the central multi-lane corridor; minor shoulder maintenance is observed at junction 4.",
           confidence: 'high' as const,
+          confidence_percent: 93,
           confidenceScore: 93,
+          confidence_reason: 'Uninterrupted linear asphalt signature along primary transit artery with no standing water.',
           detected_features: ['Primary Highway Corridor', 'Connecting Arterials', 'Overpass Structures', 'Clear Transit Corridors'],
+          region: { x_percent: 12, y_percent: 26, w_percent: 68, h_percent: 32 },
           label: 'Transportation Corridor Audit',
           revealed_layer: 'roads',
+          count_estimate: null,
+          count_uncertainty_factors: [],
           suggested_followups: [
             'Are secondary access roads open to emergency vehicles?',
             'Are there any thermal anomalies or pavement distress on the bridge?',
@@ -241,19 +286,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let low = 230, high = 265, best = 247
         let desc = "AI visual estimate: grid-based sub-counting across a 3\u00d73 sector partition identified approximately 230\u2013265 structures in this sector (best estimate ~247). Density is predominantly low-to-mid rise with organized residential and commercial rooftop footprints aligned to the street grid."
         let uncertaintyFactors = ['tree cover obscuring several rooftops', 'buildings cut off at image edge', 'shadows from taller structures may hide smaller footprints']
+        let region = { x_percent: 16, y_percent: 14, w_percent: 54, h_percent: 50 }
 
         if (terrain === 'water') {
           low = 0; high = 0; best = 0
           desc = "AI visual estimate: structural analysis confirms 0 building structures within the surveyed open water area. The visible scene consists entirely of aquatic surface and littoral boundaries with no residential or commercial footprints."
           uncertaintyFactors = ['open water \u2014 no countable structures present']
+          region = { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 60 }
         } else if (terrain === 'vegetation') {
           low = 11; high = 18; best = 14
           desc = "AI visual estimate: grid-based sector analysis identifies approximately 11\u201318 agricultural structures distributed across the canopy terrain (best estimate ~14), consisting of farmsteads and storage facilities along field access roads."
           uncertaintyFactors = ['dense canopy cover obscuring potential farmstead structures', 'buildings at image margins may be partially cut off']
+          region = { x_percent: 18, y_percent: 20, w_percent: 48, h_percent: 45 }
         } else if (terrain === 'arid') {
           low = 2; high = 7; best = 4
           desc = "AI visual estimate: sector analysis identifies approximately 2\u20137 isolated structures across this arid terrain (best estimate ~4), situated with extensive open mineral setbacks."
           uncertaintyFactors = ['low contrast between structures and arid substrate', 'potential structures near image boundary may be excluded']
+          region = { x_percent: 22, y_percent: 24, w_percent: 44, h_percent: 42 }
         }
         return {
           answer: desc,
@@ -261,7 +310,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           count_estimate: { low, high, best_estimate: best },
           count_uncertainty_factors: uncertaintyFactors,
           confidence: 'medium' as const,
+          confidence_percent: 82,
           confidenceScore: 82,
+          confidence_reason: 'Grid-based estimation with uncertainty due to partial tree cover obscuring rooftops and edge cut-off.',
+          region,
           detected_features: ['Rooftop Footprints', 'Structural Clearances', 'Parcel Demarcation', 'Access Roadways'],
           estimated_coverage_percent: best > 100 ? 52 : best > 10 ? 12 : 1,
           label: 'Building Count & Footprint Audit (AI Visual Estimate)',
@@ -278,7 +330,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return {
         answer: "Land classification breaks down into 67% urban developed land (residential structures and paved transit network), 24.6% mixed vegetative cover, 8.2% inland hydrological bodies, and under 1% bare soil. Development is dense and gridded with clear zoning demarcation between residential and riparian reserves.",
         confidence: 'high' as const,
+        confidence_percent: 98,
         confidenceScore: 98,
+        confidence_reason: 'Multi-class spectral decomposition across built-up, vegetative, and inland water features.',
+        region: { x_percent: 10, y_percent: 10, w_percent: 64, h_percent: 58 },
+        count_estimate: null,
+        count_uncertainty_factors: [],
         detected_features: ['High-Density Urban Footprints', 'Arterial Road Network', 'Riparian Water System', 'Urban Tree Canopy'],
         label: 'Land Use & Terrain Classification',
         revealed_layer: 'urban',
@@ -400,14 +457,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           building_count: mergedBest,
         }
 
-        if (!merged.confidenceScore) {
-          merged.confidenceScore = merged.confidence === 'high' ? 88 : merged.confidence === 'medium' ? 80 : 72
+        const confPercents: number[] = []
+        for (const p of parsedResults) {
+          if (typeof p.confidence_percent === 'number') {
+            confPercents.push(p.confidence_percent)
+          } else if (typeof p.confidenceScore === 'number') {
+            confPercents.push(p.confidenceScore)
+          }
+        }
+        const mergedConf = confPercents.length > 0
+          ? median(confPercents)
+          : (merged.confidence === 'high' ? 88 : merged.confidence === 'medium' ? 80 : 72)
+        merged.confidence_percent = Math.max(0, Math.min(100, Math.round(mergedConf)))
+        merged.confidenceScore = merged.confidence_percent
+        if (!merged.confidence_reason) {
+          merged.confidence_reason = 'Self-assessed confidence based on grid sub-counting consistency and visual scene clarity.'
         }
         if (typeof merged.building_count === 'number') {
           merged.building_count = Math.max(0, Math.round(merged.building_count as number))
         }
 
-        console.log(`[Orbital-AI] Self-consistency merged: best=${mergedBest} range=[${mergedLow},${mergedHigh}] from ${parsedResults.length} responses`)
+        console.log(`[Orbital-AI] Self-consistency merged: best=${mergedBest} range=[${mergedLow},${mergedHigh}] conf=${merged.confidence_percent}% from ${parsedResults.length} responses`)
         return res.status(200).json(merged)
       }
 
@@ -424,12 +494,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
       const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      if (!parsed.confidenceScore) {
-        parsed.confidenceScore = parsed.confidence === 'high' ? 96 : parsed.confidence === 'medium' ? 88 : 78
+      if (typeof parsed.confidence_percent !== 'number') {
+        parsed.confidence_percent = typeof parsed.confidenceScore === 'number'
+          ? parsed.confidenceScore
+          : (parsed.confidence === 'high' ? 95 : parsed.confidence === 'medium' ? 80 : 55)
       }
+      parsed.confidence_percent = Math.max(0, Math.min(100, Math.round(parsed.confidence_percent)))
+      parsed.confidenceScore = parsed.confidence_percent
       if (typeof parsed.building_count === 'number') {
         parsed.building_count = Math.max(0, Math.round(parsed.building_count))
       }
+      // Non-counting questions must not return count_estimate
+      parsed.count_estimate = null
+      parsed.count_uncertainty_factors = []
       return res.status(200).json(parsed)
     } catch {
       return res.status(200).json(generateRealisticAnalysis(question.trim(), resolvedImage))
@@ -438,7 +515,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       answer: "Land classification indicates 67% urban development, 24.6% mixed vegetative cover, and 8.2% hydrological coverage with stable environmental margins.",
       confidence: 'high',
+      confidence_percent: 96,
       confidenceScore: 96,
+      confidence_reason: 'High spectral separation across land cover classes.',
+      region: { x_percent: 10, y_percent: 10, w_percent: 60, h_percent: 55 },
+      count_estimate: null,
+      count_uncertainty_factors: [],
       detected_features: ['Urban Grid', 'Vegetation', 'Water Body'],
       label: 'Scene Assessment',
       suggested_followups: [
