@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Globe from './components/Globe'
 import { SESSION_CALL_LIMIT } from './lib/constants'
 import { DEFAULT_BUILDING_ANALYSIS } from './data/defaultDetections'
+import { detectBuildingsFromImage } from './utils/buildingVisionDetector'
 
 const CYN = '#20D9FF'
 const ORG = '#FF9F43'
@@ -881,16 +882,29 @@ export default function App() {
               data = parsed as BuildingAnalysisResult
               break
             }
+          } else if (res.status === 202) {
+            // Vercel serverless: custom image requires client-side CV analysis
+            const signal = await res.json().catch(() => null)
+            if (signal?.custom_analysis_required) {
+              setStatus('Running client-side building detection…')
+              const imageSource = fileToSend ? imagePreview! : imagePreview!
+              data = await detectBuildingsFromImage(imageSource, isDefaultScene)
+              break
+            }
           }
         } catch {
           // Try next endpoint
         }
       }
 
-      // If backend network endpoints are unavailable (e.g. on Vercel deployment), use calibrated deep-learning model analysis
+      // If all network endpoints are unavailable, run client-side CV or use precomputed defaults
       if (!data) {
         if (isDefaultScene) {
           data = DEFAULT_BUILDING_ANALYSIS
+        } else if (imagePreview) {
+          // Run client-side canvas-based structural detection on the uploaded image
+          setStatus('Running client-side building detection…')
+          data = await detectBuildingsFromImage(imagePreview, false)
         } else {
           data = {
             ...DEFAULT_BUILDING_ANALYSIS,

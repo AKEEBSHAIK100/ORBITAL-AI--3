@@ -93,9 +93,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isCustom = Boolean(body.image && !body.image.includes('photo-1472146936668-d987bf0a6e38'))
 
     if (isCustom) {
-      return res.status(200).json({
-        ...defaultDetections,
-        validation_status: 'Deep-learning segmentation verified (ground truth comparison optional)',
+      // Signal client to run dynamic computer vision detector on custom image
+      return res.status(202).json({
+        custom_analysis_required: true,
+        message: 'Compute custom building detection on client canvas',
       })
     }
 
