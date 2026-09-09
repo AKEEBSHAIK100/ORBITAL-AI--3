@@ -119,6 +119,7 @@ export interface BuildingAnalysisResult {
   confidence_level: 'High' | 'Medium' | 'Low'
   validation_status: string
   detections: BuildingDetection[]
+  image_dimensions?: { width: number; height: number }
 }
 
 export const DEFAULT_TELEMETRY: ImageTelemetry = {
