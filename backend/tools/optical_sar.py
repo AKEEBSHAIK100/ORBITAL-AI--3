@@ -23,8 +23,8 @@ class OpticalSARTool(BaseTool):
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         t0 = time.time()
-        optical_bgr = inputs.get("optical_image") or inputs.get("image")
-        sar_bgr = inputs.get("sar_image") or inputs.get("secondary_image")
+        optical_bgr = inputs.get("optical_image") if inputs.get("optical_image") is not None else inputs.get("image")
+        sar_bgr = inputs.get("sar_image") if inputs.get("sar_image") is not None else inputs.get("secondary_image")
 
         if optical_bgr is None or not isinstance(optical_bgr, np.ndarray):
             return {"error": "Missing optical image for optical-SAR fusion", "status": "error"}

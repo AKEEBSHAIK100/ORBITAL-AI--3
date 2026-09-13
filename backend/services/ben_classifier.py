@@ -146,13 +146,18 @@ class BENClassifier:
                     configilm.metrics = metrics
 
                 import inspect
-                from configilm.ConfigILM import ILMConfiguration
+                from configilm.ConfigILM import ILMConfiguration, ILMType
                 orig_ilm_init = ILMConfiguration.__init__
                 def patched_ilm_init(self, *args, **kwargs):
                     if '_fusion_activation' in kwargs and 'fusion_activation' not in kwargs:
                         kwargs.pop('_fusion_activation')
                     if '_fusion_method' in kwargs and 'fusion_method' not in kwargs:
                         kwargs.pop('_fusion_method')
+                    if not args and 'timm_model_name' not in kwargs:
+                        kwargs['timm_model_name'] = kwargs.get('model_name', 'resnet50')
+                    kwargs.setdefault('classes', 19)
+                    kwargs.setdefault('channels', 10)
+                    kwargs.setdefault('network_type', ILMType.IMAGE_CLASSIFICATION)
                     valid_params = set(inspect.signature(orig_ilm_init).parameters.keys()) - {'self'}
                     filtered = {k: v for k, v in kwargs.items() if k in valid_params}
                     return orig_ilm_init(self, *args, **filtered)
