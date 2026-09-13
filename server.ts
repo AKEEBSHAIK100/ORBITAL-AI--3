@@ -525,13 +525,37 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Please wait a minute before asking again.' })
     }
 
-    const { image, question, history, sessionId } = req.body as {
-      image?: string; question?: string; history?: unknown; sessionId?: string
+    const { image, question, query, history, sessionId } = req.body as {
+      image?: string; question?: string; query?: string; history?: unknown; sessionId?: string
     }
 
-    if (!question?.trim()) return res.status(400).json({ error: 'A question is required.' })
+    const rawPrompt = (query || question || '').trim()
+    if (!rawPrompt) return res.status(400).json({ error: 'A question is required.' })
 
-    const promptText = question.trim()
+    const promptText = rawPrompt
+
+    // Try FastAPI master analysis first if Python backend is active
+    try {
+      const pyBase = process.env.PYTHON_BACKEND_URL?.replace(/\/api\/analyze.*$/, '') ?? 'http://127.0.0.1:8000'
+      const pyRes = await fetch(`${pyBase}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: promptText,
+          image: image || undefined,
+          task_type: (req.body as Record<string, unknown>).task_type,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (pyRes.ok) {
+        const pyData = await pyRes.json()
+        if (pyData && (pyData.answer || pyData.building_analysis)) {
+          return res.json(pyData)
+        }
+      }
+    } catch {
+      // Python backend offline or timeout — fall back to Node/OpenAI engine
+    }
 
     // 1. Task classification step
     const step1Start = Date.now()

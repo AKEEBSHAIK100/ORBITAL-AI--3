@@ -71,16 +71,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const traceSteps: ExecutionTraceStep[] = []
 
   try {
-    const { image, question, history, sessionId } = req.body as {
+    const { image, question, query, history, sessionId } = req.body as {
       image?: string
       question?: string
+      query?: string
       history?: unknown
       sessionId?: string
     }
 
-    if (!question?.trim()) return res.status(400).json({ error: 'A question is required.' })
+    const rawPrompt = (query || question || '').trim()
+    if (!rawPrompt) return res.status(400).json({ error: 'A question is required.' })
 
-    const promptText = question.trim()
+    const promptText = rawPrompt
 
     // Step 1: Deterministic task classification
     const step1Start = Date.now()

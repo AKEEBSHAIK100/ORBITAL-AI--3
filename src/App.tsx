@@ -1247,6 +1247,7 @@ export default function App() {
           const task_type = isBuildingQuery ? 'building_segmentation' : 'vqa'
           const body: Record<string, unknown> = {
             query: prompt,
+            question: prompt,
             task_type,
             image: imagePreview || undefined,
             history: history.map(h => ({ question: h.question, answer: h.answer })),
