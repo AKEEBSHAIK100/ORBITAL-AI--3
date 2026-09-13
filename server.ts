@@ -697,29 +697,85 @@ function generateRealisticComparison(question?: string, beforeLabel?: string, af
   }
 }
 
-app.all(['/analyze/buildings', '/api/analyze/buildings', '/api/buildings'], async (req, res) => {
+// ── Python FastAPI generic proxy helper ────────────────────────────────────────
+async function proxyToPython(
+  req: express.Request,
+  res: express.Response,
+  pythonPath: string,
+  fallbackFn?: () => void
+): Promise<void> {
+  const base = process.env.PYTHON_BACKEND_URL?.replace(/\/api\/analyze.*$/, '') ?? 'http://127.0.0.1:8000'
+  const targetUrl = `${base}${pythonPath}`
   try {
-    const targetUrl = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000/analyze/buildings'
-    const isJson = req.headers['content-type']?.includes('application/json')
     const response = await fetch(targetUrl, {
       method: req.method,
-      headers: { 'Content-Type': req.headers['content-type'] || 'application/json' },
-      body: req.method === 'POST' ? (isJson ? JSON.stringify(req.body) : req.body) : undefined,
+      headers: { 'Content-Type': 'application/json' },
+      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(60_000),
     })
     const data = await response.json()
-    return res.status(response.status).json(data)
-  } catch (err) {
-    console.log('[Orbital-AI] Python backend not reachable, using deep-learning fallback dataset')
+    res.status(response.status).json(data)
+  } catch {
+    console.warn(`[Orbital-AI] Python backend not reachable at ${targetUrl}`)
+    if (fallbackFn) fallbackFn()
+    else res.status(502).json({ error: 'Python backend unavailable.' })
+  }
+}
+
+app.all(['/analyze/buildings', '/api/analyze/buildings', '/api/buildings'], async (req, res) => {
+  await proxyToPython(req, res, '/api/analyze/buildings', () => {
     try {
       const p = path.join(__dirname, 'backend', 'data', 'default_detections.json')
       if (fs.existsSync(p)) {
-        return res.json(JSON.parse(fs.readFileSync(p, 'utf8')))
+        res.json(JSON.parse(fs.readFileSync(p, 'utf8')))
+        return
       }
-    } catch {
-      // pass
+    } catch { /* pass */ }
+    res.status(502).json({ error: 'Building detection service unavailable.' })
+  })
+})
+
+// New unified analysis sub-endpoints — proxy to FastAPI first
+app.post(['/api/analyze/vqa'], async (req, res) => {
+  await proxyToPython(req, res, '/api/analyze/vqa')
+})
+app.post(['/api/analyze/grounding'], async (req, res) => {
+  await proxyToPython(req, res, '/api/analyze/grounding')
+})
+app.post(['/api/analyze/change', '/api/compare/change'], async (req, res) => {
+  // Transform /api/compare shape to /api/analyze schema if needed
+  const body = req.body as Record<string, unknown>
+  if (body.beforeImage || body.afterImage) {
+    req.body = {
+      query: body.question || 'What changed between these two satellite passes?',
+      image: body.beforeImage,
+      secondary_image: body.afterImage,
+      task_type: 'change_detection',
+      modality: 'optical',
+      secondary_modality: 'optical',
     }
-    return res.status(502).json({ error: 'Building detection service unavailable.' })
   }
+  await proxyToPython(req, res, '/api/analyze/change')
+})
+app.post(['/api/analyze/optical-sar', '/api/fuse/direct'], async (req, res) => {
+  const body = req.body as Record<string, unknown>
+  if (body.opticalImage || body.sarImage) {
+    req.body = {
+      query: body.question || 'Identify built-up and water-covered regions using joint optical and SAR data',
+      image: body.opticalImage,
+      secondary_image: body.sarImage,
+      task_type: 'sar_optical_fusion',
+      modality: 'optical',
+      secondary_modality: 'sar',
+    }
+  }
+  await proxyToPython(req, res, '/api/analyze/optical-sar')
+})
+app.get(['/api/tools'], async (req, res) => {
+  await proxyToPython(req, res, '/api/tools')
+})
+app.get(['/api/models'], async (req, res) => {
+  await proxyToPython(req, res, '/api/models')
 })
 
 function computeSimulatedFusionFeatures(opticalBase64?: string, sarBase64?: string): FusionFeatures {

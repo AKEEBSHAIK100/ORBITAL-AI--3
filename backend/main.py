@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import building_analysis, fusion
+from .routers import building_analysis, fusion, analyze
 from .routers.classify import router as classify_router
 from .services.building_detector import BuildingDetector
 from .services.ben_classifier import BENClassifier
@@ -47,6 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(analyze.router)
 app.include_router(building_analysis.router)
 app.include_router(fusion.router)
 app.include_router(classify_router)

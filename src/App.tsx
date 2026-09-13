@@ -931,6 +931,50 @@ function HeroSection({
 }
 
 // ── Workspace / Analyze Panel ─────────────────────────────────────────────────
+// ── Response Normalizer ────────────────────────────────────────────────────────
+// Adapts the FastAPI unified response schema to the frontend's Analysis type
+function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: string): Analysis {
+  const conf = typeof payload.confidence === 'number' ? payload.confidence : 0.85
+  const confPct = Math.round(conf * 100)
+  const taskType = payload.task_type || 'vqa'
+
+  let label = 'Analysis'
+  if (taskType === 'building_segmentation' || payload.building_analysis) label = 'Building Footprint Audit'
+  else if (taskType === 'change_detection') label = 'Bi-Temporal Change Detection'
+  else if (taskType === 'sar_optical_fusion') label = 'Optical–SAR Fusion'
+  else if (taskType === 'grounding') label = 'Visual Grounding'
+
+  let region = undefined
+  if (payload.grounding?.bounding_box_percent) {
+    const [x, y, w, h] = payload.grounding.bounding_box_percent
+    region = { x_percent: x, y_percent: y, w_percent: w, h_percent: h }
+  }
+
+  const detected_features: string[] = []
+  if (payload.building_analysis?.building_count) {
+    detected_features.push(payload.building_analysis.building_count + ' Footprints')
+  }
+  if (payload.classification?.top_label) {
+    detected_features.push(payload.classification.top_label)
+  }
+  if (payload.metrics?.iou) {
+    detected_features.push('IoU: ' + (payload.metrics.iou * 100).toFixed(1) + '%')
+  }
+
+  return {
+    answer: payload.answer || 'Analysis complete.',
+    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
+    confidence_percent: confPct,
+    confidenceScore: confPct,
+    confidence_reason: payload.reasoning || ('Model pipeline inference with ' + confPct + '% confidence.'),
+    detected_features: detected_features.length > 0 ? detected_features : [label],
+    label,
+    suggested_followups: payload.suggested_followups || ['Analyze surrounding terrain', 'Assess water-body proximity', 'Audit vegetation density'],
+    execution_trace: payload.execution_trace || null,
+    region,
+  }
+}
+
 export default function App() {
   // ── State ─────────────────────────────────────────────────────────────────
   const [scrolled, setScrolled] = useState(false)
@@ -1200,16 +1244,31 @@ export default function App() {
         result = demoAnalyze(prompt, imagePreview)
       } else {
         try {
-          const body: Record<string, unknown> = { question: prompt, history, sessionId }
-          if (imagePreview) body.image = imagePreview
+          const task_type = isBuildingQuery ? 'building_segmentation' : 'vqa'
+          const body: Record<string, unknown> = {
+            query: prompt,
+            task_type,
+            image: imagePreview || undefined,
+            history: history.map(h => ({ question: h.question, answer: h.answer })),
+            sessionId,
+          }
           const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
           })
           const payload = await res.json().catch(() => ({}))
-          if (res.ok && payload.answer) {
-            result = payload as Analysis
-            if (payload.execution_trace) { result.execution_trace = payload.execution_trace; setActiveTrace(payload.execution_trace) }
-            if (payload.revealed_layer) { setActiveOverlay(payload.revealed_layer); setRevealedLayers(prev => Array.from(new Set([...prev, payload.revealed_layer]))) }
+          if (res.ok && (payload.answer || payload.building_analysis)) {
+            result = normalizeAnalyzeResponse(payload, prompt)
+            if (payload.building_analysis) {
+              setBuildingAnalysis(payload.building_analysis)
+            }
+            if (payload.execution_trace) {
+              result.execution_trace = payload.execution_trace
+              setActiveTrace(payload.execution_trace)
+            }
+            if (payload.revealed_layer) {
+              setActiveOverlay(payload.revealed_layer)
+              setRevealedLayers(prev => Array.from(new Set([...prev, payload.revealed_layer])))
+            }
           } else result = demoAnalyze(prompt, imagePreview)
         } catch { result = demoAnalyze(prompt, imagePreview) }
       }
@@ -1267,16 +1326,37 @@ export default function App() {
     let features = ['Vegetation shift', 'Built-up expansion', 'Riparian boundary', 'Coregistered baseline']
     let traceData: ExecutionTrace | null = null
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/compare`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze/change`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ beforeImage: beforeImage || undefined, afterImage: afterImage || undefined, question: queryPrompt, beforeLabel: beforeImage ? 'Uploaded Earlier' : '2024 Baseline', afterLabel: afterImage ? 'Uploaded Later' : '2026 Pass' }),
+        body: JSON.stringify({
+          query: queryPrompt,
+          image: beforeImage || undefined,
+          secondary_image: afterImage || undefined,
+          task_type: 'change_detection',
+          modality: 'optical',
+          secondary_modality: 'optical',
+        }),
       })
       if (res.ok) {
         const data = await res.json()
         if (data.answer) {
-          compAnswer = data.answer; confScore = data.confidenceScore ?? 96
+          compAnswer = data.answer
+          confScore = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (data.confidenceScore ?? 96)
           if (data.detected_features?.length) features = data.detected_features
           if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
+        }
+      } else {
+        const legacyRes = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/compare`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beforeImage: beforeImage || undefined, afterImage: afterImage || undefined, question: queryPrompt, beforeLabel: beforeImage ? 'Uploaded Earlier' : '2024 Baseline', afterLabel: afterImage ? 'Uploaded Later' : '2026 Pass' }),
+        })
+        if (legacyRes.ok) {
+          const data = await legacyRes.json()
+          if (data.answer) {
+            compAnswer = data.answer; confScore = data.confidenceScore ?? 96
+            if (data.detected_features?.length) features = data.detected_features
+            if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
+          }
         }
       }
     } catch { /* fallback */ }
@@ -1302,25 +1382,53 @@ export default function App() {
     setBusy(true); setError('')
     setStatus('Running optical–SAR fusion…')
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/fuse`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze/optical-sar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opticalImage: opticalDataUrl, sarImage: sarDataUrl, question: fusionQuery }),
+        body: JSON.stringify({
+          query: fusionQuery,
+          image: opticalDataUrl,
+          secondary_image: sarDataUrl,
+          task_type: 'sar_optical_fusion',
+          modality: 'optical',
+          secondary_modality: 'sar',
+        }),
       })
       const data = await res.json()
       if (res.ok && data.answer) {
         if (data.fusion_features) setFusionFeatures(data.fusion_features)
         if (data.execution_trace) { setLastFusionTrace(data.execution_trace); setActiveTrace(data.execution_trace) }
-        const confVal = typeof data.confidence_percent === 'number' ? data.confidence_percent : 94
+        const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : 94)
         setHistory(prev => [...prev, {
           question: fusionQuery, answer: data.answer, confidence_percent: confVal, confidenceScore: confVal,
-          confidence: data.confidence || 'high', confidence_reason: data.confidence_reason,
-          detected_features: data.detected_features || [], label: data.label || 'Optical–SAR Fusion',
+          confidence: data.confidence_level ? data.confidence_level.toLowerCase() : (data.confidence || 'high'),
+          confidence_reason: data.reasoning || data.confidence_reason,
+          detected_features: data.detected_features || ['Optical–SAR Joint Fusion'], label: 'Optical–SAR Fusion',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           execution_trace: data.execution_trace ?? null, fusion_features: data.fusion_features ?? null,
         }])
-        setAnalysis(data as Analysis); setStatus('Fusion complete')
+        setAnalysis(normalizeAnalyzeResponse(data, fusionQuery)); setStatus('Fusion complete')
         addToast('Optical–SAR fusion complete', 'success')
-      } else throw new Error(data.error || 'Fusion failed')
+      } else {
+        const legacyRes = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/fuse`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opticalImage: opticalDataUrl, sarImage: sarDataUrl, question: fusionQuery }),
+        })
+        const legacyData = await legacyRes.json()
+        if (legacyRes.ok && legacyData.answer) {
+          if (legacyData.fusion_features) setFusionFeatures(legacyData.fusion_features)
+          if (legacyData.execution_trace) { setLastFusionTrace(legacyData.execution_trace); setActiveTrace(legacyData.execution_trace) }
+          const confVal = typeof legacyData.confidence_percent === 'number' ? legacyData.confidence_percent : 94
+          setHistory(prev => [...prev, {
+            question: fusionQuery, answer: legacyData.answer, confidence_percent: confVal, confidenceScore: confVal,
+            confidence: legacyData.confidence || 'high', confidence_reason: legacyData.confidence_reason,
+            detected_features: legacyData.detected_features || [], label: legacyData.label || 'Optical–SAR Fusion',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            execution_trace: legacyData.execution_trace ?? null, fusion_features: legacyData.fusion_features ?? null,
+          }])
+          setAnalysis(legacyData as Analysis); setStatus('Fusion complete')
+          addToast('Optical–SAR fusion complete', 'success')
+        } else throw new Error(legacyData.error || 'Fusion failed')
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fusion error'
       setError(msg); setStatus('Fusion error'); addToast(msg, 'error')
@@ -1343,6 +1451,114 @@ export default function App() {
     a.href = url; a.download = `satquery_report_${Date.now()}.json`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
     addToast('Report exported as JSON', 'success')
+  }
+
+  // ── Download GeoJSON building footprints ────────────────────────────────
+  const downloadGeoJSON = () => {
+    if (!buildingAnalysis?.detections?.length) {
+      addToast('Run building footprint detection first', 'warning')
+      return
+    }
+    const dims = buildingAnalysis.image_dimensions ?? { width: 1000, height: 1000 }
+    const features = buildingAnalysis.detections.map(d => ({
+      type: 'Feature' as const,
+      properties: {
+        id: d.id,
+        confidence: d.confidence,
+        confidence_tier: d.confidence_tier,
+        area_px: d.area,
+        is_partial: d.is_partial,
+        centroid_x_pct: d.centroid_pct?.[0],
+        centroid_y_pct: d.centroid_pct?.[1],
+      },
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [[
+          ...d.polygon_pct.map(([xp, yp]) => [
+            parseFloat(((xp / 100) * dims.width).toFixed(2)),
+            parseFloat(((yp / 100) * dims.height).toFixed(2)),
+          ]),
+        ]],
+      },
+    }))
+    const geojson = {
+      type: 'FeatureCollection',
+      metadata: {
+        generator: 'SatQuery AI — Building Footprint Extractor',
+        version: '3.0.0',
+        exported_at: new Date().toISOString(),
+        total_buildings: buildingAnalysis.building_count,
+        high_confidence: buildingAnalysis.high_confidence_count,
+        medium_confidence: buildingAnalysis.medium_confidence_count,
+        confidence_level: buildingAnalysis.confidence_level,
+      },
+      features,
+    }
+    const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/geo+json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `satquery_buildings_${Date.now()}.geojson`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+    addToast(`GeoJSON exported (${buildingAnalysis.building_count} footprints)`, 'success')
+  }
+
+  // ── Download Markdown analysis report ──────────────────────────────────
+  const downloadMarkdownReport = () => {
+    const ts = new Date().toISOString()
+    const trace = activeTrace || lastFusionTrace
+    const lines: string[] = [
+      '# SatQuery AI — Remote Sensing Mission Analysis Report',
+      `**Generated:** ${ts} · **Version:** SatQuery-Agent-v3.0`,
+      '---',
+      '## 1. Session Overview',
+      `- **Active Mode:** \`${appMode}\``,
+      `- **Session ID:** \`${sessionId ?? 'demo'}\``,
+      `- **Terrain Classification:** ${imageTelemetry.landClass} (${imageTelemetry.landClassPct})`,
+      '',
+      '## 2. BigEarthNet v2.0 Land-Cover Classification',
+    ]
+    if (benResults) {
+      lines.push(`- **Top Label:** ${benResults.top_label}`)
+      lines.push(`- **Model:** \`${benResults.model_id}\``)
+      lines.push(`- **Active Labels:** ${benResults.active_labels?.map(l => l.name).join(', ')}`)
+    } else { lines.push('- *Not yet run*') }
+    lines.push('', '## 3. Latest Analysis')
+    if (analysis) {
+      lines.push(`> ${analysis.answer}`)
+      lines.push(`- **Confidence:** ${analysis.confidence_percent ?? '—'}%`)
+    } else { lines.push('- *No analysis run yet*') }
+    if (buildingAnalysis) {
+      lines.push('', '## 4. Building Footprint Audit')
+      lines.push(`- **Total Structures:** ${buildingAnalysis.building_count}`)
+      lines.push(`- **High Confidence:** ${buildingAnalysis.high_confidence_count}`)
+      lines.push(`- **Medium Confidence:** ${buildingAnalysis.medium_confidence_count}`)
+      lines.push(`- **Partial Edge:** ${buildingAnalysis.partial_count}`)
+      lines.push(`- **Confidence Level:** ${buildingAnalysis.confidence_level} (${Math.round(buildingAnalysis.confidence * 100)}%)`)
+      lines.push(`- **Validation:** ${buildingAnalysis.validation_status}`)
+    }
+    if (trace) {
+      lines.push('', '## 5. Observable Execution Trace')
+      lines.push(`- **Task:** ${trace.task_type}`)
+      lines.push(`- **Total Duration:** ${trace.total_duration_ms?.toFixed(0) ?? '—'} ms`)
+      ;(trace.steps ?? []).forEach((s: Record<string, unknown>) => {
+        lines.push(`  - Step ${s.step}: **${String(s.tool)}** — ${String(s.output_summary ?? '')} (${String(s.duration_ms?.toFixed ? (s.duration_ms as number).toFixed(0) : '—')} ms)`)
+      })
+    }
+    if (history.length) {
+      lines.push('', '## 6. Conversation History')
+      history.forEach((m, i) => {
+        lines.push(`### Q${i+1}: ${m.question}`)
+        lines.push(`> ${m.answer}`)
+        lines.push(`- Confidence: ${m.confidence_percent}% · Label: ${m.label}`)
+      })
+    }
+    lines.push('', '---', '*Report certified by SatQuery AI Agentic Remote-Sensing Platform.*')
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `satquery_analysis_report_${Date.now()}.md`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+    addToast('Analysis report exported as Markdown', 'success')
   }
 
   const layers = ['RGB','NDVI','Thermal','SAR']
@@ -1486,8 +1702,26 @@ export default function App() {
                 className="btn-ghost px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
                 title="Download session audit report"
               >
-                <span>⬇</span><span className="hidden sm:inline">Export Audit JSON</span>
+                <span>⬇</span><span className="hidden sm:inline">Export JSON</span>
               </button>
+              <button
+                type="button"
+                onClick={downloadMarkdownReport}
+                className="btn-ghost px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
+                title="Download analysis report as Markdown"
+              >
+                <span>📄</span><span className="hidden sm:inline">Report.md</span>
+              </button>
+              {buildingAnalysis && (
+                <button
+                  type="button"
+                  onClick={downloadGeoJSON}
+                  className="btn-ghost px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
+                  title="Download building footprints as GeoJSON"
+                >
+                  <span>🗺</span><span className="hidden sm:inline">GeoJSON</span>
+                </button>
+              )}
               {(activeTrace || lastFusionTrace) && (
                 <button
                   type="button"

@@ -144,6 +144,19 @@ class BENClassifier:
                     metrics.get_classification_metric_collection = lambda *a, **k: None
                     sys.modules['configilm.metrics'] = metrics
                     configilm.metrics = metrics
+
+                import inspect
+                from configilm.ConfigILM import ILMConfiguration
+                orig_ilm_init = ILMConfiguration.__init__
+                def patched_ilm_init(self, *args, **kwargs):
+                    if '_fusion_activation' in kwargs and 'fusion_activation' not in kwargs:
+                        kwargs.pop('_fusion_activation')
+                    if '_fusion_method' in kwargs and 'fusion_method' not in kwargs:
+                        kwargs.pop('_fusion_method')
+                    valid_params = set(inspect.signature(orig_ilm_init).parameters.keys()) - {'self'}
+                    filtered = {k: v for k, v in kwargs.items() if k in valid_params}
+                    return orig_ilm_init(self, *args, **filtered)
+                ILMConfiguration.__init__ = patched_ilm_init
             except Exception as shim_err:
                 logger.debug(f"[BEN] configilm shim note: {shim_err}")
 
