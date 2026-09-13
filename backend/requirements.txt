@@ -1,0 +1,19 @@
+# Core web framework
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# Computer vision & numerics
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+pillow>=10.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.0.0
+
+# BigEarthNet v2.0 classifier (reBEN — Clasen et al., IGARSS 2025)
+# Loads pretrained ResNet-50 from HuggingFace: BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0
+configilm[full]~=0.7.0
+huggingface-hub>=0.23.0
+timm>=0.9.0

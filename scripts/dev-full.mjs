@@ -37,7 +37,7 @@ pyChild.on('exit', code => {
 
 // 4. Fallback HTTP bridge on port 5173 for browsers that restrict 8443
 const bridge = http.createServer((req, res) => {
-  const isApi = req.url && (req.url.startsWith('/api') || req.url.startsWith('/analyze'))
+  const isApi = req.url && (req.url.startsWith('/api') || req.url.startsWith('/analyze') || req.url.startsWith('/classify'))
   const isPythonAnalyze = req.url && req.url.startsWith('/analyze')
   const targetPort = isPythonAnalyze ? 8000 : isApi ? 8787 : 8443
   const connector = http.request(

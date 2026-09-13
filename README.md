@@ -97,20 +97,52 @@ And `/api/health` returns `totalCallsThisDeployment` so you can track spend with
 
 ```
 src/
-  App.tsx              — React UI with session management and soft-cap UX
-  lib/constants.ts     — Client-side model/token/limit constants
-  components/Globe.tsx — Three.js 3D globe
+  App.tsx                           — React UI with multi-modal mode switching and session UX
+  components/
+    Globe.tsx                       — Three.js 3D globe
+    OpticalSarFusionPanel.tsx       — Optical + SAR cross-modal fusion panel
+    AgentTraceModal.tsx             — Auditable agent execution trace inspector
+  lib/
+    agentController.ts              — Client-side task formatting and tool registry
+    constants.ts                    — Client-side model/token/limit constants
+  utils/
+    imageUtils.ts                   — GeoTIFF / canvas JPEG compression pipeline
 
 lib/
-  constants.ts         — Server-side constants (process.env)
+  agentController.ts                — Deterministic task classifier, validator & trace builder
+  constants.ts                      — Server-side constants (process.env)
 
-api/                   — Vercel serverless handlers
-  _lib.ts              — Shared client, cache, counter, classifyError
-  analyze.ts           — POST /api/analyze
-  compare.ts           — POST /api/compare
-  health.ts            — GET /api/health
+api/                                — Vercel serverless handlers
+  _lib.ts                           — Shared client, cache, counter, classifyError
+  analyze.ts                        — POST /api/analyze (Single Scene VQA + Trace)
+  compare.ts                        — POST /api/compare (Bi-Temporal Change + Trace)
+  fuse.ts                           — POST /api/fuse (Optical-SAR Fusion + Trace)
+  buildings.ts                      — POST /api/buildings (Building detection)
+  health.ts                         — GET /api/health
 
-server.ts              — Express server for local dev (npm run dev:full)
+backend/                            — FastAPI Remote Sensing Python Backend (port 8000)
+  main.py                           — FastAPI application with CORS and lifespan handlers
+  requirements.txt                  — Python CV and DL dependencies
+  routers/
+    building_analysis.py            — Tiled instance segmentation building detection
+    fusion.py                       — Optical-SAR cross-modal feature extraction
+  services/
+    building_detector.py            — YOLO building footprint segmentation model
+    fusion_service.py               — OpenCV telemetry (NDVI proxy, SAR backscatter dB, SSIM)
+    tiling.py, duplicate_removal.py — Tiling and NMS merging pipelines
+
+server.ts                           — Express server for local dev (npm run dev:full)
 scripts/
-  dev-full.mjs         — Runs API + Vite concurrently
+  dev-full.mjs                      — Orchestrates Vite + Express + FastAPI concurrently
 ```
+
+---
+
+## Capabilities & Modalities
+
+1. **Single Scene VQA & Telemetry:** Natural-language remote sensing QA with automatic confidence scoring and terrain categorization.
+2. **Optical–SAR Cross-Modal Fusion:** Jointly correlates optical multispectral albedo with synthetic aperture radar (SAR) microwave backscatter, computing vegetation indices, backscatter dB, speckle ratios, and structural similarity (SSIM).
+3. **Bi-Temporal Change Detection:** Compares satellite passes over time with interactive slider comparison and verified change attribution.
+4. **Auditable Agent Execution Traces:** Step-by-step transparency logging every tool invocation, task classification, radiometric validation, and inference latency.
+5. **Full Session Audit Export:** One-click JSON download bundling image telemetry, model detections, footprint counts, and execution traces for GIS workflows.
+

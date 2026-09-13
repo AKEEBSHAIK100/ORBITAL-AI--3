@@ -40,6 +40,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/buildings/, '/analyze/buildings'),
         },
         '/analyze/buildings': 'http://localhost:8000',
+        '/analyze/fusion': 'http://localhost:8000',
+        '/classify': 'http://localhost:8787',
         '/api': 'http://localhost:8787',
       },
       watch: { ignored: ['**/.figma/**'] },
