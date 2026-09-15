@@ -23,6 +23,8 @@ def build_observable_trace(
             output_summary=s.get("output_summary", ""),
             duration_ms=s.get("duration_ms", 0.0),
             status=s.get("status", "success"),
+            success=s.get("success", s.get("status") == "success"),
+            confidence_source=s.get("confidence_source", "heuristic"),
             parameters=s.get("parameters")
         )
         for idx, s in enumerate(steps)

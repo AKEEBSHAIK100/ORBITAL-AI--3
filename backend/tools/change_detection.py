@@ -30,11 +30,10 @@ class ChangeDetectionTool(BaseTool):
             return {"error": "Missing initial image (T1) for change detection", "status": "error"}
 
         if t2_img is None or not isinstance(t2_img, np.ndarray):
-            # Single image provided: inform user and evaluate internal contrast
-            t2_img = t1_img
-            is_single = True
-        else:
-            is_single = False
+            return {
+                "error": "Bi-temporal change detection requires a co-registered secondary image (T2). Only 1 image was provided.",
+                "status": "error"
+            }
 
         # Resize t2 to match t1 if slight difference
         h1, w1 = t1_img.shape[:2]
@@ -77,26 +76,23 @@ class ChangeDetectionTool(BaseTool):
         exg2 = (2.0 * t2_img[:, :, 1] - t2_img[:, :, 2] - t2_img[:, :, 0]).mean()
         veg_delta_pct = round(((exg2 - exg1) / (abs(exg1) + 1e-5)) * 100, 1)
 
-        # Built-up alteration interpretation
-        if is_single:
-            answer = "Only a single temporal acquisition was provided. A bi-temporal pair (T1 earlier, T2 later) is required for full multi-temporal alteration verification."
-            confidence = 0.50
-        elif change_ratio < 0.02:
-            answer = f"Surface structure remained largely unchanged between the two acquisition dates (only {change_ratio*100:.1f}% slight radiometric variance detected). Built-up area remained stable."
-            confidence = 0.92
+        # Built-up alteration interpretation (Pixel-diff heuristic baseline)
+        if change_ratio < 0.02:
+            answer = f"Pixel-differencing baseline confirms surface structure remained largely unchanged between the two acquisition dates (only {change_ratio*100:.1f}% radiometric variance). Built-up footprint remained stable."
+            confidence = 0.90
         elif change_ratio < 0.12:
             direction = "increased" if exg2 > exg1 else "decreased"
             answer = (
-                f"Moderate surface alterations identified across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
-                f"Vegetation index has {direction} by {abs(veg_delta_pct)}%. Built-up structures exhibit local expansion in the highlighted sectors."
+                f"Pixel-differencing baseline identified surface alterations across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
+                f"Vegetation index has {direction} by {abs(veg_delta_pct)}%. Structural alterations demarcated in highlighted sectors."
             )
-            confidence = 0.88
+            confidence = 0.85
         else:
             answer = (
-                f"Significant bi-temporal evolution detected across {change_ratio*100:.1f}% of the observation area. "
-                f"Multiple structural alterations and surface reconfigurations are demarcated across {len(significant_changes)} contiguous clusters."
+                f"Pixel-differencing baseline identified significant alterations across {change_ratio*100:.1f}% of the observation area "
+                f"({len(significant_changes)} contiguous change clusters detected via adaptive thresholding)."
             )
-            confidence = 0.91
+            confidence = 0.85
 
         duration_ms = (time.time() - t0) * 1000
 
@@ -110,5 +106,7 @@ class ChangeDetectionTool(BaseTool):
             "vegetation_delta_pct": veg_delta_pct,
             "confidence": confidence,
             "confidence_level": "High" if confidence >= 0.80 else "Medium",
+            "confidence_source": "heuristic",
+            "method": "Radiometric pixel-differencing & morphological contour clustering",
             "duration_ms": duration_ms
         }

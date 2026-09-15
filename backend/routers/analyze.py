@@ -142,6 +142,10 @@ async def analyze_master(req: AnalyzeRequest):
     # 3. Input Validation
     val_t0 = time.time()
     validation = validate_input_imagery(task_type, images, modalities=modalities)
+    if validation.get("compatibility") == "error":
+        err_msg = "; ".join(validation.get("errors", ["Input validation rejected request."]))
+        raise HTTPException(status_code=400, detail=err_msg)
+
     steps_log.append({
         "step": 1,
         "tool": "input_validator",
@@ -150,6 +154,8 @@ async def analyze_master(req: AnalyzeRequest):
         "output_summary": f"Compatibility: {validation['compatibility'].upper()} ({len(validation['notes'])} checks verified)",
         "duration_ms": (time.time() - val_t0) * 1000,
         "status": "success",
+        "success": True,
+        "confidence_source": "none",
         "parameters": {"task": task_type, "modalities": modalities}
     })
 
@@ -180,6 +186,9 @@ async def analyze_master(req: AnalyzeRequest):
         b_t0 = time.time()
         b_res = b_tool.run(tool_inputs, req.parameters)
         b_dur = (time.time() - b_t0) * 1000
+
+        if "error" in b_res:
+            raise HTTPException(status_code=503, detail=f"Building detection unavailable: {b_res['error']}")
 
         building_response = BuildingAnalysisResponse(
             success=True,
@@ -215,6 +224,8 @@ async def analyze_master(req: AnalyzeRequest):
             "output_summary": f"Detected {b_res['building_count']} building footprints ({b_res['high_confidence_count']} high confidence)",
             "duration_ms": b_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "real_inference",
             "parameters": b_tool.permitted_parameters
         })
 
@@ -225,19 +236,24 @@ async def analyze_master(req: AnalyzeRequest):
         f_res = f_tool.run(tool_inputs, req.parameters)
         f_dur = (time.time() - f_t0) * 1000
 
+        if "error" in f_res:
+            raise HTTPException(status_code=400, detail=f"Optical-SAR fusion unavailable: {f_res['error']}")
+
         fusion_response = f_res.get("metrics")
         answer = f_res.get("interpretation", "Optical-SAR fusion analysis complete.")
-        confidence = 0.88
+        confidence = 0.82
         confidence_level = "High"
 
         steps_log.append({
             "step": 2,
             "tool": f_tool.name,
-            "description": "Cross-modal telemetry extraction (radar backscatter dB, speckle index, SSIM structural similarity)",
+            "description": "Heuristic cross-modal telemetry baseline: spectral indices, SAR backscatter dB, SSIM",
             "input_summary": "Co-registered Optical + SAR sensor matrices",
             "output_summary": f"SSIM: {f_res.get('metrics', {}).get('cross_modal', {}).get('structural_similarity', 0.7):.2f}; Mean Backscatter: {f_res.get('metrics', {}).get('sar', {}).get('mean_backscatter_db', -14):.1f} dB",
             "duration_ms": f_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "heuristic",
             "parameters": f_tool.permitted_parameters
         })
 
@@ -248,19 +264,24 @@ async def analyze_master(req: AnalyzeRequest):
         c_res = c_tool.run(tool_inputs, req.parameters)
         c_dur = (time.time() - c_t0) * 1000
 
+        if "error" in c_res:
+            raise HTTPException(status_code=400, detail=f"Change detection unavailable for this image pair: {c_res['error']}")
+
         change_response = c_res
         answer = c_res.get("answer", "Bi-temporal change analysis completed.")
-        confidence = c_res.get("confidence", 0.90)
+        confidence = c_res.get("confidence", 0.85)
         confidence_level = c_res.get("confidence_level", "High")
 
         steps_log.append({
             "step": 2,
             "tool": c_tool.name,
-            "description": "Bi-temporal radiometric differencing and contour change cluster identification",
+            "description": "Pixel-differencing heuristic baseline: adaptive thresholding & morphological contour clustering",
             "input_summary": "T1 (initial) and T2 (subsequent) temporal captures",
             "output_summary": f"Alteration detected across {c_res.get('change_percentage', 0):.1f}% surface ({c_res.get('change_clusters', 0)} clusters)",
             "duration_ms": c_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "heuristic",
             "parameters": c_tool.permitted_parameters
         })
 
@@ -271,6 +292,9 @@ async def analyze_master(req: AnalyzeRequest):
         g_res = g_tool.run(tool_inputs, req.parameters)
         g_dur = (time.time() - g_t0) * 1000
 
+        if "error" in g_res:
+            raise HTTPException(status_code=422, detail=f"Spatial grounding unavailable: {g_res['error']}")
+
         grounding_response = [
             GroundingItem(
                 target=r["target"],
@@ -280,23 +304,29 @@ async def analyze_master(req: AnalyzeRequest):
             )
             for r in g_res.get("regions", [])
         ]
-        top_reg = g_res.get("primary_region", {})
-        answer = (
-            f"Successfully localized {g_res.get('target', 'feature')} within the coordinate sector: "
-            f"X: {top_reg.get('x_percent', 0)}%, Y: {top_reg.get('y_percent', 0)}%, "
-            f"Width: {top_reg.get('w_percent', 0)}%, Height: {top_reg.get('h_percent', 0)}%."
-        )
-        confidence = 0.91
-        confidence_level = "High"
+        top_reg = g_res.get("primary_region")
+        if top_reg:
+            answer = (
+                f"Spectral grounding baseline localized '{g_res.get('target', 'feature')}' at: "
+                f"X: {top_reg.get('x_percent', 0)}%, Y: {top_reg.get('y_percent', 0)}%, "
+                f"Width: {top_reg.get('w_percent', 0)}%, Height: {top_reg.get('h_percent', 0)}%."
+            )
+            confidence = 0.80
+        else:
+            answer = f"No '{g_res.get('target', 'target feature')}' was localized in this scene by spectral thresholding."
+            confidence = 0.40
+        confidence_level = "High" if confidence >= 0.75 else "Medium"
 
         steps_log.append({
             "step": 2,
             "tool": g_tool.name,
-            "description": "Spatial coordinate bounding box and connected component demarcation",
+            "description": "Spectral thresholding & connected component contour extraction for target localization",
             "input_summary": f"Query targeting '{g_res.get('target', 'grounding feature')}'",
-            "output_summary": f"Demarcated {len(grounding_response)} localized bounding region(s)",
+            "output_summary": f"{len(grounding_response)} region(s) localized via spectral heuristic",
             "duration_ms": g_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "heuristic",
             "parameters": g_tool.permitted_parameters
         })
 
@@ -324,6 +354,8 @@ async def analyze_master(req: AnalyzeRequest):
             "output_summary": f"Primary terrain: {cap_res.get('top_label')}",
             "duration_ms": cap_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "real_inference",
             "parameters": cap_tool.permitted_parameters
         })
 
@@ -370,6 +402,8 @@ async def analyze_master(req: AnalyzeRequest):
             "output_summary": f"Answer formulated with {confidence_level} confidence ({confidence*100:.0f}%)",
             "duration_ms": v_dur,
             "status": "success",
+            "success": True,
+            "confidence_source": "real_inference",
             "parameters": vqa_tool.permitted_parameters
         })
 

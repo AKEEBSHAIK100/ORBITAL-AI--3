@@ -78,12 +78,7 @@ class GroundingTool(BaseTool):
 
         # Sort by area (largest first)
         valid_regions.sort(key=lambda r: r["region"]["w_percent"] * r["region"]["h_percent"], reverse=True)
-        top_regions = valid_regions[:3] if valid_regions else [{
-            "target": target,
-            "region": {"x_percent": 15.0, "y_percent": 20.0, "w_percent": 40.0, "h_percent": 35.0},
-            "confidence": 0.72,
-            "label": f"Demarcated {target.title()}"
-        }]
+        top_regions = valid_regions[:3]
 
         duration_ms = (time.time() - t0) * 1000
 
@@ -92,6 +87,9 @@ class GroundingTool(BaseTool):
             "target": target,
             "regions": top_regions,
             "count": len(top_regions),
-            "primary_region": top_regions[0]["region"],
+            "primary_region": top_regions[0]["region"] if top_regions else None,
+            "detected": len(top_regions) > 0,
+            "confidence_source": "heuristic",
+            "method": "Spectral thresholding & connected component contour extraction",
             "duration_ms": duration_ms
         }

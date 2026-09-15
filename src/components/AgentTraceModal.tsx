@@ -215,11 +215,27 @@ export default function AgentTraceModal({ isOpen, onClose, trace, queryTitle }: 
 
                     <div className="flex items-center gap-2 font-mono text-[11px]">
                       <span style={{ color: MNT }}>{st.duration_ms} ms</span>
+                      {st.confidence_source && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider"
+                          style={{
+                            background: st.confidence_source === 'real_inference' ? `${CYN}22` : st.confidence_source === 'heuristic' ? `${ORG}22` : 'rgba(255,255,255,0.08)',
+                            color: st.confidence_source === 'real_inference' ? CYN : st.confidence_source === 'heuristic' ? ORG : GRY,
+                            border: `1px solid ${st.confidence_source === 'real_inference' ? CYN : st.confidence_source === 'heuristic' ? ORG : GRY}44`,
+                          }}
+                        >
+                          {st.confidence_source === 'real_inference' ? 'REAL MODEL' : st.confidence_source === 'heuristic' ? 'HEURISTIC' : 'NO INFERENCE'}
+                        </span>
+                      )}
                       <span
-                        className="px-1.5 py-0.2 rounded text-[9px] uppercase font-bold"
-                        style={{ background: `${MNT}22`, color: MNT }}
+                        className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold"
+                        style={{
+                          background: st.status === 'success' ? `${MNT}22` : 'rgba(255,107,107,0.2)',
+                          color: st.status === 'success' ? MNT : '#FF6B6B',
+                          border: `1px solid ${st.status === 'success' ? MNT : '#FF6B6B'}55`,
+                        }}
                       >
-                        {st.status}
+                        {st.status === 'success' ? '✓ OK' : '✕ FAILED'}
                       </span>
                     </div>
                   </div>

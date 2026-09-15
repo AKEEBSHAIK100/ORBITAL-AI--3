@@ -29,18 +29,11 @@ class OpticalSARTool(BaseTool):
         if optical_bgr is None or not isinstance(optical_bgr, np.ndarray):
             return {"error": "Missing optical image for optical-SAR fusion", "status": "error"}
 
-        is_synthetic = False
         if sar_bgr is None or not isinstance(sar_bgr, np.ndarray):
-            # Generate synthetic SAR proxy from optical band
-            is_synthetic = True
-            gray = cv2.cvtColor(optical_bgr, cv2.COLOR_BGR2GRAY)
-            sobelx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
-            sobely = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-            grad_mag = np.sqrt(sobelx**2 + sobely**2)
-            sar_synth = np.clip(grad_mag * 1.8 + gray * 0.4, 0, 255).astype(np.uint8)
-            speckle = np.random.gamma(4, 0.25, gray.shape).astype(np.float32)
-            sar_noisy = np.clip(sar_synth.astype(np.float32) * speckle, 0, 255).astype(np.uint8)
-            sar_bgr = cv2.cvtColor(sar_noisy, cv2.COLOR_GRAY2BGR)
+            return {
+                "error": "Missing SAR image for cross-modal fusion. Co-registered optical and radar acquisitions are required.",
+                "status": "error"
+            }
 
         metrics = analyze_fusion_pair(optical_bgr, sar_bgr)
         duration_ms = (time.time() - t0) * 1000
@@ -53,15 +46,17 @@ class OpticalSARTool(BaseTool):
         water_frac = metrics.get("optical", {}).get("water_fraction", 0.08)
 
         interpretation = (
-            f"Joint Optical-SAR analysis completed. Optical channels indicate {built_up_frac*100:.1f}% built-up fabric "
-            f"and {water_frac*100:.1f}% water bodies. SAR backscatter measures {mean_db:.1f} dB with speckle index {metrics.get('sar', {}).get('speckle_index', 0.28):.2f}. "
-            f"Cross-modal structural similarity (SSIM) is {ssim:.2f} and cross-correlation is {cross_corr:.2f}, verifying physical alignment."
+            f"Heuristic cross-modal telemetry baseline: optical spectral analysis indicates {built_up_frac*100:.1f}% built-up fabric "
+            f"and {water_frac*100:.1f}% water bodies. SAR microwave backscatter measures {mean_db:.1f} dB (speckle index {metrics.get('sar', {}).get('speckle_index', 0.28):.2f}). "
+            f"Cross-modal structural alignment: SSIM = {ssim:.2f}, Cross-Correlation = {cross_corr:.2f}."
         )
 
         return {
             "status": "success",
             "interpretation": interpretation,
             "metrics": metrics,
-            "is_synthetic_sar": is_synthetic,
+            "is_synthetic_sar": False,
+            "confidence_source": "heuristic",
+            "method": "Rule-based optical indices & SAR backscatter telemetry baseline",
             "duration_ms": duration_ms
         }

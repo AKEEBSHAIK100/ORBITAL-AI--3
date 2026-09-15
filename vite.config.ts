@@ -7,6 +7,12 @@ import siteConfiguration from './.figma/make/site.json' with { type: 'json' }
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  if (mode === 'production' && process.env.VITE_DEMO_MODE === 'true') {
+    throw new Error(
+      'COMPLIANCE ERROR: VITE_DEMO_MODE=true is forbidden in production builds. Disable demo mode before shipping.'
+    )
+  }
+
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
 

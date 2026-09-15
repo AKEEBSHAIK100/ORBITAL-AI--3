@@ -56,6 +56,8 @@ class TraceStep(BaseModel):
     output_summary: str
     duration_ms: float
     status: str
+    success: bool = True
+    confidence_source: str = "heuristic"
     parameters: Optional[Dict[str, Any]] = None
 
 class ObservableTrace(BaseModel):

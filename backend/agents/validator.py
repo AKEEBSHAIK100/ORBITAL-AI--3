@@ -17,6 +17,7 @@ def validate_input_imagery(
     image_names = image_names or []
     notes: List[str] = []
     warnings: List[str] = []
+    errors: List[str] = []
     compatibility = "valid"
 
     image_count = len(images)
@@ -39,23 +40,23 @@ def validate_input_imagery(
     # Modality & Task specific checks
     if task_type == "sar_optical_fusion":
         has_sar = any("sar" in m.lower() for m in modalities) or any("sar" in n.lower() for n in image_names)
-        has_optical = any("optical" in m.lower() or "multispectral" in m.lower() for m in modalities) or not has_sar
+        has_optical = any("optical" in m.lower() or "multispectral" in m.lower() for m in modalities)
         
         if image_count < 2:
-            compatibility = "warning"
-            warnings.append("Optical–SAR fusion requires 2 co-registered images (Optical + SAR). Synthesizing radar backscatter proxy from optical band.")
+            compatibility = "error"
+            errors.append("Optical–SAR fusion requires two co-registered images (Optical + SAR). Only 1 image was provided.")
         else:
             notes.append("Dual-sensor optical + SAR co-registered pair verified.")
             # Check dimensional correspondence
             if len(dimensions) >= 2:
                 d1, d2 = dimensions[0], dimensions[1]
                 if abs(d1["width"] - d2["width"]) > 50 or abs(d1["height"] - d2["height"]) > 50:
-                    warnings.append(f"Dimension mismatch between optical ({d1['width']}x{d1['height']}) and SAR ({d2['width']}x{d2['height']}). Auto-rescaling and spatial alignment applied.")
+                    warnings.append(f"Dimension mismatch between optical ({d1['width']}x{d1['height']}) and SAR ({d2['width']}x{d2['height']}). Spatial resampling applied.")
 
     elif task_type == "change_detection" or task_type == "change_vqa":
         if image_count < 2:
-            compatibility = "warning"
-            warnings.append("Bi-temporal change detection requires two images (T1 earlier, T2 later).")
+            compatibility = "error"
+            errors.append("Bi-temporal change detection requires two co-registered images (T1 earlier, T2 later). Only 1 image was provided.")
         else:
             notes.append("Bi-temporal pair verified. Validating spatial overlap and coregistration.")
             if len(dimensions) >= 2:
@@ -79,4 +80,5 @@ def validate_input_imagery(
         "compatibility": compatibility,
         "notes": notes,
         "warnings": warnings,
+        "errors": errors,
     }

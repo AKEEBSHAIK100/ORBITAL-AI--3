@@ -128,6 +128,8 @@ export interface ExecutionTraceStep {
   output_summary: string
   duration_ms: number
   status: 'success' | 'skipped' | 'error'
+  success?: boolean
+  confidence_source?: 'real_inference' | 'heuristic' | 'none'
   parameters?: Record<string, string | number | boolean>
 }
 

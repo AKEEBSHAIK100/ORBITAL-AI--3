@@ -63,6 +63,7 @@ type Analysis = {
   execution_trace?: ExecutionTrace | null
   fusion_features?: FusionFeatures | null
   mode?: string
+  is_synthetic?: boolean
 }
 
 type ChatMessage = {
@@ -79,6 +80,7 @@ type ChatMessage = {
   execution_trace?: ExecutionTrace | null
   fusion_features?: FusionFeatures | null
   mode?: string
+  is_synthetic?: boolean
 }
 
 export interface ImageTelemetry {
@@ -266,7 +268,7 @@ function detectHiddenLayer(text: string): HiddenLayer | null {
 }
 
 // ── Demo analyze (fallback / demo mode) ──────────────────────────────────────
-function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
+function _rawDemoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
   const telem = imageDataUrl && imageTelemetryCache.get(imageDataUrl) ? imageTelemetryCache.get(imageDataUrl)! : null
   const terrain = telem ? telem.terrain : (imageDataUrl ? detectImageTerrain(imageDataUrl) : 'urban')
   const q = question.toLowerCase()
@@ -368,6 +370,15 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
     detected_features: ['High-Density Urban Footprints', 'Arterial Road Network', 'Riparian Water System', 'Urban Tree Canopy'],
     label: 'Land Use & Terrain Classification', revealed_layer: 'urban',
     suggested_followups: ['Describe the land-cover and major objects visible in this image.','Highlight the water body referred to in the query.','Has the built-up area increased, decreased, or remained unchanged?','Use the optical and SAR images together to identify built-up and water-covered regions.'],
+  }
+}
+
+function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
+  const base = _rawDemoAnalyze(question, imageDataUrl)
+  return {
+    ...base,
+    is_synthetic: true,
+    mode: 'demo_scene',
   }
 }
 
@@ -987,6 +998,7 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
     execution_trace: payload.execution_trace || null,
     region,
     mode: payload.mode || (payload.available === false ? 'synthetic_fallback' : undefined),
+    is_synthetic: payload.is_synthetic === true || payload.mode === 'synthetic_fallback' || payload.mode === 'demo_scene',
   }
 }
 
@@ -1271,18 +1283,42 @@ export default function App() {
 
       if (isBuildingQuery) {
         setStatus('Running instance segmentation…')
-        const bRes = await runBuildingDetection()
-        if (bRes) {
-          result = {
-            answer: `Instance segmentation across high-resolution tiles identified ${bRes.building_count} unique building footprints (${bRes.confidence_level} confidence, ${Math.round(bRes.confidence*100)}%). Breakdown: ${bRes.high_confidence_count} high confidence, ${bRes.medium_confidence_count} medium, ${bRes.partial_count} partial perimeter. ${bRes.validation_status}.`,
-            confidence: bRes.confidence_level === 'High' ? 'high' : bRes.confidence_level === 'Medium' ? 'medium' : 'low',
-            confidence_percent: Math.round(bRes.confidence*100), confidenceScore: Math.round(bRes.confidence*100),
-            confidence_reason: `Evaluated via YOLO segmentation with tile mapping and polygon IoU deduplication.`,
-            detected_features: [`${bRes.building_count} Verified Footprints`, `${bRes.high_confidence_count} High Confidence`, `${bRes.medium_confidence_count} Medium`, `${bRes.partial_count} Partial Edge`],
-            label: 'Building Footprint Audit', revealed_layer: 'urban',
-            suggested_followups: ['Total roof area for solar?','Buildings closest to flood zone?','Density distribution?'],
+        try {
+          const bRes = await runBuildingDetection()
+          if (bRes) {
+            result = {
+              answer: `Instance segmentation across high-resolution tiles identified ${bRes.building_count} unique building footprints (${bRes.confidence_level} confidence, ${Math.round(bRes.confidence*100)}%). Breakdown: ${bRes.high_confidence_count} high confidence, ${bRes.medium_confidence_count} medium, ${bRes.partial_count} partial perimeter. ${bRes.validation_status}.`,
+              confidence: bRes.confidence_level === 'High' ? 'high' : bRes.confidence_level === 'Medium' ? 'medium' : 'low',
+              confidence_percent: Math.round(bRes.confidence*100), confidenceScore: Math.round(bRes.confidence*100),
+              confidence_reason: `Evaluated via YOLO segmentation with tile mapping and polygon IoU deduplication.`,
+              detected_features: [`${bRes.building_count} Verified Footprints`, `${bRes.high_confidence_count} High Confidence`, `${bRes.medium_confidence_count} Medium`, `${bRes.partial_count} Partial Edge`],
+              label: 'Building Footprint Audit', revealed_layer: 'urban',
+              suggested_followups: ['Total roof area for solar?','Buildings closest to flood zone?','Density distribution?'],
+            }
+          } else {
+            result = {
+              answer: 'Building detection unavailable for this scene. The specialist YOLO segmentation service did not return footprints.',
+              confidence: 'low',
+              confidence_percent: 15,
+              confidenceScore: 15,
+              confidence_reason: 'Building detector service returned null or no valid footprints.',
+              detected_features: ['Footprint Audit Incomplete'],
+              label: 'Building Audit Unavailable',
+              suggested_followups: ['Retry building audit with high-resolution imagery', 'Run general land-cover classification'],
+            }
           }
-        } else result = demoAnalyze(prompt, imagePreview)
+        } catch (bErr: any) {
+          result = {
+            answer: `Building footprint analysis failed: ${bErr?.message || 'Specialist model service unreachable.'}`,
+            confidence: 'low',
+            confidence_percent: 10,
+            confidenceScore: 10,
+            confidence_reason: bErr?.message || 'Building detection model service failed.',
+            detected_features: ['Model Service Unavailable'],
+            label: 'Building Footprint Error',
+            suggested_followups: ['Verify backend service is running', 'Retry analysis'],
+          }
+        }
       } else if (import.meta.env.VITE_DEMO_MODE === 'true') {
         await new Promise(r => setTimeout(r, 700))
         result = demoAnalyze(prompt, imagePreview)
@@ -1314,8 +1350,34 @@ export default function App() {
               setActiveOverlay(payload.revealed_layer)
               setRevealedLayers(prev => Array.from(new Set([...prev, payload.revealed_layer])))
             }
-          } else result = demoAnalyze(prompt, imagePreview)
-        } catch { result = demoAnalyze(prompt, imagePreview) }
+          } else {
+            const errorMsg = typeof payload.detail === 'string'
+              ? payload.detail
+              : (payload.error || `Specialist analysis failed (HTTP ${res.status})`)
+            result = {
+              answer: `Remote sensing analysis unavailable: ${errorMsg}`,
+              confidence: 'low',
+              confidence_percent: 10,
+              confidenceScore: 10,
+              confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
+              detected_features: ['Analysis Unavailable'],
+              label: 'Analysis Error',
+              suggested_followups: ['Verify image input requirements', 'Retry with co-registered dual-sensor pair'],
+              execution_trace: payload.execution_trace || null,
+            }
+          }
+        } catch (fetchErr: any) {
+          result = {
+            answer: `Analysis unavailable: could not contact specialist analysis service (${fetchErr?.message || 'Network error'}).`,
+            confidence: 'low',
+            confidence_percent: 10,
+            confidenceScore: 10,
+            confidence_reason: fetchErr?.message || 'Network connection to analysis API failed.',
+            detected_features: ['Service Unreachable'],
+            label: 'Connection Error',
+            suggested_followups: ['Ensure FastAPI backend is running', 'Retry query'],
+          }
+        }
       }
 
       const confPct = typeof result.confidence_percent === 'number'
@@ -1335,25 +1397,25 @@ export default function App() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         region: result.region ?? null,
         execution_trace: result.execution_trace ?? null, fusion_features: result.fusion_features ?? null,
+        is_synthetic: result.is_synthetic,
+        mode: result.mode,
       }])
       setSuggestions(result.suggested_followups?.length ? result.suggested_followups : OFFICIAL_REPRESENTATIVE_QUERIES.map(q => q.query))
       setSessionCallCount(prev => prev+1)
       setStatus('Analysis complete')
       setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-    } catch {
-      const fr = demoAnalyze(prompt, imagePreview)
-      if (fr.region) setActiveRegion({ region: fr.region, label: fr.label || 'Target', confidence_percent: fr.confidence_percent ?? 94 })
-      setAnalysis(fr)
+    } catch (err: any) {
+      const errAnswer = `Analysis error: ${err?.message || 'Remote sensing tool pipeline failed.'}`
+      setError(errAnswer)
+      setStatus('Analysis failed')
       setHistory(prev => [...prev, {
-        question: prompt, answer: fr.answer,
-        confidence_percent: fr.confidence_percent ?? 94, confidenceScore: fr.confidenceScore ?? 94,
-        confidence: fr.confidence, confidence_reason: fr.confidence_reason,
-        detected_features: fr.detected_features || [], label: fr.label || 'Analysis',
+        question: prompt, answer: errAnswer,
+        confidence_percent: 10, confidenceScore: 10,
+        confidence: 'low', confidence_reason: 'Pipeline execution threw an unhandled exception.',
+        detected_features: ['Pipeline Failure'], label: 'Execution Error',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        region: fr.region ?? null, execution_trace: null, fusion_features: null,
+        region: null, execution_trace: null, fusion_features: null,
       }])
-      setSuggestions(fr.suggested_followups?.length ? fr.suggested_followups : OFFICIAL_REPRESENTATIVE_QUERIES.map(q => q.query))
-      setStatus('Analysis complete')
       setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     } finally { setBusy(false) }
   }, [question, busy, atCap, imagePreview, history, sessionId, runBuildingDetection])
@@ -2078,6 +2140,27 @@ export default function App() {
 
                       {/* AI response */}
                       <div className="rounded-xl px-4 py-3.5 space-y-2.5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                        {m.is_synthetic && (
+                          <div
+                            className="w-full rounded-xl p-3.5 flex items-start gap-3 border-2"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(255,159,67,0.22) 0%, rgba(255,107,107,0.15) 100%)',
+                              borderColor: '#FF9F43',
+                              boxShadow: '0 0 16px rgba(255,159,67,0.3)',
+                            }}
+                          >
+                            <span className="text-xl shrink-0 leading-none">⚠️</span>
+                            <div className="space-y-1">
+                              <div className="text-xs font-mono font-bold tracking-wider uppercase" style={{ color: '#FFB86C' }}>
+                                Sample output — not a live model result
+                              </div>
+                              <div className="text-[11px] font-mono leading-relaxed" style={{ color: '#F4F7FA' }}>
+                                This response was generated from pre-configured demonstration data. It does not represent live specialist model execution.
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between text-[10px] font-mono flex-wrap gap-1">
                           <ConfidenceBadge confidence={m.confidence} percent={m.confidence_percent ?? m.confidenceScore ?? 94} reason={m.confidence_reason} />
                           <span style={{ color: C.dim }}>{m.timestamp}</span>
