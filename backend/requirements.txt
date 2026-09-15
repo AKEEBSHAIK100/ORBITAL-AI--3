@@ -14,6 +14,7 @@ ultralytics>=8.0.0
 
 # BigEarthNet v2.0 classifier (reBEN — Clasen et al., IGARSS 2025)
 # Loads pretrained ResNet-50 from HuggingFace: BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0
-configilm[full]~=0.7.0
+# Note: configilm requires pydantic<2.0 which conflicts with FastAPI/pydantic>=2.0.
+# ben_classifier.py provides an automatic fallback when configilm is not installed.
 huggingface-hub>=0.23.0
 timm>=0.9.0
