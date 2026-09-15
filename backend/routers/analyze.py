@@ -22,7 +22,7 @@ from ..schemas.analysis import (
 from ..agents.validator import validate_input_imagery
 from ..agents.router import classify_query_intent
 from ..agents.aggregator import build_observable_trace
-from ..tools.registry import TOOLS, get_tool, list_all_tools
+from ..tools.registry import get_tool, list_all_tools
 from ..preprocessing.geotiff import inspect_and_load_geospatial_image
 from ..postprocessing.report_generator import generate_downloadable_report
 
@@ -41,21 +41,8 @@ def decode_image_input(val: Optional[str]) -> Tuple[Optional[np.ndarray], Dict[s
         print(f"[AnalyzeRouter] Error decoding base64 image: {e}")
         return None, {}
 
-@router.get("/api/health")
-@router.get("/health")
-async def health_check():
-    detector = get_tool("building_detection")
-    ben = get_tool("land_cover")
-    return {
-        "status": "healthy",
-        "service": "SatQuery AI Multi-Specialist Remote Sensing Platform",
-        "version": "3.0.0",
-        "models": {
-            "building_detector": {"status": "ready", "model_id": detector.model_id if detector else "yolo"},
-            "ben_classifier": {"status": "ready", "model_id": ben.model_id if ben else "resnet50"},
-        },
-        "tools_available": list(TOOLS.keys())
-    }
+# NOTE: /health and /api/health are handled by backend/main.py
+# to avoid duplicate route registration and ensure model-safe responses.
 
 @router.get("/api/models")
 @router.get("/models")
@@ -94,7 +81,10 @@ async def get_models():
 @router.get("/api/tools")
 @router.get("/tools")
 async def get_tools():
-    return {"tools": list_all_tools()}
+    try:
+        return {"tools": list_all_tools()}
+    except Exception as e:
+        return {"tools": {}, "error": str(e)}
 
 @router.post("/api/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -425,7 +415,8 @@ async def analyze_master(req: AnalyzeRequest):
         grounding=grounding_response,
         change_map=change_response,
         fusion_metrics=fusion_response,
-        land_cover=land_cover_response
+        land_cover=land_cover_response,
+        mode="model",
     )
 
 # Specialized sub-endpoints from Section 9

@@ -60,34 +60,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const defaultDetections = getDefaultDetections()
-  const pythonBackend = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000/analyze/buildings'
+  const pythonBackendBase = (process.env.PYTHON_BACKEND_URL || '').replace(/\/+$/, '')
+  const pythonBackend = pythonBackendBase ? `${pythonBackendBase}/analyze/buildings` : null
 
   // Attempt live proxy to Python backend if reachable
-  try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 6000)
+  if (pythonBackend) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
 
-    const proxyRes = await fetch(pythonBackend, {
-      method: 'POST',
-      headers: {
-        'Content-Type': req.headers['content-type'] || 'application/json',
-      },
-      body: typeof req.body === 'object' ? JSON.stringify(req.body) : req.body,
-      signal: controller.signal,
-    })
-    clearTimeout(timeoutId)
+      const proxyRes = await fetch(pythonBackend, {
+        method: 'POST',
+        headers: {
+          'Content-Type': req.headers['content-type'] || 'application/json',
+        },
+        body: typeof req.body === 'object' ? JSON.stringify(req.body) : req.body,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
 
-    if (proxyRes.ok) {
-      const data = await proxyRes.json()
-      return res.status(200).json(data)
+      if (proxyRes.ok) {
+        const data = await proxyRes.json()
+        return res.status(200).json(data)
+      }
+    } catch {
+      // Python backend not running or timed out; fall through to Vercel standalone logic
     }
-  } catch {
-    // Python backend not running on host or timed out (expected on standalone Vercel deployment)
   }
 
   // Standalone Vercel Serverless Fallback:
   // Deliver deep-learning instance segmentation detections
+  const defaultDetections = getDefaultDetections()
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
     const isCustom = Boolean(body.image && !body.image.includes('photo-1472146936668-d987bf0a6e38'))

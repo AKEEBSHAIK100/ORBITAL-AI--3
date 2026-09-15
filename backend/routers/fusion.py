@@ -55,6 +55,7 @@ def generate_synthetic_sar_from_optical(optical_img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(sar_noisy, cv2.COLOR_GRAY2BGR)
 
 @router.post("/analyze/fusion")
+@router.post("/api/fuse")  # alias for Vercel/Express proxy compatibility
 async def analyze_fusion(request: Request):
     """
     Optical + SAR Cross-Modal Fusion Endpoint.
@@ -109,13 +110,17 @@ async def analyze_fusion(request: Request):
             raise HTTPException(status_code=400, detail="Optical image is required for fusion analysis.")
 
     # Generate synthetic radar channel if SAR image wasn't provided
+    sar_is_synthetic = sar_bgr is None
     if sar_bgr is None:
         sar_bgr = generate_synthetic_sar_from_optical(optical_bgr)
 
     try:
         fusion_results = analyze_fusion_pair(optical_bgr, sar_bgr)
+        mode = "synthetic_proxy" if sar_is_synthetic else "model"
         return {
             "status": "success",
+            "mode": mode,
+            "sar_synthetic": sar_is_synthetic,
             "service": "SatQuery AI Optical-SAR Fusion Engine",
             "fusion_features": fusion_results,
         }

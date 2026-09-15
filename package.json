@@ -9,8 +9,9 @@
     "api:dev": "tsx server.ts",
     "api:start": "node --import tsx server.ts",
     "backend:start": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "start": "NODE_ENV=production node --import tsx server.ts",
+    "start": "node --import tsx server.ts",
     "preview": "vite preview",
     "format": "oxfmt"
   },

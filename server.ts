@@ -898,15 +898,18 @@ app.post('/api/fuse', async (req, res) => {
     let fusionFeatures = computeSimulatedFusionFeatures(opticalImage, sarImage)
     try {
       if (opticalImage && sarImage) {
-        const pyRes = await fetch('http://127.0.0.1:8000/analyze/fusion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage }),
-          signal: AbortSignal.timeout(1800),
-        })
-        if (pyRes.ok) {
-          const pyJson = await pyRes.json()
-          if (pyJson.fusion_features) fusionFeatures = pyJson.fusion_features
+        const pyBackend = (process.env.PYTHON_BACKEND_URL || '').replace(/\/+$/, '')
+        if (pyBackend) {
+          const pyRes = await fetch(`${pyBackend}/analyze/fusion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage }),
+            signal: AbortSignal.timeout(1800),
+          })
+          if (pyRes.ok) {
+            const pyJson = await pyRes.json()
+            if (pyJson.fusion_features) fusionFeatures = pyJson.fusion_features
+          }
         }
       }
     } catch {

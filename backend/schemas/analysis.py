@@ -97,3 +97,4 @@ class UnifiedAnalysisResponse(BaseModel):
     change_map: Optional[Dict[str, Any]] = None
     fusion_metrics: Optional[Dict[str, Any]] = None
     land_cover: Optional[Dict[str, Any]] = None
+    mode: Optional[str] = None  # "model" | "synthetic_fallback" | "demo_scene"

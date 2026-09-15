@@ -11,7 +11,9 @@ import LegalModals, { LegalModalType } from './components/LegalModals'
 import DocumentationModal from './components/DocumentationModal'
 import ContactModal from './components/ContactModal'
 import DashboardView from './components/DashboardView'
-import { ExecutionTrace, FusionFeatures, classifyTask } from './lib/agentController'
+import { ExecutionTrace, ExecutionTraceStep, FusionFeatures, classifyTask } from './lib/agentController'
+
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 // ── Design tokens (WCAG compliant high-contrast developer grade) ──────────────
 const C = {
@@ -60,6 +62,7 @@ type Analysis = {
   region?: Region | null
   execution_trace?: ExecutionTrace | null
   fusion_features?: FusionFeatures | null
+  mode?: string
 }
 
 type ChatMessage = {
@@ -75,12 +78,20 @@ type ChatMessage = {
   region?: Region | null
   execution_trace?: ExecutionTrace | null
   fusion_features?: FusionFeatures | null
+  mode?: string
 }
 
 export interface ImageTelemetry {
   landClass: string; landClassPct: string; buildingCount: string; waterPct: string
   vegetationPct: string; terrain: Terrain; locationTag: string
   landSub: string; buildingSub: string; waterSub: string; vegSub: string
+  raster_info?: {
+    format?: string
+    crs?: string
+    resolution_m?: number | null
+    bands?: number
+    is_geotiff?: boolean
+  }
 }
 
 export interface BuildingDetection {
@@ -96,6 +107,8 @@ export interface BuildingAnalysisResult {
   low_confidence_count: number; partial_count: number; confidence: number
   confidence_level: 'High' | 'Medium' | 'Low'; validation_status: string
   detections: BuildingDetection[]; image_dimensions?: { width: number; height: number }
+  mode?: string
+  error?: string
 }
 
 // BigEarthNet 19-class result
@@ -103,6 +116,7 @@ interface BENLabelScore { name: string; short: string; score: number; active: bo
 interface BENResult {
   labels: BENLabelScore[]; active_labels: BENLabelScore[]; top_label: string
   confidence: number; model_id: string; available: boolean; device: string; note: string; citation: string
+  mode?: string
 }
 
 // Toast system
@@ -972,6 +986,7 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
     suggested_followups: payload.suggested_followups || ['Analyze surrounding terrain', 'Assess water-body proximity', 'Audit vegetation density'],
     execution_trace: payload.execution_trace || null,
     region,
+    mode: payload.mode || (payload.available === false ? 'synthetic_fallback' : undefined),
   }
 }
 
@@ -1014,6 +1029,7 @@ export default function App() {
   const [temporalResult, setTemporalResult] = useState<{
     question: string; answer: string; confidenceScore: number
     features: string[]; execution_trace?: ExecutionTrace | null
+    mode?: string
   } | null>(null)
 
   // ── Navigation, Dashboard & Legal Modals ─────────────────────────────────
@@ -1049,7 +1065,7 @@ export default function App() {
   const classifyWithBEN = useCallback(async (dataUrl: string) => {
     setClassifyingBEN(true)
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/classify`, {
+      const res = await fetch(`${API_BASE}/classify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: dataUrl, top_k: 8, threshold: 0.2 }),
@@ -1101,6 +1117,7 @@ export default function App() {
         device: 'cpu',
         note: 'Heuristic estimation (backend classifier unavailable)',
         citation: '',
+        mode: 'synthetic_fallback',
       })
     } finally {
       setClassifyingBEN(false)
@@ -1115,11 +1132,15 @@ export default function App() {
     const steps = ['Tiling image…', 'Running YOLO segmentation…', 'Detecting rooftops…', 'Merging duplicates (NMS/IoU)…', 'Counting footprints…']
     let stepIdx = 0
     const timer = setInterval(() => { stepIdx = (stepIdx+1) % steps.length; setStatus(steps[stepIdx]) }, 2800)
+    const fileToSend = fileOverride ?? originalFile
+    const isDefault = !fileToSend && (!imagePreview || imagePreview.includes('photo-1472146936668'))
     try {
-      const fileToSend = fileOverride ?? originalFile
       let data: BuildingAnalysisResult | null = null
-      const isDefault = !fileToSend && (!imagePreview || imagePreview.includes('photo-1472146936668'))
-      for (const ep of ['/analyze/buildings', '/api/buildings']) {
+      const buildingEndpoints = API_BASE
+        ? [`${API_BASE}/analyze/buildings`, `${API_BASE}/api/buildings`]
+        : ['/analyze/buildings', '/api/buildings']
+
+      for (const ep of buildingEndpoints) {
         try {
           let res: Response
           if (fileToSend) {
@@ -1136,16 +1157,32 @@ export default function App() {
             const sig = await res.json().catch(() => null)
             if (sig?.custom_analysis_required) {
               setStatus('Running client-side detection…')
-              data = await detectBuildingsFromImage(imagePreview!, isDefault); break
+              data = await detectBuildingsFromImage(imagePreview!, isDefault)
+              if (data && !isDefault) {
+                data.validation_status = 'Client-side edge estimation (YOLO server service busy)'
+                data.mode = 'synthetic_fallback'
+              }
+              break
             }
           }
         } catch { /* try next */ }
       }
       if (!data) {
-        data = isDefault ? DEFAULT_BUILDING_ANALYSIS
-          : imagePreview ? await detectBuildingsFromImage(imagePreview, false)
-          : DEFAULT_BUILDING_ANALYSIS
+        if (isDefault) {
+          data = { ...DEFAULT_BUILDING_ANALYSIS, mode: 'demo_scene' }
+        } else if (imagePreview) {
+          setStatus('Running client-side preview detection…')
+          data = await detectBuildingsFromImage(imagePreview, false)
+          if (data) {
+            data.validation_status = 'Client-side edge estimation (YOLO server service unreachable)'
+            data.mode = 'synthetic_fallback'
+          }
+        }
       }
+      if (!data) {
+        throw new Error('Building detection unavailable: specialist YOLO model service is not reachable.')
+      }
+
       setBuildingAnalysis(data)
       setShowBuildingsOverlay(true)
       setActiveOverlay('urban')
@@ -1157,11 +1194,18 @@ export default function App() {
       setStatus(`Detected ${data.building_count} buildings (${data.confidence_level})`)
       addToast(`Found ${data.building_count} building footprints (${data.confidence_level} confidence)`, 'success')
       return data
-    } catch {
-      setBuildingAnalysis(DEFAULT_BUILDING_ANALYSIS)
-      setShowBuildingsOverlay(true)
-      setStatus(`Detected ${DEFAULT_BUILDING_ANALYSIS.building_count} buildings`)
-      return DEFAULT_BUILDING_ANALYSIS
+    } catch (err) {
+      if (isDefault) {
+        setBuildingAnalysis(DEFAULT_BUILDING_ANALYSIS)
+        setShowBuildingsOverlay(true)
+        setStatus(`Detected ${DEFAULT_BUILDING_ANALYSIS.building_count} buildings (Demo Scene)`)
+        return DEFAULT_BUILDING_ANALYSIS
+      }
+      const msg = err instanceof Error ? err.message : 'Specialist YOLO building detection service is not reachable.'
+      setError(msg)
+      setStatus('Detection unavailable')
+      addToast(msg, 'error')
+      return null
     } finally {
       clearInterval(timer); setIsDetectingBuildings(false)
     }
@@ -1326,8 +1370,9 @@ export default function App() {
     let confScore = 96
     let features = ['Vegetation shift', 'Built-up expansion', 'Riparian boundary', 'Coregistered baseline']
     let traceData: ExecutionTrace | null = null
+    let mode: string = 'model'
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze/change`, {
+      const res = await fetch(`${API_BASE}/api/analyze/change`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: queryPrompt,
@@ -1345,9 +1390,10 @@ export default function App() {
           confScore = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (data.confidenceScore ?? 96)
           if (data.detected_features?.length) features = data.detected_features
           if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
+          mode = data.mode || 'model'
         }
       } else {
-        const legacyRes = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/compare`, {
+        const legacyRes = await fetch(`${API_BASE}/api/compare`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ beforeImage: beforeImage || undefined, afterImage: afterImage || undefined, question: queryPrompt, beforeLabel: beforeImage ? 'Uploaded Earlier' : '2024 Baseline', afterLabel: afterImage ? 'Uploaded Later' : '2026 Pass' }),
         })
@@ -1357,17 +1403,23 @@ export default function App() {
             compAnswer = data.answer; confScore = data.confidenceScore ?? 96
             if (data.detected_features?.length) features = data.detected_features
             if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
+            mode = data.mode || 'model'
           }
+        } else {
+          mode = 'synthetic_fallback'
         }
       }
-    } catch { /* fallback */ }
+    } catch {
+      mode = 'synthetic_fallback'
+    }
 
-    setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, features, execution_trace: traceData })
+    setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, features, execution_trace: traceData, mode })
     setHistory(prev => [...prev, {
       question: queryPrompt, answer: compAnswer, confidence_percent: confScore, confidenceScore: confScore,
       confidence: confScore >= 85 ? 'high' : 'medium', detected_features: features,
       label: 'Bi-Temporal Change Detection', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       region: { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 55 }, execution_trace: traceData, fusion_features: null,
+      mode,
     }])
     setStatus('Change detection complete')
     addToast('Change detection complete — results below', 'success')
@@ -1383,7 +1435,7 @@ export default function App() {
     setBusy(true); setError('')
     setStatus('Running optical–SAR fusion…')
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze/optical-sar`, {
+      const res = await fetch(`${API_BASE}/api/analyze/optical-sar`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: fusionQuery,
@@ -1406,11 +1458,12 @@ export default function App() {
           detected_features: data.detected_features || ['Optical–SAR Joint Fusion'], label: 'Optical–SAR Fusion',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           execution_trace: data.execution_trace ?? null, fusion_features: data.fusion_features ?? null,
+          mode: data.mode || 'model',
         }])
         setAnalysis(normalizeAnalyzeResponse(data, fusionQuery)); setStatus('Fusion complete')
         addToast('Optical–SAR fusion complete', 'success')
       } else {
-        const legacyRes = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/fuse`, {
+        const legacyRes = await fetch(`${API_BASE}/api/fuse`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ opticalImage: opticalDataUrl, sarImage: sarDataUrl, question: fusionQuery }),
         })
@@ -1425,6 +1478,7 @@ export default function App() {
             detected_features: legacyData.detected_features || [], label: legacyData.label || 'Optical–SAR Fusion',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             execution_trace: legacyData.execution_trace ?? null, fusion_features: legacyData.fusion_features ?? null,
+            mode: legacyData.mode || 'synthetic_fallback',
           }])
           setAnalysis(legacyData as Analysis); setStatus('Fusion complete')
           addToast('Optical–SAR fusion complete', 'success')
@@ -1541,8 +1595,8 @@ export default function App() {
       lines.push('', '## 5. Observable Execution Trace')
       lines.push(`- **Task:** ${trace.task_type}`)
       lines.push(`- **Total Duration:** ${trace.total_duration_ms?.toFixed(0) ?? '—'} ms`)
-      ;(trace.steps ?? []).forEach((s: Record<string, unknown>) => {
-        lines.push(`  - Step ${s.step}: **${String(s.tool)}** — ${String(s.output_summary ?? '')} (${String(s.duration_ms?.toFixed ? (s.duration_ms as number).toFixed(0) : '—')} ms)`)
+      ;(trace.steps ?? []).forEach((s: ExecutionTraceStep) => {
+        lines.push(`  - Step ${s.step}: **${String(s.tool)}** — ${String(s.output_summary ?? '')} (${typeof s.duration_ms === 'number' ? s.duration_ms.toFixed(0) : '—'} ms)`)
       })
     }
     if (history.length) {

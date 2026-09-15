@@ -88,6 +88,7 @@ def load_image_from_any(val: str) -> np.ndarray:
         raise ValueError(f"Failed to decode base64 image: {b64_err}")
 
 @router.post("/analyze/buildings")
+@router.post("/api/buildings")  # alias for Vercel/Express proxy compatibility
 async def analyze_buildings(request: Request):
     """
     Main building detection endpoint:
@@ -175,6 +176,16 @@ async def analyze_buildings(request: Request):
     tiles = generate_tiles(img_width, img_height, tile_size=tile_size, overlap=overlap)
     detector = BuildingDetector.get_instance()
 
+    if not detector.is_available:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "MODEL_UNAVAILABLE",
+                "message": f"Building detection model is not loaded: {detector.load_error}",
+                "mode": "model_unavailable",
+            },
+        )
+
     # Step 2: Crop all tiles and run batch inference (offloaded to thread pool)
     tile_crops = [img_bgr[y1:y2, x1:x2] for (x1, y1, x2, y2) in tiles]
     loop = asyncio.get_event_loop()
@@ -220,6 +231,7 @@ async def analyze_buildings(request: Request):
 
     return {
         "success": True,
+        "mode": "model",
         "image_dimensions": {"width": img_width, "height": img_height},
         "tiles_processed": len(tiles),
         "raw_detections_count": len(raw_tile_detections),

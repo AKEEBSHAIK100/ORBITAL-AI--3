@@ -1,25 +1,23 @@
 import os
-import torch
-import numpy as np
+from pathlib import Path
 from typing import List, Dict, Any, Optional
-from ultralytics import YOLO
+
+import numpy as np
 
 class BuildingDetector:
     _instance: Optional["BuildingDetector"] = None
-    _model: Optional[YOLO] = None
+    _model = None
     _device: str = "cpu"
+    is_available: bool = False
+    load_error: str = ""
 
     def __init__(self, model_path: Optional[str] = None):
         if model_path is None:
             model_path = os.getenv(
                 "BUILDING_MODEL_PATH",
-                os.path.join(os.path.dirname(__file__), "..", "models", "building_model.pt")
+                str(Path(__file__).parent.parent / "models" / "building_model.pt")
             )
-        self.model_path = os.path.abspath(model_path)
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
-        if self._device == "cpu":
-            num_cores = os.cpu_count() or 4
-            torch.set_num_threads(num_cores)  # use all available cores
+        self.model_path = str(Path(model_path).resolve())
         self._load_model()
 
     @classmethod
@@ -33,19 +31,36 @@ class BuildingDetector:
         return self._device
 
     def _load_model(self):
-        print(f"[BuildingDetector] Loading building segmentation model from: {self.model_path}")
-        print(f"[BuildingDetector] Target inference device: {self._device.upper()}")
+        print(f"[BuildingDetector] Attempting to load model from: {self.model_path}")
         if not os.path.exists(self.model_path):
-            raise FileNotFoundError(f"Model file not found at: {self.model_path}")
-        
-        self._model = YOLO(self.model_path)
-        # Warmup
+            self.is_available = False
+            self.load_error = f"Model file not found at: {self.model_path}"
+            print(f"[BuildingDetector] WARNING: {self.load_error}")
+            return
+
         try:
-            dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-            self._model.predict(dummy, device=self._device, verbose=False)
-            print("[BuildingDetector] Model loaded and warmed up successfully.")
+            import torch
+            from ultralytics import YOLO
+
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            if self._device == "cpu":
+                num_cores = os.cpu_count() or 4
+                torch.set_num_threads(num_cores)
+
+            self._model = YOLO(self.model_path)
+            # Warmup pass
+            try:
+                dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+                self._model.predict(dummy, device=self._device, verbose=False)
+            except Exception as warm_err:
+                print(f"[BuildingDetector] Warmup warning (non-fatal): {warm_err}")
+
+            self.is_available = True
+            print(f"[BuildingDetector] Model loaded successfully on {self._device.upper()}.")
         except Exception as e:
-            print(f"[BuildingDetector] Warmup warning: {e}")
+            self.is_available = False
+            self.load_error = str(e)
+            print(f"[BuildingDetector] ERROR loading model: {e}")
 
     def predict_batch(
         self,
@@ -53,9 +68,13 @@ class BuildingDetector:
         conf_threshold: float = 0.20
     ) -> List[List[Dict[str, Any]]]:
         """Run batch inference for higher throughput."""
+        if not self.is_available or self._model is None:
+            raise RuntimeError(
+                f"Building detection model unavailable: {self.load_error or 'model not loaded'}"
+            )
         if not tiles:
             return []
-        
+
         results = self._model.predict(
             tiles,
             conf=conf_threshold,
@@ -76,7 +95,6 @@ class BuildingDetector:
                 poly = masks[i].tolist() if i < len(masks) else [
                     [box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]
                 ]
-                
                 detections.append({
                     "bbox": box,
                     "confidence": float(confs[i]),
