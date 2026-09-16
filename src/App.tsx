@@ -457,7 +457,7 @@ function ConfidenceBadge({ confidence, percent, reason }: { confidence: 'high'|'
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 p-2.5 rounded-lg text-[10px] leading-snug z-50 pointer-events-none"
             style={{ background: '#071022F5', border: `1px solid ${C.borderHover}`, color: '#D8F6FF', boxShadow: '0 4px 20px rgba(0,0,0,0.6)' }}>
             <div className="font-semibold text-white mb-0.5">AI Self-Assessed Confidence</div>
-            <div>Based on image clarity and query specificity — not a measured accuracy statistic.</div>
+            <div>Based on image clarity and query specificity. Not a measured accuracy statistic.</div>
             {reason && <div className="mt-1 pt-1 text-[9px] text-slate-400 border-t border-slate-700/50">Factor: {reason}</div>}
           </div>
         )}
@@ -531,7 +531,7 @@ function BENPanel({ results, loading }: { results: BENResult | null, loading: bo
         <div className="px-4 pb-3">
           <div className="flex flex-wrap gap-1.5">
             {results.active_labels?.map(l => (
-              <span key={l.name} className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+              <span key={l.name} className="text-[9px] font-mono px-2 py-0.5 rounded-md"
                 style={{ background: `${C.mint}18`, color: C.mint, border: `1px solid ${C.mint}33` }}>{l.short}</span>
             ))}
           </div>
@@ -627,7 +627,7 @@ function Navbar({
               activeView === 'workspace' && appMode === 'fusion' ? 'text-cyan-400 font-semibold bg-cyan-950/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
             }`}
           >
-            <span className="mr-1 text-emerald-400">⚡</span>Fusion
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-emerald-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>Fusion
           </button>
           <button
             onClick={() => { setActiveView('workspace'); setAppMode('compare'); scrollTo('compare-section') }}
@@ -672,14 +672,14 @@ function Navbar({
             className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg btn-outline-cyan font-mono font-bold"
             title="ISRO/SAC Evaluation Protocol"
           >
-            <span>⚖</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21" /><path d="M3 9l9-6 9 6" /><path d="M9 21h6" /><path d="M4 10h5L6 18" /><path d="M15 10h5l-3 8" /></svg>
             <span className="hidden md:inline">EVAL CRITERIA</span>
           </button>
           <button
             onClick={onOpenContact}
             className="hidden md:flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg btn-ghost font-mono"
           >
-            <span>✉</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
             <span>Contact</span>
           </button>
           <button
@@ -692,7 +692,7 @@ function Navbar({
             onClick={() => { setActiveView('workspace'); onAnalyze() }}
             className="btn-primary text-xs px-4 py-2 font-semibold shadow-md shadow-cyan-950"
           >
-            Launch AI
+            Launch Workspace
           </button>
 
           {/* Mobile hamburger */}
@@ -725,7 +725,7 @@ function Navbar({
             onClick={() => { setActiveView('workspace'); setAppMode('fusion'); scrollTo('analyze') }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            ⚡ Optical–SAR Fusion
+            Optical-SAR Fusion
           </button>
           <button
             onClick={() => { setActiveView('workspace'); setAppMode('compare'); scrollTo('compare-section') }}
@@ -737,19 +737,19 @@ function Navbar({
             onClick={() => { setActiveView('dashboard'); scrollTo('analyze') }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-cyan-400 font-bold bg-cyan-950/30"
           >
-            📊 Operational Dashboard
+            Operational Dashboard
           </button>
           <button
             onClick={() => { onOpenDocs(); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            📖 Technical Documentation
+            Technical Documentation
           </button>
           <button
             onClick={() => { onOpenContact(); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            ✉ Contact Researchers
+            Contact Researchers
           </button>
           <button
             onClick={() => scrollTo('features')}
@@ -759,7 +759,7 @@ function Navbar({
           </button>
           <div className="pt-2 flex gap-2">
             <button onClick={() => { onEval(); setMobileOpen(false) }} className="btn-outline-cyan text-xs px-3 py-2 font-mono flex-1">
-              ⚖ EVAL CRITERIA
+              EVAL CRITERIA
             </button>
             <button onClick={() => { onUpload(); setMobileOpen(false) }} className="btn-ghost text-xs px-3 py-2 flex-1">
               Upload Image
@@ -821,19 +821,6 @@ function HeroSection({
     <section id="explore" className="relative min-h-screen flex items-center overflow-hidden" style={{ background: C.base }}>
       <Starfield />
 
-      {/* Radial glows */}
-      <div className="absolute pointer-events-none" style={{
-        right: '-5%', top: '50%', transform: 'translateY(-50%)',
-        width: '60vw', height: '60vw',
-        background: 'radial-gradient(ellipse at center, rgba(32,217,255,0.06) 0%, transparent 65%)',
-        borderRadius: '50%',
-      }} />
-      <div className="absolute pointer-events-none" style={{
-        right: '20%', top: '15%', width: '25vw', height: '25vw',
-        background: 'radial-gradient(ellipse at center, rgba(53,224,184,0.04) 0%, transparent 65%)',
-        borderRadius: '50%',
-      }} />
-
       {/* Grid background */}
       <div className="absolute inset-0 grid-bg opacity-40 pointer-events-none" />
 
@@ -843,7 +830,7 @@ function HeroSection({
           {/* Left: Copy */}
           <div className="py-10 fade-up">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-full"
+            <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-md"
               style={{ background: 'rgba(32,217,255,0.08)', border: `1px solid ${C.borderHover}` }}>
               <span className="w-2 h-2 rounded-full pulse-dot" style={{ background: C.cyan }} />
               <span className="text-xs font-mono tracking-[0.2em] uppercase" style={{ color: C.cyan }}>ISRO / SAC Remote-Sensing VLM Challenge</span>
@@ -853,11 +840,11 @@ function HeroSection({
             <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.02] mb-6" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}>
               SatQuery
               <br />
-              <span className="gradient-text">AI Assistant.</span>
+              <span style={{ color: 'var(--cyan)' }}>Earth Observation Engine.</span>
             </h1>
 
             <p className="text-lg leading-relaxed mb-10 max-w-lg" style={{ color: C.muted, lineHeight: 1.8 }}>
-              Agentic vision-language intelligence for single, bi-temporal, and optical–SAR satellite imagery. Ask anything in plain language — get verified, traceable answers with BigEarthNet domain adaptation.
+              Agentic vision-language intelligence for single-image VQA, bi-temporal change detection, and optical-SAR cross-sensor fusion. Grounded on BigEarthNet v2.0 domain adaptation with transparent step-level execution traces.
             </p>
 
             {/* CTA buttons */}
@@ -877,7 +864,7 @@ function HeroSection({
                 { val: '19', label: 'BigEarthNet classes', col: C.mint },
                 { val: '0.5m', label: 'GSD resolution', col: C.cyan },
                 { val: '5', label: 'ISRO/SAC task types', col: C.orange },
-                { val: '99.2%', label: 'Detection accuracy', col: C.white },
+                { val: '0.68', label: 'F1 multi-label score', col: C.white },
               ].map(s => (
                 <div key={s.label}>
                   <div className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif", color: s.col }}>{s.val}</div>
@@ -888,7 +875,7 @@ function HeroSection({
 
             {/* 5 Official Queries */}
             <div className="space-y-2">
-              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>— ISRO/SAC Representative Queries —</div>
+              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>ISRO/SAC Representative Queries</div>
               <div className="flex flex-wrap gap-2">
                 {OFFICIAL_REPRESENTATIVE_QUERIES.map(q => (
                   <button key={q.badge} onClick={() => onQueryChip(q.query)}
@@ -1484,7 +1471,7 @@ export default function App() {
       mode,
     }])
     setStatus('Change detection complete')
-    addToast('Change detection complete — results below', 'success')
+    addToast('Change detection complete: results below', 'success')
     setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
   }
 
@@ -1555,7 +1542,7 @@ export default function App() {
   // ── Export report ─────────────────────────────────────────────────────────
   const downloadReport = () => {
     const data = {
-      generator: 'SatQuery AI — Agentic Remote-Sensing VLM', version: '3.0.0',
+      generator: 'SatQuery AI: Agentic Remote-Sensing VLM', version: '3.0.0',
       exported_at: new Date().toISOString(), session_id: sessionId, active_mode: appMode,
       telemetry: imageTelemetry, bigearth_classification: benResults,
       latest_analysis: analysis, building_audit: buildingAnalysis,
@@ -1601,7 +1588,7 @@ export default function App() {
     const geojson = {
       type: 'FeatureCollection',
       metadata: {
-        generator: 'SatQuery AI — Building Footprint Extractor',
+        generator: 'SatQuery AI: Building Footprint Extractor',
         version: '3.0.0',
         exported_at: new Date().toISOString(),
         total_buildings: buildingAnalysis.building_count,
@@ -1624,7 +1611,7 @@ export default function App() {
     const ts = new Date().toISOString()
     const trace = activeTrace || lastFusionTrace
     const lines: string[] = [
-      '# SatQuery AI — Remote Sensing Mission Analysis Report',
+      '# SatQuery AI: Remote Sensing Mission Analysis Report',
       `**Generated:** ${ts} · **Version:** SatQuery-Agent-v3.0`,
       '---',
       '## 1. Session Overview',
@@ -1658,7 +1645,7 @@ export default function App() {
       lines.push(`- **Task:** ${trace.task_type}`)
       lines.push(`- **Total Duration:** ${trace.total_duration_ms?.toFixed(0) ?? '—'} ms`)
       ;(trace.steps ?? []).forEach((s: ExecutionTraceStep) => {
-        lines.push(`  - Step ${s.step}: **${String(s.tool)}** — ${String(s.output_summary ?? '')} (${typeof s.duration_ms === 'number' ? s.duration_ms.toFixed(0) : '—'} ms)`)
+        lines.push(`  - Step ${s.step}: **${String(s.tool)}**: ${String(s.output_summary ?? '')} (${typeof s.duration_ms === 'number' ? s.duration_ms.toFixed(0) : '—'} ms)`)
       })
     }
     if (history.length) {
@@ -1800,7 +1787,7 @@ export default function App() {
                   boxShadow: activeView === 'dashboard' ? `0 0 14px ${C.cyan}22` : 'none',
                 }}
               >
-                <span>📊</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
                 <span>Audit & Telemetry Dashboard</span>
               </button>
             </div>
@@ -1811,7 +1798,7 @@ export default function App() {
                 onClick={() => setDocModalOpen(true)}
                 className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg flex items-center gap-1.5"
               >
-                <span>📖</span><span>Docs & API</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg><span>Docs & API</span>
               </button>
               <button
                 type="button"
@@ -1827,7 +1814,7 @@ export default function App() {
                 className="btn-ghost px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
                 title="Download analysis report as Markdown"
               >
-                <span>📄</span><span className="hidden sm:inline">Report.md</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg><span className="hidden sm:inline">Report.md</span>
               </button>
               {buildingAnalysis && (
                 <button
@@ -1836,7 +1823,7 @@ export default function App() {
                   className="btn-ghost px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
                   title="Download building footprints as GeoJSON"
                 >
-                  <span>🗺</span><span className="hidden sm:inline">GeoJSON</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg><span className="hidden sm:inline">GeoJSON</span>
                 </button>
               )}
               {(activeTrace || lastFusionTrace) && (
@@ -1845,7 +1832,7 @@ export default function App() {
                   onClick={() => setTraceModalOpen(true)}
                   className="btn-outline-cyan px-3 py-1.5 text-xs font-mono flex items-center gap-1.5 rounded-lg"
                 >
-                  <span>⚡</span><span>Agent Trace</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg><span>Agent Trace</span>
                 </button>
               )}
             </div>
@@ -1884,9 +1871,9 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2 mb-6">
                 <div className="text-xs font-mono uppercase tracking-widest mr-3" style={{ color: C.dim }}>Analysis Mode</div>
                 {([
-                  { id: 'single', label: '◉ Single Image', col: C.cyan },
-                  { id: 'fusion', label: '⚡ Optical–SAR Fusion', col: C.mint },
-                  { id: 'compare', label: '⇄ Bi-Temporal', col: C.orange },
+                  { id: 'single', label: 'Single Image', col: C.cyan },
+                  { id: 'fusion', label: 'Optical-SAR Fusion', col: C.mint },
+                  { id: 'compare', label: 'Bi-Temporal Compare', col: C.orange },
                 ] as const).map(m => (
                   <button key={m.id} onClick={() => { setAppMode(m.id); if (m.id !== 'single') scrollToSection(m.id === 'compare' ? 'compare-section' : 'analyze') }}
                     className="px-4 py-2 rounded-xl text-xs font-mono font-bold tracking-wide transition-all"
@@ -1948,7 +1935,7 @@ export default function App() {
                         <button onClick={() => setShowBuildingsOverlay(!showBuildingsOverlay)}
                           className="px-2 py-0.5 rounded text-[9px] font-mono transition-all cursor-pointer"
                           style={{ background: showBuildingsOverlay ? `${C.cyan}28` : 'transparent', color: showBuildingsOverlay ? C.white : C.muted, border: `1px solid ${showBuildingsOverlay ? C.cyan : C.border}` }}>
-                          {showBuildingsOverlay ? '👁 Footprints: ON' : '👁 Show Footprints'}
+                          {showBuildingsOverlay ? 'Footprints: ON' : 'Show Footprints'}
                         </button>
                       )}
                     </div>
@@ -2066,7 +2053,7 @@ export default function App() {
                     {imagePreview && (
                       <button onClick={openUploader} className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg text-xs font-mono glass-strong cursor-pointer transition-all hover:border-cyan-400"
                         style={{ border: `1px solid ${C.border}`, color: C.muted }}>
-                        ⤒ New Image
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 inline-block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>New Image
                       </button>
                     )}
                   </div>
@@ -2076,8 +2063,8 @@ export default function App() {
                     {[
                       { label: 'Land Classification', val: imageTelemetry.landClassPct, sub: imageTelemetry.landSub, col: imageTelemetry.terrain === 'water' ? C.cyan : imageTelemetry.terrain === 'vegetation' ? C.mint : imageTelemetry.terrain === 'arid' ? C.orange : C.cyan, active: activeOverlay === 'urban' },
                       { label: 'Buildings', val: buildingAnalysis ? String(buildingAnalysis.building_count) : imageTelemetry.buildingCount, sub: buildingAnalysis ? `High: ${buildingAnalysis.high_confidence_count} · Med: ${buildingAnalysis.medium_confidence_count}` : imageTelemetry.buildingSub, col: C.white, active: !!buildingAnalysis },
-                      { label: 'Water Coverage', val: imageTelemetry.waterPct, sub: activeOverlay === 'flood' ? '★ Safe 140m buffer' : imageTelemetry.waterSub, col: C.cyan, active: activeOverlay === 'flood' },
-                      { label: 'Vegetation', val: imageTelemetry.vegetationPct, sub: activeOverlay === 'drought' ? '⚠ −38% Moisture Stress' : activeOverlay === 'harvest' ? '★ 88% Harvest Ready' : imageTelemetry.vegSub, col: activeOverlay === 'drought' ? C.orange : C.mint, active: activeOverlay === 'drought' || activeOverlay === 'harvest' },
+                      { label: 'Water Coverage', val: imageTelemetry.waterPct, sub: activeOverlay === 'flood' ? 'Safe: 140m buffer' : imageTelemetry.waterSub, col: C.cyan, active: activeOverlay === 'flood' },
+                      { label: 'Vegetation', val: imageTelemetry.vegetationPct, sub: activeOverlay === 'drought' ? '-38% Moisture Stress' : activeOverlay === 'harvest' ? '88% Harvest Ready' : imageTelemetry.vegSub, col: activeOverlay === 'drought' ? C.orange : C.mint, active: activeOverlay === 'drought' || activeOverlay === 'harvest' },
                     ].map((s, i) => (
                       <div key={i} className="px-5 py-4 stat-card transition-all duration-300"
                         style={{ borderRight: i < 3 ? `1px solid ${C.border}` : 'none', background: s.active ? `${s.col}0A` : 'transparent' }}>
@@ -2113,7 +2100,7 @@ export default function App() {
                     <button onClick={() => setShowInfoModal(true)} className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] btn-ghost">?</button>
                     {(activeTrace || lastFusionTrace) && (
                       <button onClick={() => setTraceModalOpen(true)} className="px-2 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1 btn-outline-cyan">
-                        <span>⚡</span><span>Trace</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg><span>Trace</span>
                       </button>
                     )}
                   </div>
@@ -2123,9 +2110,11 @@ export default function App() {
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto" style={{ maxHeight: 400 }}>
                   {history.length === 0 && !busy && (
                     <div className="rounded-xl p-4 text-xs leading-relaxed text-center" style={{ background: `${C.card}88`, border: `1px solid ${C.border}`, color: C.muted }}>
-                      <div className="text-3xl mb-2 opacity-40">🛰</div>
+                      <div className="mb-2 opacity-40 flex justify-center">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2" /><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" /></svg>
+                      </div>
                       <div className="font-medium mb-1" style={{ color: C.white }}>Upload an image to begin</div>
-                      <div>Ask any question in natural language — SatQuery AI delivers verified remote-sensing insights with BigEarthNet domain adaptation.</div>
+                      <div>Ask in natural language. SatQuery AI routes your query to the correct specialist pipeline and returns a verified, traceable result.</div>
                     </div>
                   )}
 
@@ -2142,17 +2131,20 @@ export default function App() {
                       <div className="rounded-xl px-4 py-3.5 space-y-2.5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                         {m.is_synthetic && (
                           <div
-                            className="w-full rounded-xl p-3.5 flex items-start gap-3 border-2"
+                            className="w-full rounded-xl p-3.5 flex items-start gap-3 border"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(255,159,67,0.22) 0%, rgba(255,107,107,0.15) 100%)',
-                              borderColor: '#FF9F43',
-                              boxShadow: '0 0 16px rgba(255,159,67,0.3)',
+                              background: 'rgba(255,159,67,0.08)',
+                              borderColor: 'rgba(255,159,67,0.4)',
                             }}
                           >
-                            <span className="text-xl shrink-0 leading-none">⚠️</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: '#FF9F43' }}>
+                              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                              <line x1="12" y1="9" x2="12" y2="13" />
+                              <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
                             <div className="space-y-1">
                               <div className="text-xs font-mono font-bold tracking-wider uppercase" style={{ color: '#FFB86C' }}>
-                                Sample output — not a live model result
+                                Sample output: not a live model result
                               </div>
                               <div className="text-[11px] font-mono leading-relaxed" style={{ color: '#F4F7FA' }}>
                                 This response was generated from pre-configured demonstration data. It does not represent live specialist model execution.
@@ -2171,7 +2163,7 @@ export default function App() {
                         {m.detected_features?.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {m.detected_features.map(f => (
-                              <span key={f} className="text-[9px] px-2 py-0.5 rounded-full font-mono" style={{ background: `${C.cyan}0A`, color: C.muted, border: `1px solid ${C.border}` }}>{f}</span>
+                              <span key={f} className="text-[9px] px-2 py-0.5 rounded-md font-mono" style={{ background: `${C.cyan}0A`, color: C.muted, border: `1px solid ${C.border}` }}>{f}</span>
                             ))}
                           </div>
                         )}
@@ -2193,7 +2185,8 @@ export default function App() {
                         {m.execution_trace && (
                           <button onClick={() => { setActiveTrace(m.execution_trace!); setTraceModalOpen(true) }}
                             className="px-2.5 py-1 rounded-lg text-[10px] font-mono btn-outline-cyan flex items-center gap-1.5 w-fit">
-                            <span>⚡</span><span>View Execution Trace ({m.execution_trace.task_type.toUpperCase()})</span>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                            <span>View Execution Trace ({m.execution_trace.task_type.toUpperCase()})</span>
                           </button>
                         )}
 
@@ -2226,7 +2219,7 @@ export default function App() {
                   )}
 
                   {error && <div className="rounded-xl px-4 py-3 text-xs leading-relaxed" style={{ background: 'rgba(255,107,107,0.10)', border: `1px solid rgba(255,107,107,0.3)`, color: C.danger }}>{error}</div>}
-                  {atCap && <div className="rounded-xl px-4 py-3 text-xs font-medium" style={{ background: `${C.orange}10`, border: `1px solid ${C.orange}50`, color: C.orange }}>⚠ Session limit reached — refresh to start a new session.</div>}
+                  {atCap && <div className="rounded-xl px-4 py-3 text-xs font-medium flex items-center gap-2" style={{ background: `${C.orange}10`, border: `1px solid ${C.orange}50`, color: C.orange }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg> Session limit reached. Refresh to start a new session.</div>}
                   <div ref={chatBottomRef} />
                 </div>
 
@@ -2251,7 +2244,7 @@ export default function App() {
                     <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2.5 input-field text-xs">
                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: atCap ? C.orange : C.cyan, boxShadow: `0 0 6px ${atCap ? C.orange : C.cyan}` }} />
                       <input value={question} onChange={e => setQuestion(e.target.value)}
-                        placeholder={atCap ? 'Session limit reached — refresh to continue' : 'Ask anything about this image…'}
+                        placeholder={atCap ? 'Session limit reached. Refresh to continue' : 'Ask anything about this image…'}
                         disabled={atCap} className="flex-1 bg-transparent outline-none disabled:opacity-50 text-xs"
                         style={{ color: C.white, fontFamily: 'Inter, sans-serif' }} />
                     </div>
@@ -2270,12 +2263,12 @@ export default function App() {
       </section>
 
       {/* ── FEATURES SECTION ─────────────────────────────────────────────────── */}
-      <section id="features" ref={r2.ref} className="py-28 section-reveal" style={{ ...({} as any), opacity: r2.visible ? 1 : 0, transform: r2.visible ? 'none' : 'translateY(32px)', transition: 'all 0.7s ease', borderTop: `1px solid ${C.border}`, background: C.base }}>
+      <section id="features" ref={r2.ref} className="py-28 section-reveal" style={{ borderTop: `1px solid ${C.border}`, background: C.base }}>
         <div className="max-w-7xl mx-auto px-5">
           <div className="text-center mb-16">
-            <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-full" style={{ color: C.orange, background: `${C.orange}0E`, border: `1px solid ${C.orange}22` }}>CORE CAPABILITIES</div>
+            <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-md" style={{ color: C.orange, background: `${C.orange}0E`, border: `1px solid ${C.orange}22` }}>CORE CAPABILITIES</div>
             <h2 className="text-4xl lg:text-5xl font-bold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Intelligence Across<br />Every Modality</h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Five specialist AI pipelines — deterministically routed, observable, and benchmarked against public datasets.</p>
+            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Five specialist pipelines: deterministically routed, observable, and benchmarked against public datasets.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -2291,7 +2284,7 @@ export default function App() {
                 style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <div className="flex items-start justify-between mb-5">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl" style={{ background: `${f.color}18`, border: `1px solid ${f.color}33`, color: f.color }}>{f.icon}</div>
-                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: `${f.color}18`, color: f.color, border: `1px solid ${f.color}33` }}>{f.badge}</span>
+                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md" style={{ background: `${f.color}18`, color: f.color, border: `1px solid ${f.color}33` }}>{f.badge}</span>
                 </div>
                 <h3 className="text-base font-bold mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed mb-4" style={{ color: C.muted }}>{f.desc}</p>
@@ -2304,11 +2297,11 @@ export default function App() {
 
       {/* ── COMPARE SECTION ─────────────────────────────────────────────────── */}
       <section id="compare-section" ref={r3.ref} className="py-28 scroll-mt-10"
-        style={{ background: C.surface, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, opacity: r3.visible ? 1 : 0, transform: r3.visible ? 'none' : 'translateY(32px)', transition: 'all 0.7s ease' }}>
+        style={{ background: C.surface, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
         <div className="max-w-7xl mx-auto px-5">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div>
-              <div className="inline-block text-xs font-mono tracking-widest mb-5 px-3 py-1.5 rounded-full" style={{ color: C.mint, background: `${C.mint}0E`, border: `1px solid ${C.mint}22` }}>BI-TEMPORAL ANALYSIS · CDVQA</div>
+              <div className="inline-block text-xs font-mono tracking-widest mb-5 px-3 py-1.5 rounded-md" style={{ color: C.mint, background: `${C.mint}0E`, border: `1px solid ${C.mint}22` }}>BI-TEMPORAL ANALYSIS · CDVQA</div>
               <h2 className="text-4xl lg:text-5xl font-bold mb-5" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Compare Any Two<br />Points in Time</h2>
               <p className="text-base leading-relaxed mb-8" style={{ color: C.muted, lineHeight: 1.8 }}>Upload before/after satellite passes or use demo imagery. SatQuery AI co-registers the scenes, quantifies structural and environmental changes, and generates a CDVQA-compliant change analysis with confidence bounds.</p>
 
@@ -2317,14 +2310,14 @@ export default function App() {
                   <span>▸</span><span>Run Change Detection</span>
                 </button>
                 <button onClick={() => beforeInputRef.current?.click()} className="btn-ghost px-4 py-2.5 text-xs font-mono rounded-xl flex items-center gap-2">
-                  <span>⤒</span><span>{beforeImage ? '✓ Earlier Loaded' : 'Upload Earlier Image'}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg><span>{beforeImage ? 'Earlier Loaded' : 'Upload Earlier Image'}</span>
                 </button>
                 <button onClick={() => afterInputRef.current?.click()} className="btn-ghost px-4 py-2.5 text-xs font-mono rounded-xl flex items-center gap-2">
-                  <span>⤒</span><span>{afterImage ? '✓ Later Loaded' : 'Upload Later Image'}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg><span>{afterImage ? 'Later Loaded' : 'Upload Later Image'}</span>
                 </button>
                 {(beforeImage || afterImage) && (
                   <button onClick={() => { setBeforeImage(null); setAfterImage(null); addToast('Images reset', 'info') }}
-                    className="btn-ghost px-3 py-2.5 text-xs font-mono rounded-xl" style={{ color: C.danger }}>↺ Reset</button>
+                    className="btn-ghost px-3 py-2.5 text-xs font-mono rounded-xl" style={{ color: C.danger }}>Reset</button>
                 )}
               </div>
 
@@ -2387,7 +2380,7 @@ export default function App() {
                   {temporalResult.execution_trace && (
                     <button onClick={() => { setActiveTrace(temporalResult.execution_trace!); setTraceModalOpen(true) }}
                       className="btn-outline-cyan px-3 py-1.5 text-[10px] font-mono flex items-center gap-1.5 rounded-lg">
-                      <span>⚡</span><span>View Execution Trace</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg><span>View Execution Trace</span>
                     </button>
                   )}
                 </div>
@@ -2399,10 +2392,10 @@ export default function App() {
 
       {/* ── ABOUT / QUERY EXAMPLES ──────────────────────────────────────────── */}
       <section id="about" ref={r5.ref} className="py-28"
-        style={{ background: C.base, opacity: r5.visible ? 1 : 0, transform: r5.visible ? 'none' : 'translateY(32px)', transition: 'all 0.7s ease' }}>
+        style={{ background: C.base }}>
         <div className="max-w-7xl mx-auto px-5">
           <div className="text-center mb-16">
-            <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-full" style={{ color: C.cyan, background: `${C.cyan}0E`, border: `1px solid ${C.cyan}22` }}>NATURAL LANGUAGE INTERFACE</div>
+            <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-md" style={{ color: C.cyan, background: `${C.cyan}0E`, border: `1px solid ${C.cyan}22` }}>NATURAL LANGUAGE INTERFACE</div>
             <h2 className="text-4xl lg:text-5xl font-bold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Ask in Plain Language</h2>
             <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>No GIS expertise needed. SatQuery AI translates everyday questions into precise remote-sensing analysis with full provenance.</p>
           </div>
@@ -2418,7 +2411,7 @@ export default function App() {
             ].map((item, i) => (
               <div key={i} className="rounded-2xl p-5 stat-card" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: `${item.col}18`, color: item.col, border: `1px solid ${item.col}28` }}>{item.badge}</span>
+                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md" style={{ background: `${item.col}18`, color: item.col, border: `1px solid ${item.col}28` }}>{item.badge}</span>
                   <span className="text-[10px] font-mono" style={{ color: C.dim }}>USER QUERY</span>
                 </div>
                 <p className="text-sm font-semibold mb-3 leading-relaxed" style={{ color: C.white, fontFamily: "'Space Grotesk', sans-serif" }}>"{item.q}"</p>
@@ -2433,15 +2426,14 @@ export default function App() {
 
       {/* ── CTA ────────────────────────────────────────────────────────────── */}
       <section ref={r6.ref} className="py-36 text-center relative overflow-hidden"
-        style={{ background: C.surface, borderTop: `1px solid ${C.border}`, opacity: r6.visible ? 1 : 0, transform: r6.visible ? 'none' : 'translateY(32px)', transition: 'all 0.7s ease' }}>
+        style={{ background: C.surface, borderTop: `1px solid ${C.border}` }}>
         <div className="absolute inset-0 pointer-events-none grid-bg opacity-30" />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(32,217,255,0.05) 0%, transparent 70%)' }} />
         <div className="relative max-w-3xl mx-auto px-5">
-          <div className="inline-block text-xs font-mono tracking-widest mb-6 px-3 py-1.5 rounded-full" style={{ color: C.cyan, background: `${C.cyan}0E`, border: `1px solid ${C.cyan}22` }}>START ANALYZING</div>
+          <div className="inline-block text-xs font-mono tracking-widest mb-6 px-3 py-1.5 rounded-md" style={{ color: C.cyan, background: `${C.cyan}0E`, border: `1px solid ${C.cyan}22` }}>START ANALYZING</div>
           <h2 className="text-5xl lg:text-6xl font-bold mb-6" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}>
-            Earth is waiting<br /><span className="gradient-text">to be questioned.</span>
+            Upload. Query.<br /><span style={{ color: 'var(--cyan)' }}>Get verified answers.</span>
           </h2>
-          <p className="text-lg mb-12 max-w-lg mx-auto" style={{ color: C.muted, lineHeight: 1.8 }}>Join research teams, urban planners, agricultural operators, and environmental agencies who use SatQuery AI to make satellite data speak.</p>
+          <p className="text-lg mb-12 max-w-lg mx-auto" style={{ color: C.muted, lineHeight: 1.8 }}>Used by research teams, urban planners, agricultural operators, and environmental agencies to interrogate satellite imagery with traceable, benchmark-grounded results.</p>
           <div className="flex flex-wrap justify-center gap-4">
             <button onClick={focusWorkspace} className="btn-primary px-8 py-4 text-sm font-semibold rounded-xl">Upload Image & Start →</button>
             <button onClick={() => setShowEvalModal(true)} className="btn-ghost px-8 py-4 text-sm font-medium rounded-xl">View Evaluation Criteria</button>
@@ -2450,7 +2442,7 @@ export default function App() {
           {/* Tech stack badges */}
           <div className="flex flex-wrap justify-center gap-2.5 mt-12">
             {['BigEarthNet v2.0', 'ResNet-50', 'VRSBench', 'RSVQA', 'CDVQA', 'Cartosat-2S', 'RISAT-1A', 'Sentinel-1/2'].map(t => (
-              <span key={t} className="text-[10px] font-mono px-3 py-1 rounded-full" style={{ background: `${C.border}`, color: C.dim, border: `1px solid ${C.border}` }}>{t}</span>
+              <span key={t} className="text-[10px] font-mono px-3 py-1 rounded-md" style={{ background: `${C.border}`, color: C.dim, border: `1px solid ${C.border}` }}>{t}</span>
             ))}
           </div>
         </div>
@@ -2471,10 +2463,10 @@ export default function App() {
                 </svg>
                 <span className="font-bold tracking-wide text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>SATQUERY<span style={{ color: C.cyan }}>AI</span></span>
               </div>
-              <p className="text-sm leading-relaxed mb-5" style={{ color: C.muted }}>Agentic remote-sensing vision-language assistant. ISRO/SAC VLM Challenge — BigEarthNet domain adaptation, multi-modal analysis, deterministic task routing.</p>
+              <p className="text-sm leading-relaxed mb-5" style={{ color: C.muted }}>Agentic remote-sensing vision-language assistant for the ISRO/SAC VLM Challenge. BigEarthNet domain adaptation, multi-modal analysis, deterministic task routing.</p>
               <div className="flex flex-wrap gap-1.5">
                 {['BigEarthNet v2.0', 'ResNet-50', 'BIFOLD/TU Berlin'].map(t => (
-                  <span key={t} className="text-[9px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${C.cyan}0A`, color: C.dim, border: `1px solid ${C.border}` }}>{t}</span>
+                  <span key={t} className="text-[9px] font-mono px-2 py-0.5 rounded-md" style={{ background: `${C.cyan}0A`, color: C.dim, border: `1px solid ${C.border}` }}>{t}</span>
                 ))}
               </div>
             </div>
@@ -2623,7 +2615,7 @@ export default function App() {
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.white}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#35E0B8'}
                 >
-                  Strict Required Data Policy 🔒
+                  Strict Required Data Policy
                 </button>
                 <button
                   type="button"

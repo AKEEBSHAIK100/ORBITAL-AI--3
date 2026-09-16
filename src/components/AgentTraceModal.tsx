@@ -40,7 +40,7 @@ export default function AgentTraceModal({ isOpen, onClose, trace, queryTitle }: 
       <div
         className="relative w-full max-w-2xl max-h-[88vh] rounded-2xl flex flex-col overflow-hidden border shadow-2xl"
         style={{
-          background: 'linear-gradient(180deg, #071022 0%, #030814 100%)',
+          background: '#07111F',
           borderColor: CB,
           boxShadow: '0 0 40px rgba(32,217,255,0.15)',
         }}
@@ -209,7 +209,7 @@ export default function AgentTraceModal({ isOpen, onClose, trace, queryTitle }: 
                         {st.tool}
                       </span>
                       <span className="text-[10px] font-mono" style={{ color: GRY }}>
-                        — {st.description}
+                        : {st.description}
                       </span>
                     </div>
 

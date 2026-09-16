@@ -1,5 +1,6 @@
 {
-  "description": "Orbital-AI streamlines AI-driven solutions for businesses, enhancing decision-making and automating workflows to boost efficiency and innovation.",
+  "title": "SatQuery AI: Agentic Remote Sensing VLM Platform",
+  "description": "Agentic remote-sensing vision-language assistant for ISRO/SAC VLM Challenge. Multi-modal BigEarthNet classification, bi-temporal CDVQA change detection, and optical-SAR fusion.",
   "robots": {
     "index": false
   },

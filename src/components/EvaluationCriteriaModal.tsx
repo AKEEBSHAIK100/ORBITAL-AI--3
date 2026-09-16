@@ -27,7 +27,7 @@ export default function EvaluationCriteriaModal({ isOpen, onClose }: Props) {
       <div
         className="relative w-full max-w-3xl max-h-[90vh] rounded-2xl flex flex-col overflow-hidden border shadow-2xl"
         style={{
-          background: 'linear-gradient(180deg, #071022 0%, #030814 100%)',
+          background: '#07111F',
           borderColor: CB,
           boxShadow: '0 0 50px rgba(32,217,255,0.18)',
         }}

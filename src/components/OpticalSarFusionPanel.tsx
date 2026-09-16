@@ -86,7 +86,9 @@ export default function OpticalSarFusionPanel({
             className="w-10 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-sm"
             style={{ background: `${CYN}22`, color: CYN, border: `1px solid ${CYN}66` }}
           >
-            ⚡
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -116,7 +118,11 @@ export default function OpticalSarFusionPanel({
           }}
           title="Load pre-calibrated Cartosat-2S and RISAT-1A test pair"
         >
-          <span>🛰 LOAD BENCHMARK PAIR</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="2" />
+            <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+          </svg>
+          <span>LOAD BENCHMARK PAIR</span>
         </button>
       </div>
 
@@ -126,7 +132,11 @@ export default function OpticalSarFusionPanel({
           className="px-3 py-2 rounded-lg text-xs font-mono flex items-center gap-2"
           style={{ background: 'rgba(255,99,71,0.12)', color: '#FF6347', border: '1px solid rgba(255,99,71,0.3)' }}
         >
-          <span>⚠</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           <span>{uploadError}</span>
         </div>
       )}
@@ -160,7 +170,10 @@ export default function OpticalSarFusionPanel({
                 className="h-36 rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-colors"
                 style={{ borderColor: 'rgba(32,217,255,0.3)', background: 'rgba(32,217,255,0.02)' }}
               >
-                <span className="text-xl mb-1">📷</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="mb-1 text-cyan-400">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
                 <span className="text-xs font-mono font-semibold" style={{ color: WHT }}>
                   Upload Optical RGB / Multi-spectral
                 </span>
@@ -217,7 +230,12 @@ export default function OpticalSarFusionPanel({
                 className="h-36 rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-colors"
                 style={{ borderColor: 'rgba(53,224,184,0.3)', background: 'rgba(53,224,184,0.02)' }}
               >
-                <span className="text-xl mb-1">📡</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="mb-1 text-emerald-400">
+                  <circle cx="12" cy="12" r="2" />
+                  <path d="M4.93 4.93a10 10 0 0 1 14.14 0" />
+                  <path d="M7.76 7.76a6 6 0 0 1 8.48 0" />
+                  <line x1="12" y1="14" x2="12" y2="22" />
+                </svg>
                 <span className="text-xs font-mono font-semibold" style={{ color: WHT }}>
                   Upload Co-Registered SAR Observation
                 </span>
@@ -264,21 +282,27 @@ export default function OpticalSarFusionPanel({
         <button
           onClick={handleExecute}
           disabled={busy || !opticalImage || !sarImage}
-          className="w-full sm:w-auto px-5 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-5 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
           style={{
-            background: 'linear-gradient(135deg, #20D9FF 0%, #35E0B8 100%)',
+            background: CYN,
             color: '#020810',
-            boxShadow: '0 0 20px rgba(32,217,255,0.3)',
+            boxShadow: '0 0 20px rgba(32,217,255,0.25)',
           }}
         >
           {busy ? (
             <>
-              <span className="inline-block animate-spin">⚙</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-spin">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" />
+              </svg>
               <span>COMPUTING FUSION...</span>
             </>
           ) : (
             <>
-              <span>⚡ RUN JOINT FUSION ANALYSIS</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <span>RUN JOINT FUSION ANALYSIS</span>
             </>
           )}
         </button>
@@ -297,10 +321,14 @@ export default function OpticalSarFusionPanel({
             {lastFusionTrace && (
               <button
                 onClick={() => onOpenTrace(lastFusionTrace)}
-                className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1"
+                className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
                 style={{ background: `${CYN}22`, color: CYN, border: `1px solid ${CYN}88` }}
               >
-                <span>🔍 INSPECT AGENT TRACE</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <span>INSPECT AGENT TRACE</span>
               </button>
             )}
           </div>

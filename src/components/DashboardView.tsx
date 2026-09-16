@@ -179,9 +179,12 @@ export default function DashboardView({
       <div className="p-6 rounded-2xl border border-slate-800 bg-[#07111F] space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="text-base font-bold text-slate-100 font-mono tracking-wide flex items-center gap-2">
-            <span>⚡</span> MODEL PIPELINE HEALTH & STATUS
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            <span>MODEL PIPELINE HEALTH & STATUS</span>
           </h3>
-          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
+          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
             ● All Specialist Engines Operational
           </span>
         </div>
@@ -251,7 +254,10 @@ export default function DashboardView({
           /* Clean Professional Empty State */
           <div className="py-14 text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl border border-slate-800 bg-slate-900/60 flex items-center justify-center mx-auto text-2xl">
-              🛰
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400">
+                <circle cx="12" cy="12" r="2" />
+                <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+              </svg>
             </div>
             <h4 className="text-base font-bold text-slate-200" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               No Analysis Queries Recorded Yet
