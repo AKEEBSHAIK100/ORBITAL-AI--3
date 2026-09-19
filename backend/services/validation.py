@@ -13,7 +13,7 @@ def evaluate_accuracy(
     if ground_truth_count is None:
         return {
             "has_ground_truth": False,
-            "status": "Deep-learning segmentation verified (ground truth comparison optional)",
+            "status": "Model confidence distribution (unverified against external ground truth)",
             "message": "No ground truth annotations provided. Confidence represents model certainty, not verified real-world accuracy.",
             "predicted_count": predicted_count,
             "ground_truth_count": None,

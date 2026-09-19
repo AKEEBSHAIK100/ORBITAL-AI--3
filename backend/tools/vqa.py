@@ -3,106 +3,164 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import BaseTool
-from .land_cover import BigEarthNetTool
-from .building_detection import BuildingDetectionTool
+from ..services.rs_adapters import RSAdapterRuntime
 
 class VQATool(BaseTool):
-    id = "vqa"
-    name = "Remote-Sensing Visual Question Answering Engine"
-    description = "Answers natural language questions regarding remote-sensing imagery, combining BigEarthNet semantic scene context with deep building footprint extraction and physical spectral metrics."
+    id = "rs_vqa_adapted"
+    name = "Remote-Sensing Adapted Visual Question Answering Specialist"
+    description = (
+        "Answers natural-language questions regarding remote-sensing imagery using "
+        "Salesforce/blip-vqa-base adapted with a BigEarthNet-derived VQA LoRA pilot adapter."
+    )
     supported_tasks = ["vqa"]
     modalities = ["optical", "multispectral"]
-    adapter = "RS-Domain Multi-Specialist Evidence Fusion Prompt / Engine"
-    domain_adaptation = "BigEarthNet-19 taxonomy, RSVQA conventions, and spatial feature grounding."
-    model_id = "rsvqa-multimodal-engine-v2"
+    adapter = "BigEarthNet-derived VQA LoRA pilot adapter"
+    domain_adaptation = (
+        "Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches "
+        "and 144 QA examples across 18 validation patches (3 epochs). "
+        "Pilot artifact only; no benchmark superiority claim (e.g. RSVQA)."
+    )
+    base_model = "Salesforce/blip-vqa-base"
+    model_id = "rs-vqa-adapted-v1"
+    provenance = {
+        "base_model": "Salesforce/blip-vqa-base",
+        "adapter": "BigEarthNet-derived VQA LoRA pilot adapter",
+        "training_qa": 551,
+        "training_patches": 69,
+        "validation_qa": 144,
+        "validation_patches": 18,
+        "epochs": 3,
+        "adaptation_scope": "pilot_domain_adaptation",
+        "benchmark_accuracy_claim": None,
+        "note": "Pilot adaptation artifact only; no benchmark superiority claim (e.g. RSVQA).",
+    }
     permitted_parameters = {
-        "confidence_threshold": 0.75,
-        "domain_taxonomy": "BigEarthNet-19",
-        "benchmark": "RSVQA",
-        "max_tokens": 700
+        "max_new_tokens": 50,
+        "include_supporting_evidence": True,
     }
 
     def __init__(
         self,
-        ben_tool: Optional[BigEarthNetTool] = None,
-        building_tool: Optional[BuildingDetectionTool] = None
+        runtime: Optional[RSAdapterRuntime] = None,
+        ben_tool: Optional[Any] = None,
+        building_tool: Optional[Any] = None
     ):
-        self.ben_tool = ben_tool or BigEarthNetTool()
-        self.building_tool = building_tool or BuildingDetectionTool()
+        self.runtime = runtime or RSAdapterRuntime.get_instance()
+        self._ben_tool = ben_tool
+        self._building_tool = building_tool
+
+    def _get_ben_tool(self):
+        if self._ben_tool is None:
+            try:
+                from .land_cover import BigEarthNetTool
+                self._ben_tool = BigEarthNetTool()
+            except Exception:
+                self._ben_tool = None
+        return self._ben_tool
+
+    def _get_building_tool(self):
+        if self._building_tool is None:
+            try:
+                from .building_detection import BuildingDetectionTool
+                self._building_tool = BuildingDetectionTool()
+            except Exception:
+                self._building_tool = None
+        return self._building_tool
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         t0 = time.time()
-        query = inputs.get("query", "").strip()
+        query = inputs.get("query", inputs.get("question", "")).strip()
         img_bgr = inputs.get("image")
 
-        if img_bgr is None or not isinstance(img_bgr, np.ndarray):
-            return {"error": "Missing image for VQA", "status": "error"}
+        if img_bgr is None:
+            return {
+                "status": "error",
+                "answer": "Missing image for VQA analysis",
+                "model_id": self.model_id,
+                "adapter": self.adapter,
+                "question": query,
+                "evidence": {},
+                "provenance": self.provenance,
+                "inference_time_ms": 0.0,
+                "confidence": None,
+            }
 
-        h, w = img_bgr.shape[:2]
-        q_lower = query.lower()
+        # 1. Primary execution path: BLIP-VQA + LoRA pilot adapter
+        adapter_res = self.runtime.vqa(img_bgr, query)
+        status = adapter_res.get("status", "error")
+        answer = adapter_res.get("answer", "")
+        inference_time_ms = adapter_res.get("inference_time_ms", (time.time() - t0) * 1000)
 
-        # Step 1: Run BigEarthNet land cover classifier
-        ben_res = self.ben_tool.run({"image": img_bgr})
-        top_label = ben_res.get("top_label", "Urban fabric")
-        active_labels = [l["name"] for l in ben_res.get("active_labels", [])]
+        evidence: Dict[str, Any] = {
+            "device": adapter_res.get("device", self.runtime.device),
+            "raw_output": answer,
+        }
 
-        # Step 2: Compute spectral fractions
-        b, g, r = img_bgr[:, :, 0], img_bgr[:, :, 1], img_bgr[:, :, 2]
-        water_mask = ((b > r * 1.1) & (b > g * 0.95)) | ((b > 75) & (r < 65) & (g < 90))
-        veg_mask = (g > r * 1.1) & (g > b * 1.05) & (g > 35)
+        # 2. For questions that require specialist spatial reasoning unavailable to BLIP-VQA,
+        # sequence additional registered tools (such as building detection) as supporting evidence
+        params = parameters or {}
+        if params.get("include_supporting_evidence", True):
+            q_lower = query.lower()
+            if any(k in q_lower for k in ["building", "structure", "count", "rooftop", "footprint"]):
+                bldg_tool = self._get_building_tool()
+                if bldg_tool is not None:
+                    try:
+                        bldg_res = bldg_tool.run({"image": img_bgr})
+                        evidence["supporting_building_detection"] = {
+                            "building_count": bldg_res.get("building_count"),
+                            "high_confidence_count": bldg_res.get("high_confidence_count"),
+                            "confidence_tier": bldg_res.get("confidence_level"),
+                        }
+                    except Exception as e:
+                        evidence["supporting_building_detection"] = {"error": str(e)}
 
-        water_pct = round(float(np.count_nonzero(water_mask)) / (w * h) * 100, 1)
-        veg_pct = round(float(np.count_nonzero(veg_mask)) / (w * h) * 100, 1)
-        urban_pct = max(0.0, round(100.0 - water_pct - veg_pct, 1))
+            # Optional supporting land-cover context
+            ben_tool = self._get_ben_tool()
+            if ben_tool is not None:
+                try:
+                    ben_res = ben_tool.run({"image": img_bgr})
+                    evidence["supporting_land_cover"] = {
+                        "top_label": ben_res.get("top_label"),
+                        "active_labels": [l.get("name") for l in ben_res.get("active_labels", [])],
+                    }
+                except Exception:
+                    pass
 
-        # Check if building query
-        building_info = None
-        if "building" in q_lower or "house" in q_lower or "structure" in q_lower or "count" in q_lower:
-            building_res = self.building_tool.run({"image": img_bgr})
-            building_count = building_res.get("building_count", 0)
-            building_info = building_res
-            answer = (
-                f"A dedicated structural footprint audit identified {building_count} individual buildings across the observation scene. "
-                f"High-confidence structures: {building_res.get('high_confidence_count', 0)}, "
-                f"Medium-confidence structures: {building_res.get('medium_confidence_count', 0)}. "
-                f"Overall land-cover context is verified as {top_label.lower()} ({urban_pct}% built-up area)."
-            )
-            confidence = building_res.get("confidence", 0.78)
-        elif "water" in q_lower or "flood" in q_lower or "river" in q_lower or "lake" in q_lower:
-            answer = (
-                f"Hydrological analysis indicates that water bodies occupy {water_pct}% of the surveyed surface area. "
-                f"Spectral reflectance exhibits distinct low-albedo attenuation in red and near-infrared bands, "
-                f"confirming open-water distribution consistent with inland drainage."
-            )
-            confidence = 0.89
-        elif "vegetation" in q_lower or "forest" in q_lower or "green" in q_lower or "agriculture" in q_lower:
-            answer = (
-                f"Vegetation canopy and green cover account for approximately {veg_pct}% of the scene. "
-                f"Surface chlorophyll reflectance demonstrates healthy photosynthetic vigor across the primary canopy sectors, "
-                f"interspersed with {urban_pct}% urbanized built structures."
-            )
-            confidence = 0.86
-        else:
-            labels_desc = ", ".join(active_labels[:3]) if active_labels else top_label
-            answer = (
-                f"Multi-spectral analysis verifies the scene as primarily {labels_desc} ({urban_pct}% built-up, {veg_pct}% vegetation, {water_pct}% water). "
-                f"Scene dimensions ({w}x{h} px) display structured geographical features with verified spectral continuity."
-            )
-            confidence = round(ben_res.get("confidence", 85.0) / 100.0, 2)
-
-        duration_ms = (time.time() - t0) * 1000
+        # If adapted model is unavailable, return structured specialist-unavailable response
+        if status == "specialist_unavailable":
+            return {
+                "status": "specialist_unavailable",
+                "answer": adapter_res.get("answer", "VQA specialist unavailable"),
+                "model_id": self.model_id,
+                "adapter": self.adapter,
+                "question": query,
+                "evidence": evidence,
+                "provenance": self.provenance,
+                "inference_time_ms": inference_time_ms,
+                "confidence": None,
+                "confidence_status": "specialist_unavailable",
+                "warnings": adapter_res.get("warnings", []),
+            }
 
         return {
-            "status": "success",
+            "status": status,
             "answer": answer,
-            "top_label": top_label,
-            "surface_breakdown": {
-                "urban_pct": urban_pct,
-                "vegetation_pct": veg_pct,
-                "water_pct": water_pct
-            },
-            "building_analysis": building_info,
-            "confidence": confidence,
-            "confidence_level": "High" if confidence >= 0.75 else "Medium",
-            "duration_ms": duration_ms
+            "model_id": self.model_id,
+            "adapter": self.adapter,
+            "question": query,
+            "evidence": evidence,
+            "provenance": self.provenance,
+            "inference_time_ms": inference_time_ms,
+            "confidence": None,  # VLM output is uncalibrated
+            "confidence_status": "not_calibrated",
+            "warnings": adapter_res.get("warnings", []),
         }
+
+    def to_spec(self) -> Dict[str, Any]:
+        base_spec = super().to_spec()
+        base_spec.update({
+            "base_model": self.base_model,
+            "provenance": self.provenance,
+            "supported_modalities": self.modalities,
+        })
+        return base_spec

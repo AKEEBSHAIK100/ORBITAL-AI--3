@@ -97,6 +97,29 @@ async def health():
     except Exception as e:
         model_status["ben_classifier"] = {"available": False, "error": str(e)}
 
+    try:
+        from .services.rs_adapters import RSAdapterRuntime, SpecialistState
+        runtime = RSAdapterRuntime.get_instance()
+        model_status["caption_specialist"] = {
+            "available": runtime.caption_state == SpecialistState.AVAILABLE,
+            "base_model": runtime.caption_base_id,
+            "adapter": "BigEarthNet-derived LoRA pilot adapter",
+            "device": runtime.device,
+            "state": runtime.caption_state.value,
+            "error": runtime.caption_unavailable_reason if runtime.caption_state != SpecialistState.AVAILABLE else None,
+        }
+        model_status["vqa_specialist"] = {
+            "available": runtime.vqa_state == SpecialistState.AVAILABLE,
+            "base_model": runtime.vqa_base_id,
+            "adapter": "BigEarthNet-derived VQA LoRA pilot adapter",
+            "device": runtime.device,
+            "state": runtime.vqa_state.value,
+            "error": runtime.vqa_unavailable_reason if runtime.vqa_state != SpecialistState.AVAILABLE else None,
+        }
+    except Exception as e:
+        model_status["caption_specialist"] = {"available": False, "error": str(e)}
+        model_status["vqa_specialist"] = {"available": False, "error": str(e)}
+
     overall = "healthy" if all(v.get("available") for v in model_status.values()) else "degraded"
     return {
         "status": overall,

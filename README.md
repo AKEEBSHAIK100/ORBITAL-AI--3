@@ -121,15 +121,29 @@ api/                                — Vercel serverless handlers
   health.ts                         — GET /api/health
 
 backend/                            — FastAPI Remote Sensing Python Backend (port 8000)
-  main.py                           — FastAPI application with CORS and lifespan handlers
+  main.py                           — FastAPI application with CORS and model status endpoints
   requirements.txt                  — Python CV and DL dependencies
+  agents/
+    router.py                       — Capability-aware query intent router
+    validator.py                    — Sensor-agnostic raster and co-registration validator
+    aggregator.py                   — 6-stage observable execution trace generator
   routers/
+    analyze.py                      — Multi-agent analysis endpoint with specialist dispatch
     building_analysis.py            — Tiled instance segmentation building detection
     fusion.py                       — Optical-SAR cross-modal feature extraction
   services/
+    rs_adapters.py                  — BLIP + BigEarthNet LoRA runtime service (lazy-loading, honest status)
     building_detector.py            — YOLO building footprint segmentation model
+    ben_classifier.py               — BigEarthNet v2.0 Corine Land-Cover ResNet-50 classifier
     fusion_service.py               — OpenCV telemetry (NDVI proxy, SAR backscatter dB, SSIM)
-    tiling.py, duplicate_removal.py — Tiling and NMS merging pipelines
+  tools/
+    caption.py                      — Remote-Sensing Adapted Captioning Specialist (BLIP + LoRA)
+    vqa.py                          — Remote-Sensing Adapted Visual QA Specialist (BLIP + LoRA)
+    building_detection.py           — SpaceNet YOLO building footprint detection specialist
+    change_detection.py             — Bi-temporal difference and change detection specialist
+    optical_sar.py                  — Classical-CV optical + SAR cross-modal fusion
+    grounding.py                    — Text-guided spatial bounding demarcator
+    registry.py                     — Lazy-loading tool registry
 
 server.ts                           — Express server for local dev (npm run dev:full)
 scripts/
@@ -138,11 +152,13 @@ scripts/
 
 ---
 
-## Capabilities & Modalities
+## Capabilities & Specialist Models
 
-1. **Single Scene VQA & Telemetry:** Natural-language remote sensing QA with automatic confidence scoring and terrain categorization.
-2. **Optical–SAR Cross-Modal Fusion:** Jointly correlates optical multispectral albedo with synthetic aperture radar (SAR) microwave backscatter, computing vegetation indices, backscatter dB, speckle ratios, and structural similarity (SSIM).
-3. **Bi-Temporal Change Detection:** Compares satellite passes over time with interactive slider comparison and verified change attribution.
-4. **Auditable Agent Execution Traces:** Step-by-step transparency logging every tool invocation, task classification, radiometric validation, and inference latency.
-5. **Full Session Audit Export:** One-click JSON download bundling image telemetry, model detections, footprint counts, and execution traces for GIS workflows.
+1. **Remote-Sensing Adapted Scene Captioning (`rs_caption_adapted`):** Salesforce BLIP base model adapted on BigEarthNet-S2 image-text pairs with PEFT LoRA pilot adapters. Provides descriptive remote sensing terrain and feature summaries without unverified benchmark superiority claims.
+2. **Remote-Sensing Adapted Visual QA (`rs_vqa_adapted`):** Domain-conditioned BLIP VQA model answering natural language queries over satellite imagery with structured evidence extraction.
+3. **Building Instance Segmentation (`building_detection`):** SpaceNet-trained YOLO instance segmentation model executing 640px tiled sliding-window inference with polygon IoU deduplication.
+4. **Optical–SAR Cross-Modal Fusion (`optical_sar_fusion`):** Jointly correlates optical multispectral albedo with synthetic aperture radar (SAR) microwave backscatter, computing vegetation indices, backscatter dB, speckle ratios, and structural similarity (SSIM).
+5. **Bi-Temporal Change Detection (`change_detection` / `change_vqa`):** Compares satellite passes over time with verified spatial co-registration and change attribution.
+6. **Auditable 6-Stage Execution Traces:** Step-by-step transparency logging every stage: Input Validation → Task Classification → Specialist Selection → Specialist Execution → Evidence Aggregation → Unified Response Generation.
+7. **Production Architecture Honesty:** Uncalibrated VLM outputs honestly report `confidence: null`; no fabricated metrics or benchmark superiority claims. Measurable signals (IoU, YOLO box scores, change area %) are clearly distinguished.
 

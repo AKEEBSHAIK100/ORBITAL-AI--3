@@ -23,23 +23,60 @@ export interface ToolSpec {
   domain_adaptation: string
   model_id: string
   permitted_parameters?: Record<string, string | number | boolean>
+  /** Whether this specialist tool is currently executable. */
+  availability: 'available' | 'unavailable'
+  /** Human-readable reason when availability === 'unavailable'. */
+  unavailable_reason?: string
+  /** Required dataset ID for domain-adapted inference. */
+  required_dataset?: string
 }
 
 export const TOOL_REGISTRY: Record<string, ToolSpec> = {
-  rs_vqa: {
-    id: 'rs_vqa',
-    name: 'Remote-Sensing VQA Engine',
-    description: 'Visual question answering adapted for satellite and aerial imagery using domain system prompts calibrated with BigEarthNet land-cover taxonomy.',
+  rs_vqa_adapted: {
+    id: 'rs_vqa_adapted',
+    name: 'Remote-Sensing Adapted Visual Question Answering Specialist',
+    description: 'Visual question answering adapted for remote-sensing imagery using Salesforce/blip-vqa-base and BigEarthNet-derived LoRA pilot adapter.',
     supported_tasks: ['vqa', 'vegetation_analysis', 'flood_assessment', 'unknown'],
     modalities: ['optical', 'multispectral'],
-    adapter: 'RS-Domain System Prompt (BigEarthNet 43-class taxonomy + RSVQA conventions)',
-    domain_adaptation: 'BigEarthNet land-cover vocabulary mapping, sensor-specific spatial calibration, and visual confidence estimation.',
-    model_id: process.env.OPENAI_VISION_MODEL || 'claude-sonnet-5',
+    adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs). Pilot artifact only.',
+    model_id: 'rs-vqa-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
-      confidence_threshold: 0.75,
-      domain_taxonomy: 'BigEarthNet-43',
-      benchmark: 'RSVQA',
-      max_tokens: 700,
+      max_new_tokens: 50,
+      include_supporting_evidence: true,
+    },
+  },
+  rs_caption_adapted: {
+    id: 'rs_caption_adapted',
+    name: 'Remote-Sensing Adapted Captioning Specialist',
+    description: 'Generates descriptive scene captions for remote sensing using Salesforce/blip-image-captioning-base and BigEarthNet-derived LoRA pilot adapter.',
+    supported_tasks: ['caption'],
+    modalities: ['optical', 'multispectral'],
+    adapter: 'BigEarthNet-derived LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 87 BigEarthNet image-text pairs (3 epochs). Pilot artifact only; no VRSBench benchmark claim.',
+    model_id: 'rs-caption-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
+    permitted_parameters: {
+      max_new_tokens: 60,
+      include_supporting_land_cover: true,
+    },
+  },
+  rs_vqa: {
+    id: 'rs_vqa',
+    name: 'Remote-Sensing Adapted VQA Engine',
+    description: 'Visual question answering adapted for satellite and aerial imagery using BLIP + BigEarthNet LoRA pilot adapter.',
+    supported_tasks: ['vqa', 'vegetation_analysis', 'flood_assessment', 'unknown'],
+    modalities: ['optical', 'multispectral'],
+    adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs).',
+    model_id: 'rs-vqa-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
+    permitted_parameters: {
+      max_new_tokens: 50,
     },
   },
   rs_building_detector: {
@@ -51,6 +88,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'PyTorch YOLO Segmentation Engine (Tiled Inference + NMS/IoU Deduplication)',
     domain_adaptation: 'Weight-trained on high-resolution aerial and satellite imagery for structural rooftop footprints with confidence calibration.',
     model_id: 'yolo-segmentation-building_model.pt',
+    availability: 'unavailable',
+    unavailable_reason: 'YOLO checkpoint (building_model.pt) is not installed. Building detection requires the model file at backend/models/building_model.pt.',
     permitted_parameters: {
       tile_size_px: 512,
       overlap_px: 64,
@@ -67,6 +106,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'RS-Change System Prompt (CDVQA benchmark conventions)',
     domain_adaptation: 'Calibrated for multi-temporal change identification, confidence reporting, and spatial change region bounding.',
     model_id: process.env.OPENAI_VISION_MODEL || 'claude-sonnet-5',
+    availability: 'available',
+    required_dataset: 'cdvqa',
     permitted_parameters: {
       coregistration_tolerance_px: 2.0,
       change_attribution: 'bi-temporal',
@@ -83,42 +124,89 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'OpenCV / NumPy Classical Computer Vision Pipeline',
     domain_adaptation: 'Sensor-specific radar backscatter (dB), speckle noise modeling, and optical-SAR complementarity scoring.',
     model_id: 'classical-cv-fusion-engine-v2',
+    availability: 'available',
+    required_dataset: 'vrsbench_sar',
     permitted_parameters: {
-      optical_sensor: 'Cartosat-2S',
-      sar_sensor: 'RISAT-1A',
+      optical_sensor: 'generic',
+      sar_sensor: 'generic',
       decomposition: 'SSIM+CrossCorr',
     },
   },
   rs_captioner: {
     id: 'rs_captioner',
-    name: 'RS Scene Captioning Engine',
-    description: 'Generates structured scene-level captions covering land-cover types, dominant objects, spatial layout, and spectral characteristics per VRSBench standards.',
+    name: 'RS Scene Captioning Engine (Prompt-Based)',
+    description: 'Generates structured scene-level captions covering land-cover types, dominant objects, spatial layout, and spectral characteristics.',
     supported_tasks: ['caption'],
     modalities: ['optical', 'multispectral', 'sar'],
-    adapter: 'RS-Captioning System Prompt (VRSBench conventions)',
+    adapter: 'RS-Captioning System Prompt',
     domain_adaptation: 'Multi-attribute remote sensing description covering topography, land-use distribution, and sensor properties.',
     model_id: process.env.OPENAI_VISION_MODEL || 'claude-sonnet-5',
+    availability: 'available',
+    required_dataset: 'vrsbench',
     permitted_parameters: {
       caption_detail: 'multi-attribute',
       vocabulary: 'BigEarthNet-43',
-      benchmark: 'VRSBench',
     },
   },
   rs_grounding: {
     id: 'rs_grounding',
-    name: 'Text-Guided Spatial Grounding Engine',
-    description: 'Identifies and localizes requested geographical objects or terrain patches, returning percentage-based bounding coordinates.',
+    name: 'Text-Guided Spatial Grounding (Classical-CV Baseline)',
+    description: 'Identifies and localizes requested geographical objects or terrain patches using edge and spectral thresholding.',
     supported_tasks: ['grounding'],
     modalities: ['optical', 'multispectral'],
-    adapter: 'RS-Grounding System Prompt (RSVQA / VRSBench grounding conventions)',
-    domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions.',
-    model_id: process.env.OPENAI_VISION_MODEL || 'claude-sonnet-5',
+    adapter: 'Classical-CV Spatial Bounding',
+    domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions (classical CV).',
+    model_id: 'classical-cv-contour',
+    availability: 'available',
+    required_dataset: 'vrsbench',
     permitted_parameters: {
       coordinate_system: 'normalized_percentage',
       bbox_format: '[x,y,w,h]',
-      benchmark: 'VRSBench-Grounding',
     },
   },
+}
+
+// ─── Tool availability helpers ────────────────────────────────────────────────
+
+/**
+ * Returns the ToolSpec for a given tool ID, or null if not found.
+ */
+export function getTool(toolId: string): ToolSpec | null {
+  return TOOL_REGISTRY[toolId] ?? null
+}
+
+/**
+ * Returns true only if the tool exists AND is marked available.
+ */
+export function checkToolAvailability(toolId: string): boolean {
+  const tool = TOOL_REGISTRY[toolId]
+  return tool?.availability === 'available'
+}
+
+/**
+ * Builds a structured controlled response for when a specialist is unavailable.
+ * This is returned instead of fabricating output.
+ */
+export function buildUnavailableResponse(
+  toolId: string,
+  taskType: TaskType
+): Record<string, unknown> {
+  const tool = TOOL_REGISTRY[toolId]
+  const reason = tool?.unavailable_reason ??
+    `Specialist tool '${toolId}' is not available. The required model or checkpoint is not installed.`
+  return {
+    specialist_unavailable: true,
+    tool_id: toolId,
+    task_type: taskType,
+    answer: `This analysis requires a specialist model that is not currently installed. ${reason}`,
+    confidence: null,
+    confidence_level: 'UNAVAILABLE',
+    unavailable_reason: reason,
+    suggested_followups: [
+      'Try a general scene description question instead.',
+      'Upload a different image type that does not require specialist processing.',
+    ],
+  }
 }
 
 export interface ExecutionTraceStep {
@@ -128,7 +216,9 @@ export interface ExecutionTraceStep {
   input_summary: string
   output_summary: string
   duration_ms: number
-  status: 'success' | 'skipped' | 'error'
+  status: 'success' | 'skipped' | 'error' | 'unavailable'
+  success?: boolean
+  confidence_source?: 'adapted_lora' | 'real_inference' | 'classical_cv' | 'classical_cv_heuristic' | 'heuristic' | 'none'
   parameters?: Record<string, string | number | boolean>
 }
 
@@ -151,6 +241,8 @@ export interface ExecutionTrace {
     model_id: string
     adapter: string
     domain_adaptation: string
+    availability?: string
+    unavailable_reason?: string
     permitted_parameters?: Record<string, string | number | boolean>
   }
 }
@@ -160,14 +252,17 @@ export interface FusionFeatures {
     vegetation_fraction: number
     water_fraction: number
     built_up_fraction: number
-    spectral_entropy: number
+    spectral_entropy?: number
+    texture_entropy?: number
   }
   sar: {
     mean_backscatter_db: number
-    backscatter_std_db: number
+    backscatter_std_db?: number
+    std_backscatter_db?: number
     speckle_index: number
     edge_density: number
-    roughness_fraction: number
+    roughness_fraction?: number
+    rough_surface_fraction?: number
   }
   cross_modal: {
     structural_similarity: number
@@ -377,7 +472,7 @@ export function buildExecutionTrace(
   const toolsInvoked = Array.from(new Set(steps.map(s => s.tool)))
 
   return {
-    agent_version: 'SatQuery-Agent-v2.1',
+    agent_version: 'SatQuery-Agent-v3.0',
     task_type: taskType,
     tools_invoked: toolsInvoked,
     steps,
@@ -387,6 +482,8 @@ export function buildExecutionTrace(
       model_id: primaryTool.model_id,
       adapter: primaryTool.adapter,
       domain_adaptation: primaryTool.domain_adaptation,
+      availability: primaryTool.availability,
+      unavailable_reason: primaryTool.unavailable_reason,
       permitted_parameters: primaryTool.permitted_parameters,
     },
   }

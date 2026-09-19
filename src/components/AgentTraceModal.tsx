@@ -219,23 +219,55 @@ export default function AgentTraceModal({ isOpen, onClose, trace, queryTitle }: 
                         <span
                           className="px-1.5 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider"
                           style={{
-                            background: st.confidence_source === 'real_inference' ? `${CYN}22` : st.confidence_source === 'heuristic' ? `${ORG}22` : 'rgba(255,255,255,0.08)',
-                            color: st.confidence_source === 'real_inference' ? CYN : st.confidence_source === 'heuristic' ? ORG : GRY,
-                            border: `1px solid ${st.confidence_source === 'real_inference' ? CYN : st.confidence_source === 'heuristic' ? ORG : GRY}44`,
+                            background: (st.confidence_source === 'adapted_lora' || st.confidence_source === 'real_inference')
+                              ? `${CYN}22`
+                              : (st.confidence_source === 'heuristic' || st.confidence_source === 'classical_cv' || st.confidence_source === 'classical_cv_heuristic')
+                              ? `${ORG}22`
+                              : 'rgba(255,255,255,0.08)',
+                            color: (st.confidence_source === 'adapted_lora' || st.confidence_source === 'real_inference')
+                              ? CYN
+                              : (st.confidence_source === 'heuristic' || st.confidence_source === 'classical_cv' || st.confidence_source === 'classical_cv_heuristic')
+                              ? ORG
+                              : GRY,
+                            border: `1px solid ${(st.confidence_source === 'adapted_lora' || st.confidence_source === 'real_inference')
+                              ? CYN
+                              : (st.confidence_source === 'heuristic' || st.confidence_source === 'classical_cv' || st.confidence_source === 'classical_cv_heuristic')
+                              ? ORG
+                              : GRY}44`,
                           }}
                         >
-                          {st.confidence_source === 'real_inference' ? 'REAL MODEL' : st.confidence_source === 'heuristic' ? 'HEURISTIC' : 'NO INFERENCE'}
+                          {st.confidence_source === 'adapted_lora'
+                            ? 'ADAPTED MODEL'
+                            : st.confidence_source === 'real_inference'
+                            ? 'REAL MODEL'
+                            : (st.confidence_source === 'classical_cv' || st.confidence_source === 'classical_cv_heuristic')
+                            ? 'CLASSICAL-CV BASELINE'
+                            : st.confidence_source === 'heuristic'
+                            ? 'HEURISTIC'
+                            : 'NO INFERENCE'}
                         </span>
                       )}
                       <span
                         className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold"
                         style={{
-                          background: st.status === 'success' ? `${MNT}22` : 'rgba(255,107,107,0.2)',
-                          color: st.status === 'success' ? MNT : '#FF6B6B',
-                          border: `1px solid ${st.status === 'success' ? MNT : '#FF6B6B'}55`,
+                          background: st.status === 'success'
+                            ? `${MNT}22`
+                            : (st.status as string) === 'unavailable'
+                            ? 'rgba(255,159,67,0.2)'
+                            : 'rgba(255,107,107,0.2)',
+                          color: st.status === 'success'
+                            ? MNT
+                            : (st.status as string) === 'unavailable'
+                            ? ORG
+                            : '#FF6B6B',
+                          border: `1px solid ${st.status === 'success'
+                            ? MNT
+                            : (st.status as string) === 'unavailable'
+                            ? ORG
+                            : '#FF6B6B'}55`,
                         }}
                       >
-                        {st.status === 'success' ? '✓ OK' : '✕ FAILED'}
+                        {st.status === 'success' ? '✓ OK' : (st.status as string) === 'unavailable' ? '⚠ SPECIALIST UNAVAILABLE' : '✕ FAILED'}
                       </span>
                     </div>
                   </div>
@@ -284,6 +316,19 @@ export default function AgentTraceModal({ isOpen, onClose, trace, queryTitle }: 
                   {trace.model_registry_entry?.domain_adaptation || primaryTool.domain_adaptation}
                 </span>
               </div>
+              {((trace.model_registry_entry as any)?.provenance || (primaryTool as any)?.provenance) && (
+                <div className="flex items-start gap-2 pt-1 border-t border-white/5">
+                  <span className="text-white/40 w-24 shrink-0">Provenance:</span>
+                  <span className="text-[11px]" style={{ color: MNT }}>
+                    {(() => {
+                      const prov = (trace.model_registry_entry as any)?.provenance || (primaryTool as any)?.provenance
+                      return typeof prov === 'object'
+                        ? `${prov.base_model || ''} + ${prov.adapter_type || 'LoRA'} (${prov.dataset || 'BigEarthNet'} pilot)`
+                        : String(prov)
+                    })()}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

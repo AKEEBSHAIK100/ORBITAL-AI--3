@@ -1,4 +1,17 @@
-from typing import List, Optional
+"""
+SatQuery AI — Capability-Aware Agentic Router.
+Routes remote-sensing queries based on:
+1. Natural language intent (VQA, captioning, grounding, counting, change, fusion)
+2. Number of images and temporal pairs
+3. Sensor modalities (optical, SAR, multispectral)
+4. Dynamic specialist model availability and input compatibility
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+from models.registry import ModelRegistry
+
 
 def classify_query_intent(
     query: str,
@@ -43,6 +56,8 @@ def classify_query_intent(
         "expansion between" in q or
         "what changed" in q
     ):
+        if "what changed" in q or "increased" in q or "decreased" in q or "?" in q:
+            return "change_vqa"
         return "change_detection"
 
     # 3. Building Footprint Detection & Counting
@@ -92,9 +107,57 @@ def classify_query_intent(
         "corine" in q or
         "bigearthnet" in q or
         "biome" in q or
-        "terrain type" in q
+        "terrain type" in q or
+        "what type of land" in q
     ):
         return "land_cover"
 
     # Default to general Remote Sensing VQA
     return "vqa"
+
+
+def route_query_to_specialist(
+    query: str,
+    image_count: int = 1,
+    modalities: Optional[List[str]] = None
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Selects the optimal specialist dynamically by inspecting intent,
+    input constraints, and ModelRegistry capabilities.
+    Returns (specialist_id, specialist_metadata).
+    """
+    intent = classify_query_intent(query, image_count=image_count, modalities=modalities)
+    reg = ModelRegistry.get_instance()
+
+    # Map intent to candidate specialists in priority order
+    intent_to_specialist_map = {
+        "sar_optical_fusion": ["optical_sar_fusion"],
+        "change_vqa": ["change_vqa", "change_detection"],
+        "change_detection": ["change_detection", "change_vqa"],
+        "building_detection": ["building_detection"],
+        "grounding": ["visual_grounding"],
+        "caption": ["rs_caption_adapted", "captioning"],
+        "land_cover": ["land_cover", "rs_vqa_adapted"],
+        "vqa": ["rs_vqa_adapted", "rs_vqa", "land_cover"]
+    }
+
+    candidates = intent_to_specialist_map.get(intent, ["rs_vqa_adapted"])
+    chosen_id = candidates[0]
+    specialist = reg.get_specialist(chosen_id)
+
+    # Fallback to secondary if primary unavailable
+    if (not specialist or not specialist.is_available) and len(candidates) > 1:
+        alt = reg.get_specialist(candidates[1])
+        if alt and alt.is_available:
+            chosen_id = candidates[1]
+            specialist = alt
+
+    info = {
+        "task": intent,
+        "specialist_id": chosen_id,
+        "specialist_name": specialist.name if specialist else chosen_id,
+        "model_id": specialist.model_id if specialist else "unknown",
+        "is_available": specialist.is_available if specialist else False,
+        "unavailable_reason": specialist.unavailable_reason if specialist else None
+    }
+    return chosen_id, info

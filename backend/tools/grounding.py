@@ -7,17 +7,16 @@ from .base import BaseTool
 
 class GroundingTool(BaseTool):
     id = "grounding"
-    name = "Text-Guided Spatial Grounding Engine"
-    description = "Localizes user-specified geographical targets (water bodies, runways, built-up clusters, vegetation corridors) and generates normalized bounding box coordinates and spatial masks."
+    name = "Classical-CV Spatial Grounding Baseline"
+    description = "Localizes user-specified geographical targets (water bodies, runways, built-up clusters, vegetation corridors) and generates normalized bounding box coordinates using classical spectral thresholding."
     supported_tasks = ["grounding"]
     modalities = ["optical", "multispectral"]
-    adapter = "Spectral Thresholding & Connected Component Grounding Engine"
-    domain_adaptation = "VRSBench-Grounding / RSVQA normalized coordinate bounding box format"
-    model_id = "rs-grounding-specialist-v2"
+    adapter = "Spectral Thresholding & Connected Component Grounding Baseline"
+    domain_adaptation = "Classical spectral indexing and connected component contour demarcation."
+    model_id = "classical-cv-grounding-baseline-v2"
     permitted_parameters = {
         "coordinate_system": "normalized_percentage",
         "bbox_format": "[x,y,w,h]",
-        "benchmark": "VRSBench-Grounding"
     }
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

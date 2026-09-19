@@ -25,20 +25,45 @@ export interface ToolSpec {
 }
 
 export const TOOL_REGISTRY: Record<string, ToolSpec> = {
-  rs_vqa: {
-    id: 'rs_vqa',
-    name: 'Remote-Sensing VQA Engine',
-    description: 'Visual question answering adapted for satellite and aerial imagery using domain system prompts calibrated with BigEarthNet land-cover taxonomy.',
+  rs_vqa_adapted: {
+    id: 'rs_vqa_adapted',
+    name: 'Remote-Sensing Adapted Visual Question Answering Specialist',
+    description: 'Visual question answering adapted for remote-sensing imagery using Salesforce/blip-vqa-base and BigEarthNet-derived LoRA pilot adapter.',
     supported_tasks: ['vqa', 'vegetation_analysis', 'flood_assessment', 'unknown'],
     modalities: ['optical', 'multispectral'],
-    adapter: 'RS-Domain System Prompt (BigEarthNet 43-class taxonomy + RSVQA conventions)',
-    domain_adaptation: 'BigEarthNet land-cover vocabulary mapping, sensor-specific spatial calibration, and visual confidence estimation.',
-    model_id: 'claude-sonnet-5',
+    adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs). Pilot artifact only.',
+    model_id: 'rs-vqa-adapted-v1',
     permitted_parameters: {
-      confidence_threshold: 0.75,
-      domain_taxonomy: 'BigEarthNet-43',
-      benchmark: 'RSVQA',
-      max_tokens: 700,
+      max_new_tokens: 50,
+      include_supporting_evidence: true,
+    },
+  },
+  rs_caption_adapted: {
+    id: 'rs_caption_adapted',
+    name: 'Remote-Sensing Adapted Captioning Specialist',
+    description: 'Generates descriptive scene captions for remote sensing using Salesforce/blip-image-captioning-base and BigEarthNet-derived LoRA pilot adapter.',
+    supported_tasks: ['caption'],
+    modalities: ['optical', 'multispectral'],
+    adapter: 'BigEarthNet-derived LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 87 BigEarthNet image-text pairs (3 epochs). Pilot artifact only; no VRSBench benchmark claim.',
+    model_id: 'rs-caption-adapted-v1',
+    permitted_parameters: {
+      max_new_tokens: 60,
+      include_supporting_land_cover: true,
+    },
+  },
+  rs_vqa: {
+    id: 'rs_vqa',
+    name: 'Remote-Sensing Adapted VQA Engine',
+    description: 'Visual question answering adapted for satellite and aerial imagery using BLIP + BigEarthNet LoRA pilot adapter.',
+    supported_tasks: ['vqa', 'vegetation_analysis', 'flood_assessment', 'unknown'],
+    modalities: ['optical', 'multispectral'],
+    adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
+    domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs).',
+    model_id: 'rs-vqa-adapted-v1',
+    permitted_parameters: {
+      max_new_tokens: 50,
     },
   },
   rs_building_detector: {
@@ -90,32 +115,30 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
   },
   rs_captioner: {
     id: 'rs_captioner',
-    name: 'RS Scene Captioning Engine',
-    description: 'Generates structured scene-level captions covering land-cover types, dominant objects, spatial layout, and spectral characteristics per VRSBench standards.',
+    name: 'RS Scene Captioning Engine (Prompt-Based)',
+    description: 'Generates structured scene-level captions covering land-cover types, dominant objects, spatial layout, and spectral characteristics.',
     supported_tasks: ['caption'],
     modalities: ['optical', 'multispectral', 'sar'],
-    adapter: 'RS-Captioning System Prompt (VRSBench conventions)',
+    adapter: 'RS-Captioning System Prompt',
     domain_adaptation: 'Multi-attribute remote sensing description covering topography, land-use distribution, and sensor properties.',
     model_id: 'claude-sonnet-5',
     permitted_parameters: {
       caption_detail: 'multi-attribute',
       vocabulary: 'BigEarthNet-43',
-      benchmark: 'VRSBench',
     },
   },
   rs_grounding: {
     id: 'rs_grounding',
-    name: 'Text-Guided Spatial Grounding Engine',
-    description: 'Identifies and localizes requested geographical objects or terrain patches, returning percentage-based bounding coordinates.',
+    name: 'Text-Guided Spatial Grounding (Classical-CV Baseline)',
+    description: 'Identifies and localizes requested geographical objects or terrain patches using edge and spectral thresholding.',
     supported_tasks: ['grounding'],
     modalities: ['optical', 'multispectral'],
-    adapter: 'RS-Grounding System Prompt (RSVQA / VRSBench grounding conventions)',
-    domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions.',
-    model_id: 'claude-sonnet-5',
+    adapter: 'Classical-CV Spatial Bounding',
+    domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions (classical CV).',
+    model_id: 'classical-cv-contour',
     permitted_parameters: {
       coordinate_system: 'normalized_percentage',
       bbox_format: '[x,y,w,h]',
-      benchmark: 'VRSBench-Grounding',
     },
   },
 }
@@ -127,9 +150,9 @@ export interface ExecutionTraceStep {
   input_summary: string
   output_summary: string
   duration_ms: number
-  status: 'success' | 'skipped' | 'error'
+  status: 'success' | 'skipped' | 'error' | 'unavailable'
   success?: boolean
-  confidence_source?: 'real_inference' | 'heuristic' | 'none'
+  confidence_source?: 'adapted_lora' | 'real_inference' | 'classical_cv' | 'classical_cv_heuristic' | 'heuristic' | 'none'
   parameters?: Record<string, string | number | boolean>
 }
 

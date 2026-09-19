@@ -1,0 +1,18 @@
+{
+  "base_model_name_or_path": "Salesforce/blip-image-captioning-base",
+  "bias": "none",
+  "fan_in_fan_out": false,
+  "inference_mode": true,
+  "init_lora_weights": true,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "modules_to_save": null,
+  "peft_type": "LORA",
+  "r": 16,
+  "target_modules": [
+    "qkv",
+    "dense"
+  ],
+  "task_type": "FEATURE_EXTRACTION",
+  "domain_adaptation": "BigEarthNet-S2 pilot (87 image-text pairs, 3 epochs, pilot only; no benchmark accuracy claim)"
+}

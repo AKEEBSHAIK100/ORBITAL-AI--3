@@ -3,85 +3,130 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import BaseTool
-from .land_cover import BigEarthNetTool
+from ..services.rs_adapters import RSAdapterRuntime
 
 class CaptionTool(BaseTool):
-    id = "caption"
-    name = "VRSBench Scene Captioning Engine"
-    description = "Generates structured multi-attribute scene descriptions covering land-cover types, dominant objects, topography, and spectral characteristics aligned with VRSBench standards."
+    id = "rs_caption_adapted"
+    name = "Remote-Sensing Adapted Captioning Specialist"
+    description = (
+        "Generates descriptive captions for remote-sensing imagery using "
+        "Salesforce/blip-image-captioning-base adapted with a BigEarthNet-derived LoRA pilot adapter."
+    )
     supported_tasks = ["caption"]
     modalities = ["optical", "multispectral"]
-    adapter = "VRSBench Multi-Attribute Captioning Adapter"
-    domain_adaptation = "BigEarthNet-19 land-cover hierarchy, urban structural distribution, and spectral indices."
-    model_id = "vrsbench-scene-captioner-v2"
+    adapter = "BigEarthNet-derived LoRA pilot adapter"
+    domain_adaptation = (
+        "Pilot domain adaptation on 87 BigEarthNet image-text pairs (3 epochs). "
+        "Pilot artifact only; no benchmark accuracy claim (e.g. VRSBench)."
+    )
+    base_model = "Salesforce/blip-image-captioning-base"
+    model_id = "rs-caption-adapted-v1"
+    provenance = {
+        "base_model": "Salesforce/blip-image-captioning-base",
+        "adapter": "BigEarthNet-derived LoRA pilot adapter",
+        "training_pairs": 87,
+        "epochs": 3,
+        "adaptation_scope": "pilot_domain_adaptation",
+        "benchmark_accuracy_claim": None,
+        "note": "Pilot adaptation artifact only; no benchmark accuracy claim (e.g. VRSBench).",
+    }
     permitted_parameters = {
-        "detail_level": "multi-attribute",
-        "vocabulary": "BigEarthNet-19",
-        "benchmark": "VRSBench"
+        "max_new_tokens": 60,
+        "include_supporting_land_cover": True,
     }
 
-    def __init__(self, ben_tool: Optional[BigEarthNetTool] = None):
-        self.ben_tool = ben_tool or BigEarthNetTool()
+    def __init__(self, runtime: Optional[RSAdapterRuntime] = None, ben_tool: Optional[Any] = None):
+        self.runtime = runtime or RSAdapterRuntime.get_instance()
+        self._ben_tool = ben_tool  # Lazy loaded if requested
+
+    def _get_ben_tool(self):
+        if self._ben_tool is None:
+            try:
+                from .land_cover import BigEarthNetTool
+                self._ben_tool = BigEarthNetTool()
+            except Exception:
+                self._ben_tool = None
+        return self._ben_tool
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         t0 = time.time()
         img_bgr = inputs.get("image")
 
-        if img_bgr is None or not isinstance(img_bgr, np.ndarray):
-            return {"error": "Missing image for captioning", "status": "error"}
+        if img_bgr is None:
+            return {
+                "status": "error",
+                "caption": None,
+                "error": "Missing image for captioning",
+                "model_id": self.model_id,
+                "adapter": self.adapter,
+                "evidence": {},
+                "provenance": self.provenance,
+                "inference_time_ms": 0.0,
+                "confidence": None,
+            }
 
-        h, w = img_bgr.shape[:2]
+        # 1. Primary execution path: BLIP + LoRA pilot adapter
+        adapter_res = self.runtime.caption(img_bgr)
+        status = adapter_res.get("status", "error")
+        caption = adapter_res.get("caption")
+        inference_time_ms = adapter_res.get("inference_time_ms", (time.time() - t0) * 1000)
 
-        # 1. Run land cover classification
-        ben_res = self.ben_tool.run({"image": img_bgr})
-        top_label = ben_res.get("top_label", "Urban fabric")
-        active_labels = [l["name"] for l in ben_res.get("active_labels", [])]
+        # Build evidence container
+        evidence: Dict[str, Any] = {
+            "device": adapter_res.get("device", self.runtime.device),
+            "raw_output": adapter_res.get("answer"),
+        }
 
-        # 2. Compute visual color/spectral fractions
-        b, g, r = img_bgr[:, :, 0], img_bgr[:, :, 1], img_bgr[:, :, 2]
-        water_mask = ((b > r * 1.1) & (b > g * 0.95)) | ((b > 75) & (r < 65) & (g < 90))
-        veg_mask = (g > r * 1.1) & (g > b * 1.05) & (g > 35)
-        
-        water_pct = round(float(np.count_nonzero(water_mask)) / (w * h) * 100, 1)
-        veg_pct = round(float(np.count_nonzero(veg_mask)) / (w * h) * 100, 1)
-        urban_pct = max(0.0, round(100.0 - water_pct - veg_pct, 1))
+        # 2. Retain BigEarthNet land-cover information ONLY as optional supporting evidence
+        params = parameters or {}
+        if params.get("include_supporting_land_cover", True):
+            ben_tool = self._get_ben_tool()
+            if ben_tool is not None:
+                try:
+                    ben_res = ben_tool.run({"image": img_bgr})
+                    evidence["supporting_land_cover"] = {
+                        "top_label": ben_res.get("top_label"),
+                        "active_labels": [l.get("name") for l in ben_res.get("active_labels", [])],
+                    }
+                except Exception as e:
+                    evidence["supporting_land_cover"] = {"error": f"Supporting classifier error: {e}"}
 
-        # 3. Formulate structured caption per VRSBench conventions
-        scene_elements = []
-        if active_labels:
-            scene_elements.append(f"predominantly comprised of {', '.join(active_labels[:3]).lower()}")
-        else:
-            scene_elements.append(f"characterized by {top_label.lower()}")
-
-        details = []
-        if urban_pct > 15:
-            details.append(f"dense-to-moderate built-up structures occupying approximately {urban_pct}% of the surface")
-        if veg_pct > 10:
-            details.append(f"vegetation patches and green canopy covering {veg_pct}%")
-        if water_pct > 5:
-            details.append(f"inland/coastal hydrological channels covering {water_pct}%")
-
-        detail_str = "; ".join(details) if details else "mixed surface cover"
-
-        caption = (
-            f"High-resolution remote-sensing scene ({w}x{h} px) {scene_elements[0]}. "
-            f"Spatial layout displays {detail_str}. "
-            f"Ground features demonstrate well-defined textural boundaries and coherent spectral signatures across the visible spectrum."
-        )
-
-        duration_ms = (time.time() - t0) * 1000
+        # If adapted model is unavailable, return structured specialist-unavailable result.
+        # DO NOT fabricate a caption using the old heuristic implementation.
+        if status == "specialist_unavailable":
+            return {
+                "status": "specialist_unavailable",
+                "caption": None,
+                "answer": adapter_res.get("answer", "Caption specialist unavailable"),
+                "model_id": self.model_id,
+                "adapter": self.adapter,
+                "evidence": evidence,
+                "provenance": self.provenance,
+                "inference_time_ms": inference_time_ms,
+                "confidence": None,
+                "confidence_status": "specialist_unavailable",
+                "warnings": adapter_res.get("warnings", []),
+            }
 
         return {
-            "status": "success",
+            "status": status,
             "caption": caption,
-            "top_label": top_label,
-            "active_labels": active_labels,
-            "surface_breakdown": {
-                "urban_pct": urban_pct,
-                "vegetation_pct": veg_pct,
-                "water_pct": water_pct
-            },
-            "confidence": round(ben_res.get("confidence", 85.0) / 100.0, 2),
-            "confidence_level": "High",
-            "duration_ms": duration_ms
+            "answer": caption,
+            "model_id": self.model_id,
+            "adapter": self.adapter,
+            "evidence": evidence,
+            "provenance": self.provenance,
+            "inference_time_ms": inference_time_ms,
+            "confidence": None,  # VLM output is uncalibrated
+            "confidence_status": "not_calibrated",
+            "warnings": adapter_res.get("warnings", []),
         }
+
+    def to_spec(self) -> Dict[str, Any]:
+        base_spec = super().to_spec()
+        base_spec.update({
+            "base_model": self.base_model,
+            "provenance": self.provenance,
+            "supported_modalities": self.modalities,
+        })
+        return base_spec

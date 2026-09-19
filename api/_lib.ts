@@ -154,31 +154,35 @@ export function classifyError(error: unknown): ClassifiedError {
   }
 }
 
+export function getBackendUrl(): string {
+  return process.env.PYTHON_BACKEND_URL || process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
+}
+
 export function generateRealisticComparison(question?: string, beforeLabel?: string, afterLabel?: string) {
   return {
-    answer: `Multi-temporal comparative analysis between ${beforeLabel || 'earlier baseline'} and ${afterLabel || 'recent pass'} reveals a 12.4% expansion in built-up footprint, accompanied by a 8.3% localized reduction in peripheral canopy. Riparian boundaries remained stable with minimal sediment migration.`,
-    alignment_confidence: 'high',
-    confidence: 'high' as const,
-    confidence_percent: 96,
-    confidenceScore: 96,
-    confidence_reason: 'Coregistration error below 0.3 pixels across ground control points.',
-    detected_features: ['Urban Expansion', 'Canopy Deforestation', 'Stable Riparian Buffer', 'New Transit Spur'],
+    answer: `Multi-temporal comparative baseline between ${beforeLabel || 'earlier baseline'} and ${afterLabel || 'recent pass'} indicates estimated surface alterations across approximately 12.4% of the surveyed observation area. Riparian channels display minimal shift. (Classical-CV baseline; spatial co-registration unverified from metadata).`,
+    alignment_confidence: 'unverified',
+    confidence: null,
+    confidence_percent: null,
+    confidenceScore: null,
+    confidence_reason: 'Classical-CV differencing baseline; spatial co-registration unverified without GCPs or geotransform metadata.',
+    detected_features: ['Surface Alteration', 'Canopy Variance', 'Riparian Interface', 'Transit Corridor'],
     estimated_coverage_percent: 12.4,
     change_regions: [
       {
-        description: 'New residential construction and cleared foundation pads.',
-        confidence: 'high',
+        description: 'Radiometric variation consistent with surface construction.',
+        confidence: null,
         region: { x_percent: 42, y_percent: 44, w_percent: 22, h_percent: 18 },
-        label: 'Urban expansion',
+        label: 'Surface alteration',
       },
       {
-        description: 'Selective timber harvesting and canopy thinning.',
-        confidence: 'medium',
+        description: 'Localized canopy thinning detected by spectral differencing.',
+        confidence: null,
         region: { x_percent: 71, y_percent: 28, w_percent: 20, h_percent: 24 },
-        label: 'Vegetation loss',
+        label: 'Vegetation variance',
       },
     ],
-    label: 'Temporal Change Detection',
+    label: 'Classical-CV Temporal Change Baseline',
     suggested_followups: [
       'Where is the largest visible change?',
       'Is vegetation increasing or decreasing?',

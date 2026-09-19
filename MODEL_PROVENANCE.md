@@ -32,6 +32,34 @@ This document describes the exact model weights, datasets, and algorithms used b
 
 ---
 
+## 2.1 Remote Sensing Adapted Captioning (`rs_caption_adapted`)
+
+| Field | Detail |
+|---|---|
+| **Base Model Architecture** | Salesforce BLIP (`Salesforce/blip-image-captioning-base`) |
+| **Adapter Architecture** | PEFT LoRA pilot adapter (`backend/models/adapters/blip_rs_lora`) |
+| **Adaptation Dataset** | BigEarthNet-S2 subset: 87 image-caption pairs |
+| **Training Hyperparameters** | 3 epochs, AdamW optimizer, lr=5e-5, rank r=8, alpha=16 |
+| **Scope & Integrity** | **Pilot domain adaptation proof-of-concept only.** This adapter demonstrates domain conditioning of general vision-language backbones onto remote sensing vocabulary. It has **NOT** been evaluated on external benchmarks such as VRSBench. No benchmark superiority is claimed. |
+| **Confidence Protocol** | VLM text outputs are uncalibrated generative language; confidence is reported as `null` (`confidence_status: "not_calibrated"`). Hardcoded heuristic confidence scores are strictly disallowed. |
+| **License** | Base model: BSD 3-Clause; LoRA adapter: MIT |
+
+---
+
+## 2.2 Remote Sensing Adapted Visual Question Answering (`rs_vqa_adapted`)
+
+| Field | Detail |
+|---|---|
+| **Base Model Architecture** | Salesforce BLIP VQA (`Salesforce/blip-vqa-base`) |
+| **Adapter Architecture** | PEFT LoRA pilot adapter (`backend/models/adapters/blip_vqa_rs_lora`) |
+| **Adaptation Dataset** | BigEarthNet-S2 subset: 551 training QA pairs (69 patches), 144 validation QA pairs (18 patches) |
+| **Training Hyperparameters** | 3 epochs, AdamW optimizer, lr=5e-5, rank r=8, alpha=16 |
+| **Scope & Integrity** | **Pilot domain adaptation proof-of-concept only.** Evaluates domain-specific visual QA capability over multi-spectral terrain and infrastructure. It has **NOT** been evaluated on RSVQA or VRSBench held-out test splits. No benchmark superiority is claimed. |
+| **Confidence Protocol** | VLM text outputs are uncalibrated generative language; confidence is reported as `null` (`confidence_status: "not_calibrated"`). Measurable evidence from secondary tools (e.g. YOLO building detection polygons) is retained in `evidence`. |
+| **License** | Base model: BSD 3-Clause; LoRA adapter: MIT |
+
+---
+
 ## 3. Optical–SAR Cross-Modal Fusion
 
 | Field | Detail |

@@ -18,3 +18,10 @@ ultralytics>=8.0.0
 # ben_classifier.py provides an automatic fallback when configilm is not installed.
 huggingface-hub>=0.23.0
 timm>=0.9.0
+transformers>=4.40.0
+peft>=0.10.0
+
+# Phase 4: Optional PostgreSQL connectivity (non-fatal if absent)
+# Install manually: pip install asyncpg psycopg2-binary
+# asyncpg>=0.29.0
+# psycopg2-binary>=2.9.0

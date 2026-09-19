@@ -1,20 +1,25 @@
 import io
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from PIL import Image
 import cv2
-from typing import Any, Dict, Optional, Tuple
 
 def inspect_and_load_geospatial_image(data_bytes: bytes) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
-    Validates GeoTIFF/TIFF inputs and inspects resolution, CRS, georeferencing,
-    and dimensions per Section 5 & 12 of the master plan.
+    Validates GeoTIFF/TIFF/raster inputs and truthfully inspects resolution, CRS,
+    georeferencing, and dimensions.
+    Never fabricates default CRS or ground-sampling distances when metadata is absent.
     """
     metadata: Dict[str, Any] = {
         "format": "UNKNOWN",
         "bands": 3,
         "is_geotiff": False,
-        "crs": "WGS 84 / UTM (projected)",
-        "resolution_m": 0.5,
+        "crs": None,
+        "resolution_m": None,
+        "geotransform": None,
+        "affine": None,
+        "acquisition_date": None,
+        "sensor": None,
         "tags": {}
     }
 
@@ -25,32 +30,46 @@ def inspect_and_load_geospatial_image(data_bytes: bytes) -> Tuple[np.ndarray, Di
 
         # Check for TIFF / GeoTIFF tags
         if pil_img.format in ["TIFF", "GeoTIFF"]:
-            metadata["is_geotiff"] = True
-            # Inspect PIL tiff tags
             if hasattr(pil_img, "tag_v2"):
                 tags = dict(pil_img.tag_v2)
+                metadata["tags_detected"] = len(tags)
+
+                # Check GeoTIFF specific tags:
                 # ModelPixelScaleTag (33550), ModelTiepointTag (33922), GeoKeyDirectoryTag (34735)
+                has_geotiff_keys = 33550 in tags or 33922 in tags or 34735 in tags
+                metadata["is_geotiff"] = bool(has_geotiff_keys)
+
                 if 33550 in tags:
                     scale = tags[33550]
                     metadata["resolution_m"] = float(scale[0]) if hasattr(scale, "__getitem__") else float(scale)
+                
                 if 34735 in tags:
+                    # Genuine GeoKey directory tag detected
                     metadata["crs"] = "GeoKey Standard / EPSG"
-                metadata["tags_detected"] = len(tags)
 
-        # Convert to BGR array for CV2 and models
+                if 33922 in tags:
+                    tiepoints = list(tags[33922])
+                    metadata["geotransform"] = {"tiepoints": tiepoints[:6]}
+
+                # Optional acquisition date tag (DateTime: 306)
+                if 306 in tags:
+                    metadata["acquisition_date"] = str(tags[306]).strip()
+
+        # Convert to BGR array for CV2 and internal pipelines
         if pil_img.mode != "RGB":
             pil_img = pil_img.convert("RGB")
         img_np = np.array(pil_img)
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-        metadata["bands"] = img_bgr.shape[2]
+        metadata["bands"] = img_bgr.shape[2] if img_bgr.ndim == 3 else 1
         return img_bgr, metadata
 
     except Exception as e:
-        # Fallback to cv2.imdecode
+        # Fallback to cv2.imdecode for raw byte arrays
         nparr = np.frombuffer(data_bytes, np.uint8)
         img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img_bgr is not None:
             metadata["dimensions"] = {"width": img_bgr.shape[1], "height": img_bgr.shape[0]}
             metadata["format"] = "RASTER"
+            metadata["bands"] = img_bgr.shape[2] if img_bgr.ndim == 3 else 1
             return img_bgr, metadata
         raise ValueError(f"Unable to decode geospatial image: {e}")

@@ -7,17 +7,16 @@ from .base import BaseTool
 
 class ChangeDetectionTool(BaseTool):
     id = "change_detection"
-    name = "Bi-Temporal Change Detection & CDVQA Specialist"
-    description = "Analyses co-registered multi-temporal optical or SAR image pairs for surface alteration, structural expansion, vegetation loss/growth, and CDVQA natural language description."
+    name = "Classical-CV Bi-Temporal Change Detection Baseline"
+    description = "Analyses co-registered multi-temporal optical or SAR image pairs for surface alteration, structural expansion, and vegetation difference using classical pixel differencing."
     supported_tasks = ["change_detection", "change_vqa"]
     modalities = ["optical", "multispectral", "sar"]
-    adapter = "Bi-Temporal Radiometric & Structural Difference Engine (CDVQA conventions)"
-    domain_adaptation = "Multi-temporal change identification, spatial alteration mapping, and confidence reporting."
-    model_id = "rs-change-detector-v2"
+    adapter = "Bi-Temporal Radiometric & Structural Difference Engine"
+    domain_adaptation = "Pixel-differencing baseline with adaptive thresholding and morphological clustering."
+    model_id = "classical-cv-change-detector-v2"
     permitted_parameters = {
         "change_threshold": 32,
         "min_change_area_px": 50,
-        "benchmark": "CDVQA"
     }
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -79,20 +78,17 @@ class ChangeDetectionTool(BaseTool):
         # Built-up alteration interpretation (Pixel-diff heuristic baseline)
         if change_ratio < 0.02:
             answer = f"Pixel-differencing baseline confirms surface structure remained largely unchanged between the two acquisition dates (only {change_ratio*100:.1f}% radiometric variance). Built-up footprint remained stable."
-            confidence = 0.90
         elif change_ratio < 0.12:
             direction = "increased" if exg2 > exg1 else "decreased"
             answer = (
                 f"Pixel-differencing baseline identified surface alterations across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
                 f"Vegetation index has {direction} by {abs(veg_delta_pct)}%. Structural alterations demarcated in highlighted sectors."
             )
-            confidence = 0.85
         else:
             answer = (
                 f"Pixel-differencing baseline identified significant alterations across {change_ratio*100:.1f}% of the observation area "
                 f"({len(significant_changes)} contiguous change clusters detected via adaptive thresholding)."
             )
-            confidence = 0.85
 
         duration_ms = (time.time() - t0) * 1000
 
@@ -104,9 +100,9 @@ class ChangeDetectionTool(BaseTool):
             "change_clusters": len(significant_changes),
             "significant_changes": significant_changes[:20],
             "vegetation_delta_pct": veg_delta_pct,
-            "confidence": confidence,
-            "confidence_level": "High" if confidence >= 0.80 else "Medium",
-            "confidence_source": "heuristic",
-            "method": "Radiometric pixel-differencing & morphological contour clustering",
+            "confidence": None,
+            "confidence_level": "UNAVAILABLE",
+            "confidence_source": "classical_cv_differencing",
+            "method": "Radiometric pixel-differencing & morphological contour clustering baseline",
             "duration_ms": duration_ms
         }

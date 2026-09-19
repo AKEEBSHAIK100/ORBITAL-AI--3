@@ -6,14 +6,14 @@ The visual identity must feel **human-designed, sophisticated, cinematic, and te
 
 Build the entire interface around this distinctive palette:
 
-* Deep Space Navy: `#07111F` — primary background
-* Midnight Blue: `#0D1B2A` — secondary sections
-* Electric Cyan: `#20D9FF` — primary interactive/accent color
-* Solar Orange: `#FF9F43` — secondary accent and important highlights
-* Mint Teal: `#35E0B8` — positive/status/data indicators
-* Soft White: `#F4F7FA` — primary text
-* Cool Gray: `#9AA9B8` — secondary text
-* Blue-Black: `#101F30` — cards and panels
+* Deep Space Navy: `#07111F` - primary background
+* Midnight Blue: `#0D1B2A` - secondary sections
+* Electric Cyan: `#20D9FF` - primary interactive/accent color
+* Solar Orange: `#FF9F43` - secondary accent and important highlights
+* Mint Teal: `#35E0B8` - positive/status/data indicators
+* Soft White: `#F4F7FA` - primary text
+* Cool Gray: `#9AA9B8` - secondary text
+* Blue-Black: `#101F30` - cards and panels
 
 Use **cyan and orange strategically**, not everywhere. Cyan should communicate technology, intelligence, maps, and interaction. Orange should draw attention to important actions, discoveries, alerts, and key data.
 
@@ -47,10 +47,10 @@ Create an impressive asymmetric hero.
 
 Left side:
 
-* Small label: "AI-POWERED EARTH INTELLIGENCE"
+* Small label: "REMOTE-SENSING VISION-LANGUAGE ASSISTANT"
 * Large headline:
-  **"Ask Anything About Earth."**
-* Supporting text explaining that users can upload satellite imagery and ask questions in natural language.
+  **"Query Satellite Imagery. Understand What Changed."**
+* Supporting text: "Upload satellite imagery and ask questions in natural language. SatQuery AI supports single-image visual question answering, bi-temporal change analysis, and optical-SAR image fusion, with an execution trace showing how each request is processed."
 * Primary CTA using Electric Cyan.
 * Secondary CTA using a subtle outlined treatment.
 

@@ -140,8 +140,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             signal: AbortSignal.timeout(1800),
           })
           if (pyRes.ok) {
-            const pyJson = await pyRes.json()
-            if (pyJson.fusion_features) {
+            const pyJson = (await pyRes.json()) as Record<string, any>
+            if (pyJson && pyJson.fusion_features) {
               fusionFeatures = pyJson.fusion_features
             }
           }

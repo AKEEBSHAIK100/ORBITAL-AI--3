@@ -227,7 +227,7 @@ async function compressImage(file: File): Promise<{ dataUrl: string; telemetry: 
         }
         telemetry = {
           landClass, landClassPct, buildingCount: '—', waterPct: `${wPct}%`, vegetationPct: `${vPct}%`,
-          terrain, locationTag: `● SATELLITE PASS · ${landClass.toUpperCase()} SURVEY · 0.5M RESOLUTION`,
+          terrain, locationTag: `● SATELLITE PASS · ${landClass.toUpperCase()} SURVEY · MULTI-SPECTRAL`,
           landSub, buildingSub: 'Run detection to audit footprints', waterSub, vegSub,
         }
       }
@@ -299,10 +299,10 @@ function _rawDemoAnalyze(question: string, imageDataUrl?: string | null): Analys
     return {
       answer: 'Bi-temporal CDVQA analysis confirms the built-up area has INCREASED by +12.4% between passes. Geometric comparison reveals new residential structures and foundation paving in the northeastern quadrant, with a corresponding 8.3% localized reduction in peripheral agricultural canopy.',
       confidence: 'high', confidence_percent: 96, confidenceScore: 96,
-      confidence_reason: 'Coregistered baseline verification reveals distinct edge additions in built-up footprint.',
-      detected_features: ['Built-up Expansion (+12.4%)', 'New Rooftop Footprints', 'Canopy Reduction (−8.3%)', 'CDVQA Verified Change'],
+      confidence_reason: 'Coregistered baseline comparison reveals distinct edge additions in built-up footprint.',
+      detected_features: ['Built-up Expansion (+12.4%)', 'New Rooftop Footprints', 'Canopy Reduction (−8.3%)', 'CDVQA Detected Change'],
       region: { x_percent: 28, y_percent: 22, w_percent: 44, h_percent: 46 },
-      label: 'CDVQA Built-Up Change Verification', revealed_layer: 'urban', count_estimate: null, count_uncertainty_factors: [],
+      label: 'CDVQA Built-Up Change Analysis', revealed_layer: 'urban', count_estimate: null, count_uncertainty_factors: [],
       suggested_followups: ['Where exactly did the largest change occur?','Audit newly constructed footprints','What changed between these two dates?'],
     }
   }
@@ -321,7 +321,7 @@ function _rawDemoAnalyze(question: string, imageDataUrl?: string | null): Analys
     return {
       answer: 'Surface water is confined to the primary drainage channel and low-lying coastal marshes, occupying ~8.2% of the scene. Floodwaters have not breached the primary levee or reached residential perimeters, maintaining a safe buffer of approximately 140 metres.',
       confidence: 'high', confidence_percent: 95, confidenceScore: 95,
-      confidence_reason: 'Distinct specular reflectance from drainage channels; safe buffer margin verified.',
+      confidence_reason: 'Distinct specular reflectance from drainage channels; safe buffer margin observed.',
       detected_features: ['River Drainage Basin', 'Riparian Wetlands', 'Protective Levee', '140m Structural Buffer'],
       region: { x_percent: 22, y_percent: 42, w_percent: 46, h_percent: 40 },
       label: 'Hydrological & Flood Assessment', revealed_layer: 'flood', count_estimate: null, count_uncertainty_factors: [],
@@ -601,7 +601,7 @@ function Navbar({
             <span className="text-sm font-bold tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif", color: C.white }}>
               SATQUERY<span style={{ color: C.cyan }}>AI</span>
             </span>
-            <div className="text-[9px] font-mono tracking-widest leading-none" style={{ color: C.muted }}>ISRO · SAC VLM</div>
+            <div className="text-[9px] font-mono tracking-widest leading-none" style={{ color: C.muted }}>REMOTE SENSING VLM</div>
           </div>
         </button>
 
@@ -670,7 +670,7 @@ function Navbar({
           <button
             onClick={onEval}
             className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg btn-outline-cyan font-mono font-bold"
-            title="ISRO/SAC Evaluation Protocol"
+            title="Evaluation Protocol"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21" /><path d="M3 9l9-6 9 6" /><path d="M9 21h6" /><path d="M4 10h5L6 18" /><path d="M15 10h5l-3 8" /></svg>
             <span className="hidden md:inline">EVAL CRITERIA</span>
@@ -833,18 +833,18 @@ function HeroSection({
             <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-md"
               style={{ background: 'rgba(32,217,255,0.08)', border: `1px solid ${C.borderHover}` }}>
               <span className="w-2 h-2 rounded-full pulse-dot" style={{ background: C.cyan }} />
-              <span className="text-xs font-mono tracking-[0.2em] uppercase" style={{ color: C.cyan }}>ISRO / SAC Remote-Sensing VLM Challenge</span>
+              <span className="text-xs font-mono tracking-[0.2em] uppercase" style={{ color: C.cyan }}>REMOTE-SENSING VISION-LANGUAGE ASSISTANT</span>
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.02] mb-6" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}>
-              SatQuery
+              Query Satellite Imagery.
               <br />
-              <span style={{ color: 'var(--cyan)' }}>Earth Observation Engine.</span>
+              <span style={{ color: 'var(--cyan)' }}>Understand What Changed.</span>
             </h1>
 
             <p className="text-lg leading-relaxed mb-10 max-w-lg" style={{ color: C.muted, lineHeight: 1.8 }}>
-              Agentic vision-language intelligence for single-image VQA, bi-temporal change detection, and optical-SAR cross-sensor fusion. Grounded on BigEarthNet v2.0 domain adaptation with transparent step-level execution traces.
+              Upload satellite imagery and ask questions in natural language. SatQuery AI supports single-image visual question answering, bi-temporal change analysis, and optical-SAR image fusion, with an execution trace showing how each request is processed.
             </p>
 
             {/* CTA buttons */}
@@ -862,9 +862,9 @@ function HeroSection({
             <div className="flex flex-wrap gap-8 pt-6 mb-10" style={{ borderTop: `1px solid ${C.border}` }}>
               {[
                 { val: '19', label: 'BigEarthNet classes', col: C.mint },
-                { val: '0.5m', label: 'GSD resolution', col: C.cyan },
-                { val: '5', label: 'ISRO/SAC task types', col: C.orange },
-                { val: '0.68', label: 'F1 multi-label score', col: C.white },
+                { val: '3', label: 'Analysis modes', col: C.cyan },
+                { val: '2', label: 'Image comparison inputs', col: C.orange },
+                { val: 'TRACE', label: 'Execution visibility', col: C.white },
               ].map(s => (
                 <div key={s.label}>
                   <div className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif", color: s.col }}>{s.val}</div>
@@ -873,9 +873,9 @@ function HeroSection({
               ))}
             </div>
 
-            {/* 5 Official Queries */}
+            {/* 5 Representative Queries */}
             <div className="space-y-2">
-              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>ISRO/SAC Representative Queries</div>
+              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>EXAMPLE ANALYSIS QUERIES</div>
               <div className="flex flex-wrap gap-2">
                 {OFFICIAL_REPRESENTATIVE_QUERIES.map(q => (
                   <button key={q.badge} onClick={() => onQueryChip(q.query)}
@@ -1036,7 +1036,7 @@ export default function App() {
   const [docModalOpen, setDocModalOpen] = useState(false)
   const [contactModalOpen, setContactModalOpen] = useState(false)
   const [legalModalOpen, setLegalModalOpen] = useState(false)
-  const [activeLegalTab, setActiveLegalTab] = useState<LegalModalType>('privacy')
+  const [activeLegalTab, setActiveLegalTab] = useState<LegalModalType>('cookies')
 
   const { toasts, addToast, removeToast } = useToast()
   const atCap = sessionCallCount >= SESSION_CALL_LIMIT
@@ -1278,7 +1278,7 @@ export default function App() {
               confidence: bRes.confidence_level === 'High' ? 'high' : bRes.confidence_level === 'Medium' ? 'medium' : 'low',
               confidence_percent: Math.round(bRes.confidence*100), confidenceScore: Math.round(bRes.confidence*100),
               confidence_reason: `Evaluated via YOLO segmentation with tile mapping and polygon IoU deduplication.`,
-              detected_features: [`${bRes.building_count} Verified Footprints`, `${bRes.high_confidence_count} High Confidence`, `${bRes.medium_confidence_count} Medium`, `${bRes.partial_count} Partial Edge`],
+              detected_features: [`${bRes.building_count} Detected Footprints`, `${bRes.high_confidence_count} High Confidence`, `${bRes.medium_confidence_count} Medium`, `${bRes.partial_count} Partial Edge`],
               label: 'Building Footprint Audit', revealed_layer: 'urban',
               suggested_followups: ['Total roof area for solar?','Buildings closest to flood zone?','Density distribution?'],
             }
@@ -1414,7 +1414,7 @@ export default function App() {
     setStatus('Running change detection…')
     compareRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     let compAnswer = (beforeImage && afterImage)
-      ? 'Multi-temporal comparison of your uploaded imagery reveals: +12.4% built-up expansion with verified geometric boundaries, and 8.3% localized vegetation reduction. Coregistration confidence: 96%.'
+      ? 'Multi-temporal comparison of your uploaded imagery reveals: +12.4% built-up expansion with delineated geometric boundaries, and 8.3% localized vegetation reduction. Coregistration confidence: 96%.'
       : 'Temporal comparison (2024→2026 satellite pass): +12.4% expansion in built-up footprint, −8.3% localized canopy reduction. Coregistration confidence: 96%.'
     let confScore = 96
     let features = ['Vegetation shift', 'Built-up expansion', 'Riparian boundary', 'Coregistered baseline']
@@ -1958,7 +1958,7 @@ export default function App() {
                       <img src={imagePreview}
                         alt="Uploaded satellite image"
                         className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
-                        style={{ opacity: showBuildingsOverlay ? 0.94 : 0.68, minHeight: 360 }} />
+                        style={{ opacity: showBuildingsOverlay ? 0.94 : 0.7, minHeight: 360 }} />
                     ) : (
                       <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 transition-all ${isDragOver ? 'drop-active' : ''}`}
                         style={{ border: `2px dashed ${isDragOver ? C.cyan : C.border}`, borderRadius: 0, background: isDragOver ? `${C.cyan}06` : 'transparent' }}>
@@ -2114,7 +2114,7 @@ export default function App() {
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2" /><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" /></svg>
                       </div>
                       <div className="font-medium mb-1" style={{ color: C.white }}>Upload an image to begin</div>
-                      <div>Ask in natural language. SatQuery AI routes your query to the correct specialist pipeline and returns a verified, traceable result.</div>
+                      <div>Ask in natural language. SatQuery AI routes the request to the relevant analysis pipeline and returns the available result with an execution trace.</div>
                     </div>
                   )}
 
@@ -2268,17 +2268,17 @@ export default function App() {
           <div className="text-center mb-16">
             <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-md" style={{ color: C.orange, background: `${C.orange}0E`, border: `1px solid ${C.orange}22` }}>CORE CAPABILITIES</div>
             <h2 className="text-4xl lg:text-5xl font-bold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Intelligence Across<br />Every Modality</h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Five specialist pipelines: deterministically routed, observable, and benchmarked against public datasets.</p>
+            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Six specialist pipelines: deterministically routed, observable, and built for remote-sensing workflows.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { icon: '◉', color: C.cyan, badge: 'VRSBench', title: 'Scene Captioning & VQA', desc: 'Multi-attribute natural-language descriptions of land-cover, dominant objects, spectral signatures, and spatial layout per VRSBench conventions.', detail: 'BigEarthNet 43-class · F1-Score metric · ResNet-50 backbone' },
-              { icon: '⊕', color: C.mint, badge: 'RSVQA', title: 'Text-Guided Grounding', desc: 'Localizes requested geographical objects with percentage-based bounding coordinates. Highlights water bodies, buildings, and terrain patches on demand.', detail: 'Normalized bbox output · RSVQA-HR evaluation' },
-              { icon: '△', color: C.orange, badge: 'CDVQA', title: 'Bi-Temporal Change Detection', desc: 'Quantifies structural, vegetation, and hydrological changes between co-registered image pairs. Reports expansion rates, area deltas, and confidence bounds.', detail: 'Coregistration ≤2px tolerance · CDVQA benchmark' },
-              { icon: '⬡', color: C.mint, badge: 'RISAT/Cartosat', title: 'Optical–SAR Cross-Modal Fusion', desc: 'Combines optical NIR reflectance with SAR microwave backscatter for all-weather, cloud-penetrating analysis of built-up and water-covered regions.', detail: 'SSIM + CrossCorr · C-band · VV/VH polarization' },
-              { icon: '⬚', color: C.cyan, badge: 'YOLO-Seg', title: 'Building Footprint Audit', desc: 'Tiled deep-learning instance segmentation with IoU NMS deduplication. Returns unique polygon coordinates, per-structure confidence, and count statistics.', detail: 'YOLOv8-Seg · 512px tiles · 64px overlap' },
-              { icon: '◎', color: C.orange, badge: 'Agentic', title: 'Deterministic Task Routing', desc: 'Every query passes through a transparent task classifier → tool registry → specialist model pipeline. Full execution trace viewable and exportable.', detail: 'Observable trace · Permitted parameters · JSON export' },
+              { icon: '◉', color: C.cyan, badge: 'VRSBench', title: 'Single-Image VQA', desc: 'Multi-attribute natural-language visual question answering and descriptions for land-cover, dominant objects, and spatial layout.', detail: 'BigEarthNet taxonomy · Multi-label classification · ResNet-50 backbone' },
+              { icon: '⊕', color: C.mint, badge: 'RSVQA', title: 'Text-Guided Grounding', desc: 'Localizes requested geographical objects with percentage-based bounding coordinates. Highlights water bodies, buildings, and terrain patches on demand.', detail: 'Normalized bbox output · RSVQA evaluation protocol' },
+              { icon: '△', color: C.orange, badge: 'CDVQA', title: 'Bi-Temporal Change Detection', desc: 'Quantifies structural, vegetation, and hydrological changes between co-registered image pairs. Reports expansion rates, area deltas, and confidence bounds.', detail: 'Coregistration ≤2px tolerance · CDVQA change protocol' },
+              { icon: '⬡', color: C.mint, badge: 'RISAT/Cartosat', title: 'Optical-SAR Analysis', desc: 'Combines optical NIR reflectance with SAR microwave backscatter for all-weather, cloud-penetrating analysis of built-up and water-covered regions.', detail: 'SSIM + CrossCorr · C-band · VV/VH polarization' },
+              { icon: '⬚', color: C.cyan, badge: 'YOLO-Seg', title: 'Building Footprint Detection', desc: 'Tiled deep-learning instance segmentation with IoU NMS deduplication. Returns unique polygon coordinates, per-structure confidence, and count statistics.', detail: 'YOLOv8-Seg · 512px tiles · 64px overlap' },
+              { icon: '◎', color: C.orange, badge: 'Agentic', title: 'Traceable Task Routing', desc: 'Every query passes through a transparent task classifier → tool registry → specialist model pipeline. Full execution trace viewable and exportable.', detail: 'Observable trace · Permitted parameters · JSON export' },
             ].map((f, i) => (
               <div key={i} className="rounded-2xl p-6 transition-all duration-300 cursor-default group stat-card"
                 style={{ background: C.surface, border: `1px solid ${C.border}` }}>
@@ -2431,9 +2431,9 @@ export default function App() {
         <div className="relative max-w-3xl mx-auto px-5">
           <div className="inline-block text-xs font-mono tracking-widest mb-6 px-3 py-1.5 rounded-md" style={{ color: C.cyan, background: `${C.cyan}0E`, border: `1px solid ${C.cyan}22` }}>START ANALYZING</div>
           <h2 className="text-5xl lg:text-6xl font-bold mb-6" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}>
-            Upload. Query.<br /><span style={{ color: 'var(--cyan)' }}>Get verified answers.</span>
+            Upload. Query.<br /><span style={{ color: 'var(--cyan)' }}>Inspect the result.</span>
           </h2>
-          <p className="text-lg mb-12 max-w-lg mx-auto" style={{ color: C.muted, lineHeight: 1.8 }}>Used by research teams, urban planners, agricultural operators, and environmental agencies to interrogate satellite imagery with traceable, benchmark-grounded results.</p>
+          <p className="text-lg mb-12 max-w-lg mx-auto" style={{ color: C.muted, lineHeight: 1.8 }}>Explore satellite imagery through natural-language questions, image comparison, and optical-SAR analysis. Review the analysis output and inspect the execution trace behind each request.</p>
           <div className="flex flex-wrap justify-center gap-4">
             <button onClick={focusWorkspace} className="btn-primary px-8 py-4 text-sm font-semibold rounded-xl">Upload Image & Start →</button>
             <button onClick={() => setShowEvalModal(true)} className="btn-ghost px-8 py-4 text-sm font-medium rounded-xl">View Evaluation Criteria</button>
@@ -2463,7 +2463,7 @@ export default function App() {
                 </svg>
                 <span className="font-bold tracking-wide text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>SATQUERY<span style={{ color: C.cyan }}>AI</span></span>
               </div>
-              <p className="text-sm leading-relaxed mb-5" style={{ color: C.muted }}>Agentic remote-sensing vision-language assistant for the ISRO/SAC VLM Challenge. BigEarthNet domain adaptation, multi-modal analysis, deterministic task routing.</p>
+              <p className="text-sm leading-relaxed mb-5" style={{ color: C.muted }}>Agentic remote-sensing vision-language assistant for satellite imagery analysis. BigEarthNet domain adaptation, multi-modal analysis, deterministic task routing.</p>
               <div className="flex flex-wrap gap-1.5">
                 {['BigEarthNet v2.0', 'ResNet-50', 'BIFOLD/TU Berlin'].map(t => (
                   <span key={t} className="text-[9px] font-mono px-2 py-0.5 rounded-md" style={{ background: `${C.cyan}0A`, color: C.dim, border: `1px solid ${C.border}` }}>{t}</span>
@@ -2559,7 +2559,7 @@ export default function App() {
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.white}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = C.muted}
                 >
-                  CDVQA Bi-Temporal Verification
+                  CDVQA Bi-Temporal Change Detection
                 </button>
                 <button
                   type="button"
@@ -2578,7 +2578,7 @@ export default function App() {
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.mint}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#35E0B8'}
                 >
-                  ISRO/SAC Evaluation Protocol
+                  Evaluation Protocol
                 </button>
               </div>
             </div>
@@ -2617,32 +2617,30 @@ export default function App() {
                 >
                   Strict Required Data Policy
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveLegalTab('privacy'); setLegalModalOpen(true) }}
+                <a
+                  href="/privacy"
                   className="block text-left transition-colors cursor-pointer"
                   style={{ color: C.muted }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.white}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = C.muted}
                 >
                   Privacy Policy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveLegalTab('terms'); setLegalModalOpen(true) }}
+                </a>
+                <a
+                  href="/terms"
                   className="block text-left transition-colors cursor-pointer"
                   style={{ color: C.muted }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.white}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = C.muted}
                 >
                   Terms & Conditions
-                </button>
+                </a>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8" style={{ borderTop: `1px solid ${C.border}` }}>
-            <div className="text-xs font-mono" style={{ color: C.dim }}>© 2026 SatQuery AI · ISRO/SAC Remote-Sensing VLM Challenge · All rights reserved</div>
+            <div className="text-xs font-mono" style={{ color: C.dim }}>© 2026 SatQuery AI · Remote-Sensing Vision-Language Assistant · All rights reserved</div>
             <div className="flex items-center gap-4 text-xs font-mono flex-wrap" style={{ color: C.dim }}>
               <a
                 href="https://arxiv.org/abs/2407.03653"

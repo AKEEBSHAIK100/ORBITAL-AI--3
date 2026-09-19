@@ -1,0 +1,44 @@
+# Remote-Sensing VLM Adaptation Configuration (LoRA / QLoRA)
+# SatQuery AI / ORBITAL-AI
+
+model:
+  # Base Vision-Language Model identifier on HuggingFace Hub
+  base_model_id: "Qwen/Qwen2-VL-7B-Instruct"
+  quantization: "4bit"  # options: '4bit', '8bit', 'none'
+  torch_dtype: "bfloat16"
+
+dataset:
+  name: "BigEarthNet-S2"
+  version: "2.0.0"
+  train_data_path: "data/bigearthnet_v2/train_instructions.jsonl"
+  val_data_path: "data/bigearthnet_v2/val_instructions.jsonl"
+  image_resolution: 448  # pixel resolution for VLM vision encoder
+
+training:
+  batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  num_train_epochs: 3
+  warmup_ratio: 0.03
+  lr_scheduler_type: "cosine"
+  logging_steps: 10
+  save_steps: 250
+  save_total_limit: 2
+  fp16: false
+  bf16: true
+  seed: 42
+  output_dir: "checkpoints/rs_vlm_lora"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"

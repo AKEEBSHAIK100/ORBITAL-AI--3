@@ -1,0 +1,2 @@
+# This directory stores real benchmark evaluation JSON records.
+# Files follow the schema: <dataset>_<task>_<timestamp>.json

@@ -34,6 +34,8 @@ def _build_instances() -> Dict[str, BaseTool]:
     vqa = VQATool(ben_tool=ben, building_tool=building)
 
     return {
+        "rs_vqa_adapted": vqa,
+        "rs_caption_adapted": caption,
         "vqa": vqa,
         "caption": caption,
         "grounding": grounding,

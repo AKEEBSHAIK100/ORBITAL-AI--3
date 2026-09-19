@@ -19,14 +19,20 @@ class BaseTool(ABC):
         pass
 
     def to_spec(self) -> Dict[str, Any]:
-        return {
+        spec = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
             "supported_tasks": self.supported_tasks,
             "modalities": self.modalities,
+            "supported_modalities": getattr(self, "supported_modalities", self.modalities),
             "adapter": self.adapter,
             "domain_adaptation": self.domain_adaptation,
             "model_id": self.model_id,
             "permitted_parameters": self.permitted_parameters,
         }
+        if hasattr(self, "base_model"):
+            spec["base_model"] = getattr(self, "base_model")
+        if hasattr(self, "provenance"):
+            spec["provenance"] = getattr(self, "provenance")
+        return spec

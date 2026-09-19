@@ -85,8 +85,9 @@ class UnifiedAnalysisResponse(BaseModel):
     success: bool = True
     task_type: str
     answer: str
-    confidence: float
-    confidence_level: str  # High, Medium, Low
+    confidence: Optional[Union[float, Dict[str, Any]]] = None
+    confidence_level: Optional[str] = None  # High, Medium, Low, UNAVAILABLE, not_calibrated
+    confidence_source: Optional[str] = None
     tools_used: List[str]
     input_modality: str
     timestamp: str

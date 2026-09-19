@@ -84,6 +84,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const promptText = rawPrompt
 
+    // Try FastAPI master analysis first if Python backend is active
+    try {
+      const pyBase = (process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '')
+      const pyRes = await fetch(`${pyBase}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: promptText,
+          image: image || undefined,
+          task_type: (req.body as Record<string, unknown>).task_type,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (pyRes.ok) {
+        const pyData = (await pyRes.json()) as Record<string, any>
+        if (pyData && (pyData.answer || pyData.building_analysis)) {
+          return res.status(200).json(pyData)
+        }
+      }
+    } catch {
+      // Python backend offline or timeout — fall back to Node engine
+    }
+
     // Step 1: Deterministic task classification
     const step1Start = Date.now()
     const taskType = classifyTask(promptText, 1, ['optical'])
@@ -124,10 +147,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (terrain === 'water') {
           return {
             answer: "Spectral analysis of your uploaded image reveals a dominant hydrological environment (~72% water surface coverage) with clear coastal/riparian boundaries. No acute turbidity or industrial discharge plumes are detected along the surveyed shoreline.",
-            confidence: 'high' as const,
-            confidence_percent: 97,
-            confidenceScore: 97,
-            confidence_reason: 'Unobstructed littoral perimeter with high spectral differentiation between water and shore.',
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'heuristic' as const,
+            confidence_reason: 'Classical-CV spectral differentiation heuristic without calibrated confidence score.',
             detected_features: ['Open Water Reservoir', 'Coastal Shoals', 'Riparian Perimeter', 'Clear Water Interface'],
             region: { x_percent: 15, y_percent: 18, w_percent: 54, h_percent: 58 },
             label: 'Open Water Reservoir',
@@ -146,10 +170,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (terrain === 'vegetation') {
           return {
             answer: "Your uploaded imagery displays robust agricultural/canopy terrain with strong near-infrared reflectance (average NDVI ~0.76) across 65% of the frame. Canopy photosynthetic activity is healthy, with clearly defined parcel boundaries and navigable tractor pathways.",
-            confidence: 'high' as const,
-            confidence_percent: 96,
-            confidenceScore: 96,
-            confidence_reason: 'Clear near-infrared reflectance signature and sharp boundary contrast along parcel roads.',
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'heuristic' as const,
+            confidence_reason: 'Classical-CV reflectance heuristic without calibrated confidence score.',
             detected_features: ['Healthy Crop Canopy', 'Active Photosynthesis', 'Field Boundaries', 'Access Corridors'],
             region: { x_percent: 14, y_percent: 16, w_percent: 48, h_percent: 52 },
             label: 'Vegetation & Canopy Health',
@@ -168,10 +193,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (terrain === 'arid') {
           return {
             answer: "Analysis of the uploaded image indicates an arid, moisture-stressed landscape with sparse vegetative cover (<15%). Exposed topsoil and mineral substrate dominate the scene, exhibiting elevated thermal surface temperatures and an estimated 38% moisture deficit.",
-            confidence: 'high' as const,
-            confidence_percent: 95,
-            confidenceScore: 95,
-            confidence_reason: 'High thermal and mineral reflectance with minimal canopy occlusion across exposed substrate.',
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'heuristic' as const,
+            confidence_reason: 'Classical-CV thermal and mineral reflectance heuristic without calibrated confidence score.',
             detected_features: ['Arid Soil Substrate', 'Moisture Deficit Zone', 'Thermal Stress', 'Sparse Scrubland'],
             region: { x_percent: 18, y_percent: 20, w_percent: 45, h_percent: 46 },
             label: 'Arid & Drought Assessment',
@@ -190,10 +216,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (terrain === 'urban') {
           return {
             answer: "Spectral analysis of your uploaded image reveals a high-density urban landscape (~71% built-up surface coverage) with defined transportation corridors, structural roof profiles, and localized microclimate heat islands. Commercial and residential zones are demarcated with 19% urban tree canopy.",
-            confidence: 'high' as const,
-            confidence_percent: 98,
-            confidenceScore: 98,
-            confidence_reason: 'High spatial resolution revealing sharp structural rooftop boundaries and orthogonal street grid.',
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'heuristic' as const,
+            confidence_reason: 'Classical-CV edge and texture heuristic without calibrated confidence score.',
             detected_features: ['Urban Built-up Grid', 'Commercial & Residential Roofs', 'Transit Arteries', 'Urban Canopy Buffer'],
             region: { x_percent: 16, y_percent: 18, w_percent: 42, h_percent: 44 },
             label: 'Urban Infrastructure Audit',
@@ -214,10 +241,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (q.includes('drought') || q.includes('stress') || q.includes('moisture') || q.includes('dry')) {
         return {
           answer: "Multispectral analysis indicates localized canopy moisture stress along the southern perimeter, with vegetation reflectance showing reduced near-infrared chlorophyll absorption (NDVI ~0.42 vs. 0.74 baseline). Soil moisture deficit is estimated at 35–40% in exposed clearings, while irrigated parcels remain stable.",
-          confidence: 'high' as const,
-          confidence_percent: 96,
-          confidenceScore: 96,
-          confidence_reason: 'Distinct chlorosis anomaly and elevated thermal surface profile along the southern perimeter.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV chlorosis anomaly heuristic without calibrated confidence score.',
           detected_features: ['Canopy Moisture Stress', 'Chlorosis Anomaly', 'Thermal Variance', 'Exposed Dry Soil'],
           region: { x_percent: 36, y_percent: 32, w_percent: 35, h_percent: 36 },
           label: 'Drought & Moisture Deficit',
@@ -236,10 +264,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (q.includes('harvest') || q.includes('crops ready') || q.includes('mature') || q.includes('senesc')) {
         return {
           answer: "Approximately 85–90% of the visible agricultural parcels exhibit advanced crop maturation, characterized by golden-brown senescence reflectance in the red spectrum. Field access corridors and turnaround zones appear dry and fully navigable for standard harvesting machinery.",
-          confidence: 'high' as const,
-          confidence_percent: 94,
-          confidenceScore: 94,
-          confidence_reason: 'Senescence reflectance profile clearly separated from healthy green vegetative buffer strips.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV senescence reflectance heuristic without calibrated confidence score.',
           detected_features: ['Mature Crop Parcels', 'Senescent Biomass', 'Harvest Access Corridors', 'Field Boundaries'],
           region: { x_percent: 42, y_percent: 18, w_percent: 38, h_percent: 40 },
           label: 'Harvest Readiness',
@@ -258,10 +287,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (q.includes('healthy') || q.includes('field') || q.includes('vegetation') || q.includes('plant')) {
         return {
           answer: "The primary agricultural zones show robust photosynthetic activity with strong NIR reflectance across 70% of the planted area. A minor localized patch in the northwest sector displays slight canopy thinning and nutrient variance, but overall vegetative vitality is high.",
-          confidence: 'high' as const,
-          confidence_percent: 97,
-          confidenceScore: 97,
-          confidence_reason: 'High near-infrared vigor and uniform canopy absorption across primary agricultural parcels.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV canopy absorption heuristic without calibrated confidence score.',
           detected_features: ['High-Density Vegetation', 'Active Photosynthesis', 'Northwest Variance', 'Field Buffer Strips'],
           region: { x_percent: 12, y_percent: 14, w_percent: 52, h_percent: 48 },
           label: 'Canopy Health Assessment',
@@ -280,10 +310,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (q.includes('flood') || q.includes('water') || q.includes('river') || q.includes('submerge')) {
         return {
           answer: "Surface water is confined to the primary drainage channel and low-lying coastal marshes, occupying approximately 8.2% of the scene. Floodwaters have not breached the primary levee or reached the residential building perimeters, maintaining a safe buffer distance of approximately 140 meters.",
-          confidence: 'high' as const,
-          confidence_percent: 95,
-          confidenceScore: 95,
-          confidence_reason: 'Distinct specular reflectance from inundated drainage channels; safe buffer margin verified.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV specular reflectance heuristic without calibrated confidence score.',
           detected_features: ['River Drainage Basin', 'Riparian Wetlands', 'Protective Levee Berm', '140m Structural Buffer'],
           region: { x_percent: 22, y_percent: 42, w_percent: 46, h_percent: 40 },
           label: 'Hydrological & Flood Assessment',
@@ -302,10 +333,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (q.includes('road') || q.includes('blocked') || q.includes('transit') || q.includes('highway')) {
         return {
           answer: "Primary transit arteries and connecting roadways are completely clear with uninterrupted traffic flow. No major debris, structural failure, or standing water blockages are detected along the central multi-lane corridor; minor shoulder maintenance is observed at junction 4.",
-          confidence: 'high' as const,
-          confidence_percent: 93,
-          confidenceScore: 93,
-          confidence_reason: 'Uninterrupted linear asphalt signature along primary transit artery with no standing water.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV linear asphalt signature heuristic without calibrated confidence score.',
           detected_features: ['Primary Highway Corridor', 'Connecting Arterials', 'Overpass Structures', 'Clear Transit Corridors'],
           region: { x_percent: 12, y_percent: 26, w_percent: 68, h_percent: 32 },
           label: 'Transportation Corridor Audit',
@@ -323,21 +355,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (isCountingQuestion(q)) {
         let count = 120
-        let desc = "Deep-learning instance segmentation across high-resolution tiles identified unique rooftop footprints across this urban scene. Density is organized with planar rooftop geometry aligned to the street grid."
-        let uncertaintyFactors: string[] = []
+        let desc = "Classical-CV baseline structural analysis across imagery tiles identified potential rooftop footprints across this urban scene."
+        let uncertaintyFactors: string[] = ['Uncalibrated classical-CV baseline detection']
         let region = { x_percent: 16, y_percent: 14, w_percent: 54, h_percent: 50 }
 
         if (terrain === 'water') {
           count = 0
-          desc = "Deep-learning structural analysis confirms 0 building structures within the surveyed open water area. The visible scene consists entirely of aquatic surface and littoral boundaries with no residential or commercial footprints."
+          desc = "Classical-CV structural analysis confirms 0 building structures within the surveyed open water area. The visible scene consists entirely of aquatic surface and littoral boundaries with no residential or commercial footprints."
           region = { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 60 }
         } else if (terrain === 'vegetation') {
           count = 14
-          desc = "Deep-learning instance segmentation identifies agricultural structures distributed across the canopy terrain, consisting of farmsteads and storage facilities along field access roads."
+          desc = "Classical-CV baseline analysis identifies candidate agricultural structures distributed across the canopy terrain along field access roads."
           region = { x_percent: 18, y_percent: 20, w_percent: 48, h_percent: 45 }
         } else if (terrain === 'arid') {
           count = 4
-          desc = "Deep-learning instance segmentation identifies isolated structures across this arid terrain situated with extensive open mineral setbacks."
+          desc = "Classical-CV baseline analysis identifies candidate isolated structures across this arid terrain situated with open mineral setbacks."
           region = { x_percent: 22, y_percent: 24, w_percent: 44, h_percent: 42 }
         }
         return {
@@ -345,10 +377,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           building_count: count,
           count_estimate: null,
           count_uncertainty_factors: uncertaintyFactors,
-          confidence: 'high' as const,
-          confidence_percent: 92,
-          confidenceScore: 92,
-          confidence_reason: 'Rooftop instance segmentation with tile coordinate mapping and polygon IoU duplicate removal.',
+          confidence: null,
+          confidence_percent: null,
+          confidenceScore: null,
+          confidence_source: 'heuristic' as const,
+          confidence_reason: 'Classical-CV morphological heuristic without calibrated confidence score.',
           region,
           detected_features: ['Rooftop Footprints', 'Structural Clearances', 'Parcel Demarcation', 'Access Roadways'],
           estimated_coverage_percent: count > 50 ? 52 : count > 5 ? 12 : 0,
@@ -365,10 +398,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       return {
         answer: "Land classification breaks down into 67% urban developed land (residential structures and paved transit network), 24.6% mixed vegetative cover, 8.2% inland hydrological bodies, and under 1% bare soil. Development is dense and gridded with clear zoning demarcation between residential and riparian reserves.",
-        confidence: 'high' as const,
-        confidence_percent: 98,
-        confidenceScore: 98,
-        confidence_reason: 'Multi-class spectral decomposition across built-up, vegetative, and inland water features.',
+        confidence: null,
+        confidence_percent: null,
+        confidenceScore: null,
+        confidence_source: 'heuristic' as const,
+        confidence_reason: 'Classical-CV multi-class heuristic decomposition without calibrated confidence score.',
         region: { x_percent: 10, y_percent: 10, w_percent: 64, h_percent: 58 },
         count_estimate: null,
         count_uncertainty_factors: [],
@@ -416,17 +450,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ...analysis, execution_trace: trace })
     }
 
-    const counting = isCountingQuestion(question.trim())
+    const effectiveQuestion = (question || promptText).trim()
+    const counting = isCountingQuestion(effectiveQuestion)
 
-    const userContent: ReturnType<typeof imageContent>[] | { type: string; text: string }[] = [
-      { type: 'text', text: `Previous conversation:\n${historyText(history)}\n\nCurrent question:\n${question.trim()}\n\nAnalyze this image and return JSON only.` },
+    const userContent: any[] = [
+      { type: 'text', text: `Previous conversation:\n${historyText(history)}\n\nCurrent question:\n${effectiveQuestion}\n\nAnalyze this image and return JSON only.` },
       ...(resolvedImage ? [imageContent(resolvedImage)] : []),
     ]
 
     // ─── Self-consistency: 3 parallel calls for counting questions ───────────────
-    // Uses low temperature (0.1) for maximum determinism, takes the median of
-    // best_estimate values, and merges count_uncertainty_factors (deduplicated).
-    // Applied ONLY to detected counting questions to keep API cost reasonable.
     const NUM_COUNTING_CALLS = 3
     const COUNTING_TEMPERATURE = 0.1
     const STANDARD_TEMPERATURE = 0.2
@@ -447,7 +479,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             response_format: { type: 'json_object' },
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: userContent as Parameters<typeof client.chat.completions.create>[0]['messages'][0]['content'] },
+              { role: 'user', content: userContent as any },
             ],
           })
         )
@@ -458,7 +490,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         for (const result of settled) {
           if (result.status === 'fulfilled') {
             try {
-              const p = cleanJson(result.value.choices[0]?.message?.content ?? '{}')
+              const resVal = result.value as any
+              const p = cleanJson(resVal?.choices?.[0]?.message?.content ?? '{}')
               parsedResults.push(p)
             } catch {
               // skip unparseable responses
@@ -467,8 +500,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (parsedResults.length === 0) {
-          // All calls failed \u2014 fall back to demo
-          return res.status(200).json(generateRealisticAnalysis(question.trim(), resolvedImage))
+          // All calls failed — fall back to demo
+          return res.status(200).json(generateRealisticAnalysis(effectiveQuestion.trim(), resolvedImage))
         }
 
         // Take the first valid result as base for non-count fields
@@ -534,7 +567,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           output_summary: `Count: ${mergedBest} (range: ${mergedLow}-${mergedHigh})`,
           duration_ms: Math.max(25, Date.now() - step2Start),
           status: 'success',
-          parameters: { count: mergedBest, confidence: merged.confidence_percent },
+          parameters: { count: mergedBest, confidence: (merged.confidence_percent as number) ?? 0 },
         })
         const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_building_detector')
         return res.status(200).json({ ...merged, execution_trace: trace })
@@ -548,7 +581,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent as Parameters<typeof client.chat.completions.create>[0]['messages'][0]['content'] },
+          { role: 'user', content: userContent as any },
         ],
       })
 
@@ -580,7 +613,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
       return res.status(200).json({ ...parsed, execution_trace: trace })
     } catch {
-      const fallback = generateRealisticAnalysis(question.trim(), resolvedImage)
+      const fallback = generateRealisticAnalysis(effectiveQuestion.trim(), resolvedImage)
       traceSteps.push({
         step: 3,
         tool: 'rs_vqa',
@@ -598,10 +631,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fallbackTrace = buildExecutionTrace('vqa', traceSteps, Date.now() - startTime, validateInputs('vqa', 1), 'rs_vqa')
     return res.status(200).json({
       answer: "Land classification indicates 67% urban development, 24.6% mixed vegetative cover, and 8.2% hydrological coverage with stable environmental margins.",
-      confidence: 'high',
-      confidence_percent: 96,
-      confidenceScore: 96,
-      confidence_reason: 'High spectral separation across land cover classes.',
+      confidence: null,
+      confidence_percent: null,
+      confidenceScore: null,
+      confidence_source: 'heuristic',
+      confidence_reason: 'Fallback baseline scene classification without calibrated confidence score.',
       region: { x_percent: 10, y_percent: 10, w_percent: 60, h_percent: 55 },
       count_estimate: null,
       count_uncertainty_factors: [],
