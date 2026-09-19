@@ -1,0 +1,16 @@
+# Python backend, ML models, datasets, and tests (not deployed to Vercel)
+backend/
+training/
+evaluation/
+models/
+docs/
+tests/
+data/
+db/
+
+# Dev tooling & scratch
+scratch/
+*.pt
+*.safetensors
+*.bin
+*.log
