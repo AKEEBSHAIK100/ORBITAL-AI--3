@@ -48,9 +48,8 @@ sar_test_bc.py
 scratch_step14.py
 scratch_step14_res.json
 
-# Test & scratch images
+# Test & scratch images (keep public assets; exclude raw satellite data)
 *.jpg
 *.jpeg
 *.png
 !public/**
-!backend/data/**
