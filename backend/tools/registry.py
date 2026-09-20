@@ -39,9 +39,11 @@ def _build_instances() -> Dict[str, BaseTool]:
         "vqa": vqa,
         "caption": caption,
         "grounding": grounding,
+        "visual_grounding": grounding,
         "building_detection": building,
         "land_cover": ben,
         "optical_sar": optical_sar,
+        "optical_sar_fusion": optical_sar,
         "change_detection": change,
         "change_vqa": change,
     }

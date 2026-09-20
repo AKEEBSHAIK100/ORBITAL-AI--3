@@ -14,7 +14,7 @@
     "start": "node --import tsx server.ts",
     "preview": "vite preview",
     "format": "oxfmt",
-    "test:phase4": "node tests/phase4.test.mjs"
+    "test:phase4": "node --import tsx tests/phase4.test.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.0",
