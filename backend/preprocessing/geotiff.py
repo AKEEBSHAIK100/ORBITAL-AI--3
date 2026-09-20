@@ -1,15 +1,26 @@
+import copy
 import io
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from PIL import Image
 import cv2
 
+from ..services.cache_manager import compute_image_hash, get_image_preprocessing_cache
+
 def inspect_and_load_geospatial_image(data_bytes: bytes) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     Validates GeoTIFF/TIFF/raster inputs and truthfully inspects resolution, CRS,
     georeferencing, and dimensions.
+    Reuses cached decoded array and metadata when identical data_bytes are submitted.
     Never fabricates default CRS or ground-sampling distances when metadata is absent.
     """
+    img_cache = get_image_preprocessing_cache()
+    img_hash = compute_image_hash(data_bytes)
+    cached = img_cache.get(img_hash)
+    if cached is not None:
+        cached_img, cached_meta = cached
+        return cached_img.copy(), copy.deepcopy(cached_meta)
+
     metadata: Dict[str, Any] = {
         "format": "UNKNOWN",
         "bands": 3,
@@ -61,6 +72,7 @@ def inspect_and_load_geospatial_image(data_bytes: bytes) -> Tuple[np.ndarray, Di
         img_np = np.array(pil_img)
         img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
         metadata["bands"] = img_bgr.shape[2] if img_bgr.ndim == 3 else 1
+        img_cache.set(img_hash, (img_bgr, metadata))
         return img_bgr, metadata
 
     except Exception as e:
@@ -71,5 +83,6 @@ def inspect_and_load_geospatial_image(data_bytes: bytes) -> Tuple[np.ndarray, Di
             metadata["dimensions"] = {"width": img_bgr.shape[1], "height": img_bgr.shape[0]}
             metadata["format"] = "RASTER"
             metadata["bands"] = img_bgr.shape[2] if img_bgr.ndim == 3 else 1
+            img_cache.set(img_hash, (img_bgr, metadata))
             return img_bgr, metadata
         raise ValueError(f"Unable to decode geospatial image: {e}")

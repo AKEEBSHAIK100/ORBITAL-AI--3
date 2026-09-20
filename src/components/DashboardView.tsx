@@ -95,8 +95,8 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* Top 4 Quick Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Quick Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Session Rate Limit Card */}
         <div className="p-5 rounded-2xl border border-slate-800 bg-[#07111F] space-y-3">
           <div className="flex items-center justify-between">
@@ -122,55 +122,35 @@ export default function DashboardView({
           </div>
         </div>
 
-        {/* Building Audit Card */}
-        <div className="p-5 rounded-2xl border border-slate-800 bg-[#07111F] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Building Footprints</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              {buildingAnalysis ? 'Audited' : 'Standby'}
-            </span>
-          </div>
-          <div className="text-3xl font-bold text-slate-100" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            {buildingAnalysis ? buildingAnalysis.building_count : imageTelemetry.buildingCount}
-            <span className="text-sm font-normal text-slate-400 font-mono"> rooftops</span>
-          </div>
-          <div className="text-[10px] font-mono text-slate-400 truncate">
-            {buildingAnalysis
-              ? `High: ${buildingAnalysis.high_confidence_count} · Med: ${buildingAnalysis.medium_confidence_count}`
-              : 'Run instance audit from toolbar'}
-          </div>
-        </div>
-
         {/* BigEarthNet Top Class Card */}
         <div className="p-5 rounded-2xl border border-slate-800 bg-[#07111F] space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">BigEarthNet Prediction</span>
+            <span className="text-[11px] font-mono text-slate-400 uppercase">Land Cover Classification</span>
             <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-              19-Class
+              {benResults ? 'Verified' : 'Standby'}
             </span>
           </div>
           <div className="text-xl font-bold text-slate-100 truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            {benResults ? benResults.top_label : imageTelemetry.landClass}
+            {benResults ? benResults.top_label : 'Awaiting analysis'}
           </div>
           <div className="text-[10px] font-mono text-emerald-400">
-            {benResults ? `${benResults.confidence.toFixed(1)}% model confidence` : `${imageTelemetry.landClassPct} coverage`}
+            {benResults ? `${benResults.confidence.toFixed(1)}% model confidence` : 'Zero unverified measurements'}
           </div>
         </div>
 
-        {/* Hydrological Coverage Card */}
+        {/* Active Analysis Mode Card */}
         <div className="p-5 rounded-2xl border border-slate-800 bg-[#07111F] space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Hydrological Body</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
-              Optical NIR
+            <span className="text-[11px] font-mono text-slate-400 uppercase">Analysis Mode</span>
+            <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase">
+              {activeMode}
             </span>
           </div>
-          <div className="text-3xl font-bold text-slate-100" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            {imageTelemetry.waterPct}
-            <span className="text-sm font-normal text-slate-400 font-mono"> surface</span>
+          <div className="text-xl font-bold text-slate-100" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            {activeMode === 'compare' ? 'Bi-temporal' : activeMode === 'fusion' ? 'Optical + SAR' : 'Single Image'}
           </div>
           <div className="text-[10px] font-mono text-slate-400 truncate">
-            {imageTelemetry.waterSub || 'Inland drainage basin verified'}
+            {activeMode === 'compare' ? 'Compare 2 observation dates' : activeMode === 'fusion' ? 'Cross-modal optical & radar' : 'Visual question answering & description'}
           </div>
         </div>
       </div>

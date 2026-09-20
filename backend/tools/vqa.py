@@ -102,29 +102,52 @@ class VQATool(BaseTool):
         if params.get("include_supporting_evidence", True):
             q_lower = query.lower()
             if any(k in q_lower for k in ["building", "structure", "count", "rooftop", "footprint"]):
-                bldg_tool = self._get_building_tool()
-                if bldg_tool is not None:
-                    try:
-                        bldg_res = bldg_tool.run({"image": img_bgr})
-                        evidence["supporting_building_detection"] = {
-                            "building_count": bldg_res.get("building_count"),
-                            "high_confidence_count": bldg_res.get("high_confidence_count"),
-                            "confidence_tier": bldg_res.get("confidence_level"),
-                        }
-                    except Exception as e:
-                        evidence["supporting_building_detection"] = {"error": str(e)}
+                existing_bldg = params.get("supporting_building_result")
+                if isinstance(existing_bldg, dict) and existing_bldg.get("status") in ("success", "SUCCESS") and "building_count" in existing_bldg:
+                    evidence["supporting_building_detection"] = {
+                        "building_count": existing_bldg.get("building_count"),
+                        "high_confidence_count": existing_bldg.get("high_confidence_count"),
+                        "confidence_tier": existing_bldg.get("confidence_level"),
+                        "reused": True,
+                    }
+                else:
+                    bldg_tool = self._get_building_tool()
+                    if bldg_tool is not None:
+                        try:
+                            bldg_res = bldg_tool.run({"image": img_bgr})
+                            evidence["supporting_building_detection"] = {
+                                "building_count": bldg_res.get("building_count"),
+                                "high_confidence_count": bldg_res.get("high_confidence_count"),
+                                "confidence_tier": bldg_res.get("confidence_level"),
+                            }
+                        except Exception as e:
+                            evidence["supporting_building_detection"] = {"error": str(e)}
 
             # Optional supporting land-cover context
-            ben_tool = self._get_ben_tool()
-            if ben_tool is not None:
-                try:
-                    ben_res = ben_tool.run({"image": img_bgr})
-                    evidence["supporting_land_cover"] = {
-                        "top_label": ben_res.get("top_label"),
-                        "active_labels": [l.get("name") for l in ben_res.get("active_labels", [])],
-                    }
-                except Exception:
-                    pass
+            existing_lc = params.get("supporting_land_cover_result")
+            if isinstance(existing_lc, dict) and existing_lc.get("status") == "success" and "top_label" in existing_lc:
+                evidence["supporting_land_cover"] = {
+                    "top_label": existing_lc.get("top_label"),
+                    "active_labels": [
+                        l.get("name") if isinstance(l, dict) else l
+                        for l in existing_lc.get("active_labels", [])
+                    ],
+                    "reused": True,
+                }
+            else:
+                ben_tool = self._get_ben_tool()
+                if ben_tool is not None:
+                    try:
+                        ben_res = ben_tool.run({"image": img_bgr})
+                        evidence["supporting_land_cover"] = {
+                            "top_label": ben_res.get("top_label"),
+                            "active_labels": [
+                                l.get("name") if isinstance(l, dict) else l
+                                for l in ben_res.get("active_labels", [])
+                            ],
+                        }
+                    except Exception:
+                        pass
 
         # If adapted model is unavailable, return structured specialist-unavailable response
         if status == "specialist_unavailable":

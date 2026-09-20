@@ -22,6 +22,12 @@ export interface ToolSpec {
   domain_adaptation: string
   model_id: string
   permitted_parameters?: Record<string, string | number | boolean>
+  /** Whether this specialist tool is currently executable. */
+  availability?: 'available' | 'unavailable'
+  /** Human-readable reason when availability === 'unavailable'. */
+  unavailable_reason?: string
+  /** Required dataset ID for domain-adapted inference. */
+  required_dataset?: string
 }
 
 export const TOOL_REGISTRY: Record<string, ToolSpec> = {
@@ -34,6 +40,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs). Pilot artifact only.',
     model_id: 'rs-vqa-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 50,
       include_supporting_evidence: true,
@@ -48,6 +56,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 87 BigEarthNet image-text pairs (3 epochs). Pilot artifact only; no VRSBench benchmark claim.',
     model_id: 'rs-caption-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 60,
       include_supporting_land_cover: true,
@@ -62,6 +72,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs).',
     model_id: 'rs-vqa-adapted-v1',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 50,
     },
@@ -75,6 +87,7 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'PyTorch YOLO Segmentation Engine (Tiled Inference + NMS/IoU Deduplication)',
     domain_adaptation: 'Weight-trained on high-resolution aerial and satellite imagery for structural rooftop footprints with confidence calibration.',
     model_id: 'yolo-segmentation-building_model.pt',
+    availability: 'available',
     permitted_parameters: {
       tile_size_px: 512,
       overlap_px: 64,
@@ -91,6 +104,7 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'RS-Change System Prompt (CDVQA benchmark conventions)',
     domain_adaptation: 'Calibrated for multi-temporal change identification, confidence reporting, and spatial change region bounding.',
     model_id: 'claude-sonnet-5',
+    availability: 'available',
     permitted_parameters: {
       coregistration_tolerance_px: 2.0,
       change_attribution: 'bi-temporal',
@@ -107,6 +121,7 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'OpenCV / NumPy Classical Computer Vision Pipeline',
     domain_adaptation: 'Sensor-specific radar backscatter (dB), speckle noise modeling, and optical-SAR complementarity scoring.',
     model_id: 'classical-cv-fusion-engine-v2',
+    availability: 'available',
     permitted_parameters: {
       optical_sensor: 'Cartosat-2S',
       sar_sensor: 'RISAT-1A',
@@ -122,6 +137,7 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'RS-Captioning System Prompt',
     domain_adaptation: 'Multi-attribute remote sensing description covering topography, land-use distribution, and sensor properties.',
     model_id: 'claude-sonnet-5',
+    availability: 'available',
     permitted_parameters: {
       caption_detail: 'multi-attribute',
       vocabulary: 'BigEarthNet-43',
@@ -136,6 +152,7 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'Classical-CV Spatial Bounding',
     domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions (classical CV).',
     model_id: 'classical-cv-contour',
+    availability: 'available',
     permitted_parameters: {
       coordinate_system: 'normalized_percentage',
       bbox_format: '[x,y,w,h]',

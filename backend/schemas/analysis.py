@@ -31,6 +31,16 @@ class QueryPlan(BaseModel):
     evidence_requirements: List[str] = Field(default_factory=list, description="Description of evidence needed to answer query")
     unsupported_reason: Optional[str] = None
     supported_alternatives: Optional[List[str]] = None
+    vqa_question: Optional[str] = Field(None, description="Focused question for VQA specialist in multi-task workflows")
+    vqa_target: Optional[str] = Field(None, description="Target entity/phenomenon queried by VQA, e.g. vegetation, water, buildings")
+    planner_disposition: str = Field(
+        "Known specialist available",
+        description="'Known specialist available' | 'Generalist fallback required' | 'No supported visual capability'"
+    )
+    task_category: str = Field(
+        "KNOWN_TASK",
+        description="KNOWN_TASK | COMPLEX_KNOWN_TASK | UNSUPPORTED | OPEN_REMOTE_SENSING_QUESTION"
+    )
 
 
 # ─── 6. Specialist Evidence Object ────────────────────────────────────────────

@@ -27,6 +27,27 @@ __pycache__/
 *.pt
 !backend/models/building_model.pt
 
+# Large model weight files — never commit to Git
+*.safetensors
+*.bin
+*.gguf
+*.ggml
+backend/models/generalist/
+
+# Large dataset directories
+backend/data/levir_cd/
+backend/data/optical_sar/
+backend/data/output_bitemporal.json
+
+# Scratch / one-off scripts
+dl_optical_sar.py
+dl_sar_v2.py
+e2e_real_sar.py
+sar_test.py
+sar_test_bc.py
+scratch_step14.py
+scratch_step14_res.json
+
 # Test & scratch images
 *.jpg
 *.jpeg

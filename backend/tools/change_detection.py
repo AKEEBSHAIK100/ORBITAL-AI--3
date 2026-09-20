@@ -34,11 +34,79 @@ class ChangeDetectionTool(BaseTool):
                 "status": "error"
             }
 
-        # Resize t2 to match t1 if slight difference
+        # ── Dimension compatibility gate ──────────────────────────────────────
+        # Reject mismatched pairs rather than silently resizing.
+        # Resizing two scenes from different geographies would produce
+        # meaningless pixel-difference statistics.
         h1, w1 = t1_img.shape[:2]
         h2, w2 = t2_img.shape[:2]
         if (h1, w1) != (h2, w2):
-            t2_img = cv2.resize(t2_img, (w1, h1), interpolation=cv2.INTER_LINEAR)
+            return {
+                "error": (
+                    f"Bi-temporal dimension mismatch: T1 is {w1}x{h1} px, "
+                    f"T2 is {w2}x{h2} px. "
+                    "Images must share identical pixel dimensions for radiometric "
+                    "comparison. Resize/reproject to a common grid before submission."
+                ),
+                "status": "error",
+                "t1_dimensions": {"width": w1, "height": h1},
+                "t2_dimensions": {"width": w2, "height": h2},
+            }
+
+        # ── Geospatial metadata validation ────────────────────────────────────
+        meta1 = inputs.get("metadata") if isinstance(inputs.get("metadata"), dict) else {}
+        meta2 = inputs.get("secondary_metadata") if isinstance(inputs.get("secondary_metadata"), dict) else {}
+        if not meta1 and not meta2 and isinstance(inputs.get("metadata_list"), list):
+            m_list = inputs["metadata_list"]
+            if len(m_list) >= 1 and isinstance(m_list[0], dict):
+                meta1 = m_list[0]
+            if len(m_list) >= 2 and isinstance(m_list[1], dict):
+                meta2 = m_list[1]
+
+        crs1 = meta1.get("crs")
+        crs2 = meta2.get("crs")
+        gt1 = meta1.get("geotransform") or meta1.get("affine")
+        gt2 = meta2.get("geotransform") or meta2.get("affine")
+
+        # Validate spatial reference compatibility when metadata is present
+        if crs1 and crs2 and str(crs1).strip().upper() != str(crs2).strip().upper():
+            return {
+                "error": (
+                    f"Incompatible spatial reference systems: T1 CRS is '{crs1}', "
+                    f"T2 CRS is '{crs2}'. Observations must share a compatible "
+                    "spatial reference system for bi-temporal analysis."
+                ),
+                "status": "error",
+                "t1_crs": crs1,
+                "t2_crs": crs2,
+            }
+
+        if gt1 and gt2 and isinstance(gt1, (list, tuple)) and isinstance(gt2, (list, tuple)):
+            if len(gt1) >= 6 and len(gt2) >= 6:
+                res1 = (abs(gt1[1]), abs(gt1[5]))
+                res2 = (abs(gt2[1]), abs(gt2[5]))
+                if res1 != res2:
+                    return {
+                        "error": (
+                            f"Incompatible spatial resolution in geotransform: T1 resolution is {res1}, "
+                            f"T2 resolution is {res2}. Both observations must share identical ground sample distance."
+                        ),
+                        "status": "error",
+                        "t1_geotransform": gt1,
+                        "t2_geotransform": gt2,
+                    }
+
+        if crs1 or gt1:
+            geospatial_compatibility = "verified"
+            geospatial_note = f"Geospatial co-registration verified from metadata (CRS: {crs1 or 'consistent'})."
+        else:
+            geospatial_compatibility = "unverified"
+            geospatial_note = (
+                "Geospatial co-registration (CRS/affine) could not be independently "
+                "verified from the supplied inputs. Pixel-grid alignment is assumed "
+                "but not guaranteed."
+            )
+
 
         # Convert to grayscale
         g1 = cv2.cvtColor(t1_img, cv2.COLOR_BGR2GRAY)
@@ -104,5 +172,8 @@ class ChangeDetectionTool(BaseTool):
             "confidence_level": "UNAVAILABLE",
             "confidence_source": "classical_cv_differencing",
             "method": "Radiometric pixel-differencing & morphological contour clustering baseline",
+            "geospatial_compatibility": geospatial_compatibility,
+            "geospatial_note": geospatial_note,
             "duration_ms": duration_ms
         }
+

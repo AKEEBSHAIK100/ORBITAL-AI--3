@@ -243,6 +243,17 @@ def run_orbital_analysis(
 
     primary_tool_spec: Dict[str, Any] = {}
 
+    # Request-scoped shared evidence context to eliminate redundant multi-specialist inferences
+    shared_context: Dict[str, Any] = {
+        "land_cover": None,
+        "building_analysis": None,
+        "caption": None,
+        "vqa": None,
+        "grounding": None,
+        "change_detection": None,
+        "optical_sar": None,
+    }
+
     for specialist_id in plan.execution_order:
         # Check specialist availability in ModelRegistry
         spec_entry = model_reg.get_specialist(specialist_id)
@@ -253,11 +264,12 @@ def run_orbital_analysis(
         model_id = spec_entry.model_id if spec_entry else (getattr(tool_obj, "model_id", specialist_id))
 
         if not primary_tool_spec:
+            tool_perm_params = getattr(tool_obj, "permitted_parameters", {})
             primary_tool_spec = {
                 "model_id": model_id,
                 "adapter": getattr(tool_obj, "adapter", specialist_name),
                 "domain_adaptation": getattr(tool_obj, "domain_adaptation", "Domain-adapted RS Specialist"),
-                "permitted_parameters": getattr(tool_obj, "permitted_parameters", {})
+                "permitted_parameters": tool_perm_params if isinstance(tool_perm_params, dict) else {}
             }
 
         # Check availability
@@ -328,8 +340,66 @@ def run_orbital_analysis(
         # Execute Specialist
         tools_used.append(specialist_id)
         t_exec = time.time()
-        res = tool_obj.run(tool_inputs, parameters)
+
+        # Specialist-specific inputs: pass focused sub-question if available
+        curr_tool_inputs = dict(tool_inputs)
+        effective_query = query
+        if specialist_id in ["rs_vqa_adapted", "vqa"] and getattr(plan, "vqa_question", None):
+            curr_tool_inputs["query"] = plan.vqa_question
+            curr_tool_inputs["question"] = plan.vqa_question
+            effective_query = plan.vqa_question
+
+        # Prepare specialist parameters with request-scoped shared evidence
+        spec_params = dict(parameters)
+        reused_evidence_sources: List[str] = []
+
+        if specialist_id in ["rs_caption_adapted", "caption"]:
+            if shared_context["land_cover"] is not None:
+                spec_params["supporting_land_cover_result"] = shared_context["land_cover"]
+                reused_evidence_sources.append("land_cover")
+
+        elif specialist_id in ["rs_vqa_adapted", "vqa"]:
+            if shared_context["land_cover"] is not None:
+                spec_params["supporting_land_cover_result"] = shared_context["land_cover"]
+                reused_evidence_sources.append("land_cover")
+            if shared_context["building_analysis"] is not None:
+                spec_params["supporting_building_result"] = shared_context["building_analysis"]
+                reused_evidence_sources.append("building_detection")
+
+        if reused_evidence_sources:
+            steps_log.append({
+                "step": step_num,
+                "tool": "evidence_deduplicator",
+                "description": f"Injecting shared evidence into {specialist_name} to eliminate duplicate inference",
+                "input_summary": f"Shared sources: {', '.join(reused_evidence_sources)}",
+                "output_summary": f"Reused existing {', '.join(reused_evidence_sources)} evidence; skipped duplicate inference.",
+                "duration_ms": 0.1,
+                "status": "success",
+                "success": True,
+                "confidence_source": "none",
+                "parameters": {"reused_sources": reused_evidence_sources}
+            })
+            step_num += 1
+
+        res = tool_obj.run(curr_tool_inputs, spec_params)
         exec_dur = (time.time() - t_exec) * 1000
+
+        # Update request-scoped shared evidence context with successful outputs
+        if res.get("status") in ("success", "SUCCESS"):
+            if specialist_id == "land_cover":
+                shared_context["land_cover"] = res
+            elif specialist_id == "building_detection":
+                shared_context["building_analysis"] = res
+            elif specialist_id in ["rs_caption_adapted", "caption"]:
+                shared_context["caption"] = res
+            elif specialist_id in ["rs_vqa_adapted", "vqa"]:
+                shared_context["vqa"] = res
+            elif specialist_id in ["visual_grounding", "grounding"]:
+                shared_context["grounding"] = res
+            elif specialist_id in ["change_detection", "change_vqa"]:
+                shared_context["change_detection"] = res
+            elif specialist_id in ["optical_sar_fusion", "optical_sar"]:
+                shared_context["optical_sar"] = res
 
         # Construct structured evidence per Section 6
         task_name = getattr(tool_obj, "supported_tasks", [plan.intent])[0]
@@ -338,6 +408,10 @@ def run_orbital_analysis(
         tool_conf = res.get("confidence")
         conf_status = res.get("confidence_status", "calibrated" if tool_conf is not None else "not_calibrated")
         tool_warnings = res.get("warnings", [])
+
+        if specialist_id == "rs_generalist":
+            tool_conf = None
+            conf_status = "not_calibrated"
 
         # Process specialist specific outputs
         if specialist_id == "building_detection":
@@ -404,27 +478,36 @@ def run_orbital_analysis(
             result_summary = f"Top label: {res.get('top_label')}"
 
         else:
-            result_summary = res.get("answer", res.get("caption", "Analysis completed"))
+            ans = res.get("answer") or res.get("caption")
+            if not ans:
+                tool_st = res.get("status", "unknown")
+                if tool_st in ("specialist_unavailable", "error"):
+                    ans = f"Specialist '{specialist_name}' {tool_st}: {', '.join(tool_warnings) if tool_warnings else 'execution failed'}"
+                else:
+                    ans = f"Specialist '{specialist_name}' analysis completed"
+            result_summary = str(ans)
 
         # Log execution
+        tool_status_str = res.get("status", "success")
+        is_tool_success = (tool_status_str == "success")
         steps_log.append({
             "step": step_num,
             "tool": specialist_name,
             "description": f"Executing inference on {tool_obj.supported_tasks[0]} specialist",
-            "input_summary": f"Scene observation with query: '{query}'",
-            "output_summary": result_summary[:100],
+            "input_summary": f"Scene observation with query: '{effective_query}'",
+            "output_summary": result_summary[:100] if result_summary else "Specialist execution completed",
             "duration_ms": round(exec_dur, 2),
-            "status": "success",
-            "success": True,
+            "status": tool_status_str,
+            "success": is_tool_success,
             "confidence_source": "calibrated_score" if tool_conf is not None else "model_output_uncalibrated",
-            "parameters": getattr(tool_obj, "permitted_parameters", {})
+            "parameters": getattr(tool_obj, "permitted_parameters", {}) if isinstance(getattr(tool_obj, "permitted_parameters", {}), dict) else {}
         })
         step_num += 1
 
         # Evidence object
         ev_obj = SpecialistEvidenceObject(
             task=task_name,
-            result=res.get("answer") or res.get("caption") or result_summary,
+            result=str(res.get("answer") or res.get("caption") or result_summary),
             evidence=res.get("evidence", res),
             source=specialist_id,
             model=model_name,

@@ -61,6 +61,25 @@ class BuildingDetector:
             self.is_available = False
             self.load_error = str(e)
             print(f"[BuildingDetector] ERROR loading model: {e}")
+    def ensure_model_loaded(self) -> bool:
+        """Ensures the model is loaded in memory. If unloaded, attempts to re-load."""
+        if self._model is None:
+            self._load_model()
+        return self.is_available
+
+    def unload_model(self) -> None:
+        """Release loaded YOLO model weights from memory and clear GPU cache."""
+        import gc
+        self._model = None
+        self.is_available = False
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+        print("[BuildingDetector] Model unloaded successfully.")
 
     def predict_batch(
         self,
@@ -68,6 +87,8 @@ class BuildingDetector:
         conf_threshold: float = 0.20
     ) -> List[List[Dict[str, Any]]]:
         """Run batch inference for higher throughput."""
+        if not self.is_available or self._model is None:
+            self.ensure_model_loaded()
         if not self.is_available or self._model is None:
             raise RuntimeError(
                 f"Building detection model unavailable: {self.load_error or 'model not loaded'}"

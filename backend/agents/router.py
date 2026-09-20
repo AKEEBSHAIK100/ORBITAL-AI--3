@@ -112,6 +112,14 @@ def classify_query_intent(
     ):
         return "land_cover"
 
+    # 7. Open Remote-Sensing / Generalist Visual Questions
+    if any(k in q for k in [
+        "solar panel", "solar panels", "airplane", "airplanes", "aircraft",
+        "shipping container", "shipping containers", "swimming pool", "swimming pools",
+        "crane", "cranes", "helicopter", "helicopters", "storage tank", "oil tank"
+    ]):
+        return "general_vqa"
+
     # Default to general Remote Sensing VQA
     return "vqa"
 
@@ -138,10 +146,15 @@ def route_query_to_specialist(
         "grounding": ["visual_grounding"],
         "caption": ["rs_caption_adapted", "captioning"],
         "land_cover": ["land_cover", "rs_vqa_adapted"],
-        "vqa": ["rs_vqa_adapted", "rs_vqa", "land_cover"]
+        "vqa": ["rs_vqa_adapted", "rs_vqa", "land_cover"],
+        "general_vqa": ["rs_generalist"],
+        "open_question": ["rs_generalist"],
     }
 
-    candidates = intent_to_specialist_map.get(intent, ["rs_vqa_adapted"])
+    candidates = intent_to_specialist_map.get(
+        intent,
+        ["rs_generalist"] if intent in ("general_vqa", "open_question") else ["rs_vqa_adapted"]
+    )
     chosen_id = candidates[0]
     specialist = reg.get_specialist(chosen_id)
 

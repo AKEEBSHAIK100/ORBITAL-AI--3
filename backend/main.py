@@ -8,31 +8,60 @@ from .routers.classify import router as classify_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[SatQuery AI] Initializing services…")
-    # Pre-warm building detector (non-fatal)
-    try:
-        from .services.building_detector import BuildingDetector
-        detector = BuildingDetector.get_instance()
-        if detector.is_available:
-            print(f"[SatQuery AI] Building detector ready on {detector.device.upper()}.")
-        else:
-            print(f"[SatQuery AI] Building detector unavailable (will degrade gracefully): {detector.load_error[:120]}")
-    except Exception as e:
-        print(f"[SatQuery AI] Warning: Building detector init error: {e}")
+    lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
+    if not lazy_warmup:
+        print("[SatQuery AI] Initializing services (eager warmup)…")
+        # Pre-warm building detector (non-fatal)
+        try:
+            from .services.building_detector import BuildingDetector
+            detector = BuildingDetector.get_instance()
+            if detector.is_available:
+                print(f"[SatQuery AI] Building detector ready on {detector.device.upper()}.")
+            else:
+                print(f"[SatQuery AI] Building detector unavailable (will degrade gracefully): {detector.load_error[:120]}")
+        except Exception as e:
+            print(f"[SatQuery AI] Warning: Building detector init error: {e}")
 
-    # Pre-warm BigEarthNet v2.0 classifier (non-fatal)
-    try:
-        from .services.ben_classifier import BENClassifier
-        classifier = BENClassifier.get_instance()
-        if classifier.is_available:
-            print(f"[SatQuery AI] BigEarthNet v2.0 classifier ready on {classifier.device.upper()} ({classifier.model_id}).")
-        else:
-            print(f"[SatQuery AI] BigEarthNet classifier in fallback mode: {classifier.load_error[:120]}")
-    except Exception as e:
-        print(f"[SatQuery AI] Warning: BEN classifier init error: {e}")
+        # Pre-warm BigEarthNet v2.0 classifier (non-fatal)
+        try:
+            from .services.ben_classifier import BENClassifier
+            classifier = BENClassifier.get_instance()
+            if classifier.is_available:
+                print(f"[SatQuery AI] BigEarthNet v2.0 classifier ready on {classifier.device.upper()} ({classifier.model_id}).")
+            else:
+                print(f"[SatQuery AI] BigEarthNet classifier in fallback mode: {classifier.load_error[:120]}")
+        except Exception as e:
+            print(f"[SatQuery AI] Warning: BEN classifier init error: {e}")
+    else:
+        print("[SatQuery AI] Services initialized in lazy warmup mode (on-demand loading enabled).")
 
     yield
-    print("[SatQuery AI] Shutting down.")
+    print("[SatQuery AI] Shutting down — releasing model resources…")
+    try:
+        from .services.building_detector import BuildingDetector
+        if BuildingDetector._instance is not None:
+            BuildingDetector.get_instance().unload_model()
+    except Exception:
+        pass
+    try:
+        from .services.ben_classifier import BENClassifier
+        if BENClassifier._instance is not None:
+            BENClassifier.get_instance().unload_model()
+    except Exception:
+        pass
+    try:
+        from .services.rs_adapters import RSAdapterRuntime
+        if RSAdapterRuntime._instance is not None:
+            RSAdapterRuntime.get_instance().unload_models()
+    except Exception:
+        pass
+    try:
+        from .tools.registry import get_tool
+        gen_tool = get_tool("rs_generalist")
+        if gen_tool is not None and hasattr(gen_tool, "unload_model"):
+            gen_tool.unload_model()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -74,26 +103,47 @@ async def health():
 
     try:
         from .services.building_detector import BuildingDetector
-        detector = BuildingDetector.get_instance()
-        model_status["building_detector"] = {
-            "available": detector.is_available,
-            "device": detector.device,
-            "model": os.path.basename(detector.model_path) if hasattr(detector, "model_path") else "unknown",
-            "error": detector.load_error if not detector.is_available else None,
-        }
+        lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
+        if lazy_warmup and BuildingDetector._instance is None:
+            model_status["building_detector"] = {
+                "available": True,
+                "device": "cpu",
+                "model": "building_model.pt",
+                "state": "standby",
+                "error": None,
+            }
+        else:
+            detector = BuildingDetector.get_instance()
+            model_status["building_detector"] = {
+                "available": detector.is_available,
+                "device": detector.device,
+                "model": os.path.basename(detector.model_path) if hasattr(detector, "model_path") else "unknown",
+                "error": detector.load_error if not detector.is_available else None,
+            }
     except Exception as e:
         model_status["building_detector"] = {"available": False, "error": str(e)}
 
     try:
         from .services.ben_classifier import BENClassifier
-        classifier = BENClassifier.get_instance()
-        model_status["ben_classifier"] = {
-            "available": classifier.is_available,
-            "device": classifier.device,
-            "model_id": classifier.model_id,
-            "classes": 19,
-            "error": classifier.load_error if not classifier.is_available else None,
-        }
+        lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
+        if lazy_warmup and BENClassifier._instance is None:
+            model_status["ben_classifier"] = {
+                "available": True,
+                "device": "cpu",
+                "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
+                "classes": 19,
+                "state": "standby",
+                "error": None,
+            }
+        else:
+            classifier = BENClassifier.get_instance()
+            model_status["ben_classifier"] = {
+                "available": classifier.is_available,
+                "device": classifier.device,
+                "model_id": classifier.model_id,
+                "classes": 19,
+                "error": classifier.load_error if not classifier.is_available else None,
+            }
     except Exception as e:
         model_status["ben_classifier"] = {"available": False, "error": str(e)}
 

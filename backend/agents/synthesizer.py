@@ -54,7 +54,12 @@ def synthesize_response(
         return answer, None, "unavailable", warnings
 
     # ── 3. Specialist Unavailable ────────────────────────────────────────────
-    unavail = [ev for ev in evidence_list if ev.confidence_status == "unavailable" or "unavailable" in str(ev.result).lower()]
+    unavail = [
+        ev for ev in evidence_list
+        if ev.confidence_status == "unavailable"
+        or "specialist unavailable" in str(ev.result).lower()
+        or (str(ev.result).lower().startswith("specialist '") and "unavailable" in str(ev.result).lower())
+    ]
     if status == "SPECIALIST_UNAVAILABLE" or unavail:
         unavail_tool = unavail[0].source if unavail else (query_plan.specialists[0] if query_plan.specialists else "required_specialist")
         reason = unavail[0].warnings[0] if (unavail and unavail[0].warnings) else f"Specialist '{unavail_tool}' is not installed or checkpoint is missing."
@@ -100,7 +105,19 @@ def synthesize_response(
     if intent == "land_cover":
         top_label = lc_ev.evidence.get("top_label") if lc_ev else "Undetermined"
         active = lc_ev.evidence.get("active_labels", []) if lc_ev else []
-        active_str = ", ".join(active[:3]) if active else top_label
+        norm_active: List[str] = []
+        for item in active:
+            if isinstance(item, str):
+                norm_active.append(item)
+            elif isinstance(item, dict):
+                label_val = item.get("name") or item.get("short") or item.get("label") or item.get("class_name")
+                if label_val and isinstance(label_val, str):
+                    norm_active.append(label_val)
+                elif item:
+                    norm_active.append(str(next(iter(item.values()), "")))
+            elif item is not None:
+                norm_active.append(str(item))
+        active_str = ", ".join(norm_active[:3]) if norm_active else str(top_label)
         vqa_note = f" Visual evidence indicates {vqa_ev.result}." if vqa_ev and vqa_ev.result else ""
         answer = (
             f"The primary land cover is classified as {top_label} "
@@ -188,16 +205,22 @@ def synthesize_response(
     if intent == "optical_sar_analysis":
         metrics = fusion_ev.evidence.get("metrics", {}) if fusion_ev else {}
         cross_m = metrics.get("cross_modal", {})
-        ssim_val = cross_m.get("structural_similarity", 0.72)
+        ssim_val = cross_m.get("structural_similarity")
         sar_m = metrics.get("sar", {})
-        backscatter = sar_m.get("mean_backscatter_db", -14.2)
+        signal_db = sar_m.get("mean_signal_level_db", sar_m.get("mean_backscatter_db", -14.2))
         opt_m = metrics.get("optical", {})
         veg = opt_m.get("vegetation_fraction", 0.35)
 
+        alignment_text = (
+            f"Structural similarity (SSIM) between sensors is {ssim_val:.2f}."
+            if ssim_val is not None
+            else "Cross-modal pixel alignment is unavailable because spatial co-registration is unverified (silent pixel alignment disabled)."
+        )
+
         answer = (
             f"Optical–SAR cross-modal analysis demonstrates complementary multi-sensor signatures. "
-            f"Structural similarity (SSIM) between sensors is {ssim_val:.2f}. "
-            f"SAR mean backscatter is {backscatter:.1f} dB with characteristic roughness signatures, "
+            f"{alignment_text} "
+            f"SAR mean signal level derived from raw amplitude is {signal_db:.1f} dB (uncalibrated to sigma-nought backscatter) with characteristic roughness signatures, "
             f"while optical telemetry indicates {veg * 100:.1f}% vegetative surface reflection. "
             "Structures with strong dielectric double-bounce appear prominent across both modalities. "
             "Confidence is not calibrated for this workflow."
@@ -205,17 +228,43 @@ def synthesize_response(
         return answer, None, "not_calibrated", warnings
 
     # Intent: multi_task
-    # "Describe this scene and tell me whether there is water and whether buildings are present."
+    # e.g. "Describe the scene, identify the main land cover, and tell me whether vegetation is present."
     if intent == "multi_task":
         parts: List[str] = []
         if cap_ev and cap_ev.result:
             parts.append(f"Scene overview: {cap_ev.result}.")
+
+        if lc_ev:
+            top_lc = lc_ev.evidence.get("top_label") or lc_ev.result
+            if top_lc:
+                clean_label = str(top_lc).replace("Top label: ", "").strip()
+                parts.append(f"Main land cover: {clean_label}.")
+
         if vqa_ev and vqa_ev.result:
-            parts.append(f"Water assessment: {vqa_ev.result}.")
+            target = getattr(query_plan, "vqa_target", None)
+            if not target:
+                q_low = query.lower()
+                if any(w in q_low for w in ["vegetation", "canopy", "tree", "forest", "crop", "greenery"]):
+                    target = "vegetation"
+                elif any(w in q_low for w in ["water", "river", "lake", "ocean", "pond"]):
+                    target = "water"
+                elif any(w in q_low for w in ["building", "structure", "house", "footprint"]):
+                    target = "buildings"
+
+            if target == "vegetation":
+                parts.append(f"Vegetation presence: {vqa_ev.result}.")
+            elif target == "water":
+                parts.append(f"Water assessment: {vqa_ev.result}.")
+            elif target in ["building", "buildings"]:
+                parts.append(f"Building presence: {vqa_ev.result}.")
+            else:
+                parts.append(f"VQA assessment: {vqa_ev.result}.")
+
         if bldg_ev:
             b_cnt = bldg_ev.evidence.get("building_count", 0)
             hi_cnt = bldg_ev.evidence.get("high_confidence_count", 0)
             parts.append(f"Structural audit: {b_cnt} building footprints detected ({hi_cnt} high certainty).")
+
         parts.append("Confidence is not calibrated across this multi-specialist workflow.")
         answer = " ".join(parts)
         return answer, None, "not_calibrated", warnings
@@ -240,6 +289,17 @@ def synthesize_response(
         # Water or general VQA
         vqa_res = vqa_ev.result if vqa_ev else "Remote sensing visual analysis completed."
         answer = f"{vqa_res} Confidence is not calibrated for this workflow."
+        return answer, None, "not_calibrated", warnings
+
+    # Intent: general_vqa / open remote-sensing questions (rs_generalist fallback)
+    gen_ev = ev_by_source.get("rs_generalist") or ev_by_task.get("general_vqa")
+    if intent in ["general_vqa", "open_question", "open_scene_description", "open_remote_sensing_question"] or gen_ev:
+        ans_text = gen_ev.result if gen_ev else "General remote-sensing visual observation completed."
+        answer = (
+            f"{ans_text} "
+            "[Source: Qwen/Qwen2-VL-2B-Instruct (general multimodal VLM, uncalibrated). "
+            "Qualitative observation only; confidence is not calibrated and spatial measurements are unverified.]"
+        )
         return answer, None, "not_calibrated", warnings
 
     # Fallback default

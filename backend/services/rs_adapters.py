@@ -85,6 +85,22 @@ class RSAdapterRuntime:
         """Reset singleton for testing purposes."""
         cls._instance = None
 
+    def unload_models(self) -> None:
+        """Release loaded PyTorch model weights from memory and clear GPU cache."""
+        import gc
+        self._caption_model = None
+        self._caption_processor = None
+        self._vqa_model = None
+        self._vqa_processor = None
+        self._inspect_adapter_availability()
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
     def _detect_device(self) -> str:
         try:
             import torch
@@ -95,11 +111,20 @@ class RSAdapterRuntime:
         return "cpu"
 
     def _has_adapter_weights(self, adapter_dir: Path) -> bool:
-        """Checks whether directory exists and contains actual LoRA weight files."""
+        """
+        Checks whether directory exists and contains valid adapter artifacts:
+        1. adapter_config.json exists and is a regular file
+        2. adapter_model.safetensors exists and is a regular file with size > 0
+        """
         if not adapter_dir.exists() or not adapter_dir.is_dir():
             return False
-        weight_patterns = ["adapter_model.safetensors", "adapter_model.bin", "*.safetensors", "*.bin"]
-        return any(any(adapter_dir.glob(pat)) for pat in weight_patterns)
+        config_file = adapter_dir / "adapter_config.json"
+        weights_file = adapter_dir / "adapter_model.safetensors"
+        if not (config_file.exists() and config_file.is_file()):
+            return False
+        if not (weights_file.exists() and weights_file.is_file() and weights_file.stat().st_size > 0):
+            return False
+        return True
 
     def _inspect_adapter_availability(self) -> None:
         """Check filesystem for adapter artifacts without loading weights into memory."""
@@ -110,7 +135,7 @@ class RSAdapterRuntime:
         else:
             self.caption_state = SpecialistState.UNAVAILABLE
             self.caption_unavailable_reason = (
-                f"Caption LoRA adapter weights not found at '{CAPTION_ADAPTER_PATH}'. "
+                f"Caption LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{CAPTION_ADAPTER_PATH}'. "
                 "Set RS_CAPTION_ADAPTER_PATH or mount pilot adapter weights."
             )
 
@@ -121,7 +146,7 @@ class RSAdapterRuntime:
         else:
             self.vqa_state = SpecialistState.UNAVAILABLE
             self.vqa_unavailable_reason = (
-                f"VQA LoRA adapter weights not found at '{VQA_ADAPTER_PATH}'. "
+                f"VQA LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{VQA_ADAPTER_PATH}'. "
                 "Set RS_VQA_ADAPTER_PATH or mount pilot adapter weights."
             )
 
@@ -199,16 +224,22 @@ class RSAdapterRuntime:
             processor = BlipProcessor.from_pretrained(self.caption_base_id)
             model = BlipForConditionalGeneration.from_pretrained(self.caption_base_id)
 
-            # Attempt to apply LoRA adapter if present
-            if CAPTION_ADAPTER_PATH.exists():
-                try:
-                    from peft import PeftModel
-                    model = PeftModel.from_pretrained(model, str(CAPTION_ADAPTER_PATH))
-                except ImportError:
-                    # If PEFT is not installed, fail cleanly to UNAVAILABLE
-                    self.caption_state = SpecialistState.UNAVAILABLE
-                    self.caption_unavailable_reason = "peft library is not installed to load LoRA adapter."
-                    raise RuntimeError(self.caption_unavailable_reason)
+            # Strictly verify and apply LoRA adapter weights
+            if not self._has_adapter_weights(CAPTION_ADAPTER_PATH):
+                self.caption_state = SpecialistState.UNAVAILABLE
+                self.caption_unavailable_reason = (
+                    f"Caption LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{CAPTION_ADAPTER_PATH}'."
+                )
+                raise RuntimeError(self.caption_unavailable_reason)
+
+            try:
+                from peft import PeftModel
+                model = PeftModel.from_pretrained(model, str(CAPTION_ADAPTER_PATH))
+            except ImportError:
+                # If PEFT is not installed, fail cleanly to UNAVAILABLE
+                self.caption_state = SpecialistState.UNAVAILABLE
+                self.caption_unavailable_reason = "peft library is not installed to load LoRA adapter."
+                raise RuntimeError(self.caption_unavailable_reason)
 
             model.to(self.device)
             model.eval()
@@ -239,15 +270,21 @@ class RSAdapterRuntime:
             processor = BlipProcessor.from_pretrained(self.vqa_base_id)
             model = BlipForQuestionAnswering.from_pretrained(self.vqa_base_id)
 
-            # Attempt to apply LoRA adapter if present
-            if VQA_ADAPTER_PATH.exists():
-                try:
-                    from peft import PeftModel
-                    model = PeftModel.from_pretrained(model, str(VQA_ADAPTER_PATH))
-                except ImportError:
-                    self.vqa_state = SpecialistState.UNAVAILABLE
-                    self.vqa_unavailable_reason = "peft library is not installed to load LoRA adapter."
-                    raise RuntimeError(self.vqa_unavailable_reason)
+            # Strictly verify and apply LoRA adapter weights
+            if not self._has_adapter_weights(VQA_ADAPTER_PATH):
+                self.vqa_state = SpecialistState.UNAVAILABLE
+                self.vqa_unavailable_reason = (
+                    f"VQA LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{VQA_ADAPTER_PATH}'."
+                )
+                raise RuntimeError(self.vqa_unavailable_reason)
+
+            try:
+                from peft import PeftModel
+                model = PeftModel.from_pretrained(model, str(VQA_ADAPTER_PATH))
+            except ImportError:
+                self.vqa_state = SpecialistState.UNAVAILABLE
+                self.vqa_unavailable_reason = "peft library is not installed to load LoRA adapter."
+                raise RuntimeError(self.vqa_unavailable_reason)
 
             model.to(self.device)
             model.eval()

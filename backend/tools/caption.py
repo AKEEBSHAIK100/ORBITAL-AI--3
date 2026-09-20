@@ -80,38 +80,54 @@ class CaptionTool(BaseTool):
         # 2. Retain BigEarthNet land-cover information ONLY as optional supporting evidence
         params = parameters or {}
         if params.get("include_supporting_land_cover", True):
-            ben_tool = self._get_ben_tool()
-            if ben_tool is not None:
-                try:
-                    ben_res = ben_tool.run({"image": img_bgr})
-                    evidence["supporting_land_cover"] = {
-                        "top_label": ben_res.get("top_label"),
-                        "active_labels": [l.get("name") for l in ben_res.get("active_labels", [])],
-                    }
-                except Exception as e:
-                    evidence["supporting_land_cover"] = {"error": f"Supporting classifier error: {e}"}
+            existing_lc = params.get("supporting_land_cover_result")
+            if isinstance(existing_lc, dict) and existing_lc.get("status") == "success" and "top_label" in existing_lc:
+                # Reused existing land-cover evidence without running BigEarthNet inference again
+                evidence["supporting_land_cover"] = {
+                    "top_label": existing_lc.get("top_label"),
+                    "active_labels": [
+                        l.get("name") if isinstance(l, dict) else l
+                        for l in existing_lc.get("active_labels", [])
+                    ],
+                    "reused": True,
+                }
+            else:
+                ben_tool = self._get_ben_tool()
+                if ben_tool is not None:
+                    try:
+                        ben_res = ben_tool.run({"image": img_bgr})
+                        evidence["supporting_land_cover"] = {
+                            "top_label": ben_res.get("top_label"),
+                            "active_labels": [
+                                l.get("name") if isinstance(l, dict) else l
+                                for l in ben_res.get("active_labels", [])
+                            ],
+                        }
+                    except Exception as e:
+                        evidence["supporting_land_cover"] = {"error": f"Supporting classifier error: {e}"}
 
-        # If adapted model is unavailable, return structured specialist-unavailable result.
-        # DO NOT fabricate a caption using the old heuristic implementation.
-        if status == "specialist_unavailable":
+        # If adapted model is unavailable or encounters error, return structured failure result.
+        # DO NOT fabricate a caption using heuristic implementation.
+        if status in ("specialist_unavailable", "error"):
+            fallback_answer = adapter_res.get("answer") or f"Caption specialist {status}: {', '.join(adapter_res.get('warnings', [])) or 'execution failed'}"
             return {
-                "status": "specialist_unavailable",
+                "status": status,
                 "caption": None,
-                "answer": adapter_res.get("answer", "Caption specialist unavailable"),
+                "answer": fallback_answer,
                 "model_id": self.model_id,
                 "adapter": self.adapter,
                 "evidence": evidence,
                 "provenance": self.provenance,
                 "inference_time_ms": inference_time_ms,
                 "confidence": None,
-                "confidence_status": "specialist_unavailable",
+                "confidence_status": "specialist_unavailable" if status == "specialist_unavailable" else "unavailable",
                 "warnings": adapter_res.get("warnings", []),
             }
 
         return {
             "status": status,
             "caption": caption,
-            "answer": caption,
+            "answer": caption or adapter_res.get("answer", "Descriptive scene caption generated."),
             "model_id": self.model_id,
             "adapter": self.adapter,
             "evidence": evidence,

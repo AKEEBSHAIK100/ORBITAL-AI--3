@@ -9,6 +9,11 @@ from ..services.tiling import generate_tiles, translate_detection_to_global
 from ..services.duplicate_removal import merge_duplicate_detections
 from ..services.postprocessing import filter_and_postprocess_detections
 from ..services.validation import evaluate_accuracy
+from ..services.cache_manager import (
+    compute_image_hash,
+    build_cache_key,
+    get_query_result_cache,
+)
 
 class BuildingDetectionTool(BaseTool):
     id = "building_detection"
@@ -28,8 +33,18 @@ class BuildingDetectionTool(BaseTool):
         "min_area_px": 25.0
     }
 
-    def __init__(self):
-        self.detector = BuildingDetector.get_instance()
+    def __init__(self, detector: Optional[BuildingDetector] = None):
+        self._detector = detector
+
+    @property
+    def detector(self) -> BuildingDetector:
+        if self._detector is None:
+            self._detector = BuildingDetector.get_instance()
+        return self._detector
+
+    @detector.setter
+    def detector(self, value: Optional[BuildingDetector]) -> None:
+        self._detector = value
 
     def run(self, inputs: Dict[str, Any], parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         t0 = time.time()
@@ -46,6 +61,31 @@ class BuildingDetectionTool(BaseTool):
         box_iou_thresh = float(params.get("box_iou_threshold", 0.45))
         mask_iou_thresh = float(params.get("mask_iou_threshold", 0.35))
         min_area = float(params.get("min_area_px", 25.0))
+
+        # --- Query result cache lookup ---
+        result_cache = get_query_result_cache()
+        img_hash = compute_image_hash(img_bgr)
+        cache_key = build_cache_key(
+            image_identity=img_hash,
+            query="building_detection",
+            task="building_detection",
+            model_id=self.model_id,
+            model_version="v1",
+            adapter_identity="none",
+            parameters={
+                "tile_size": tile_size,
+                "overlap": overlap,
+                "conf_threshold": conf_thresh,
+                "box_iou_threshold": box_iou_thresh,
+                "mask_iou_threshold": mask_iou_thresh,
+                "min_area_px": min_area,
+            },
+        )
+        cached = result_cache.get(cache_key)
+        if cached is not None:
+            cached["duration_ms"] = round((time.time() - t0) * 1000, 2)
+            cached["cache_hit"] = True
+            return cached
 
         # 1. Tiling
         overlap_ratio = 0.20 if isinstance(overlap, (int, float)) and overlap > 1 else float(overlap)
@@ -140,7 +180,7 @@ class BuildingDetectionTool(BaseTool):
 
         duration_ms = (time.time() - t0) * 1000
 
-        return {
+        result = {
             "status": "success",
             "success": True,
             "image_dimensions": {"width": w, "height": h},
@@ -160,5 +200,8 @@ class BuildingDetectionTool(BaseTool):
             "validation": accuracy_eval,
             "detections": final_detections,
             "geojson": geojson_data,
-            "duration_ms": duration_ms
+            "duration_ms": round(duration_ms, 2),
+            "cache_hit": False,
         }
+        result_cache.set(cache_key, result)
+        return result

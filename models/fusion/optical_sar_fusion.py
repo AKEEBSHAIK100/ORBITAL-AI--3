@@ -85,11 +85,12 @@ class OpticalSARFusionEngine:
             return {
                 "success": True,
                 "mode": "sar_only",
-                "answer": f"SAR radar analysis ({sar_sensor.upper()}): Mean backscatter is {mean_db} dB with a speckle index of {speckle}.",
+                "answer": f"SAR radar analysis ({sar_sensor.upper()}): Mean signal level derived from raw amplitude is {mean_db} dB (uncalibrated to sigma-nought backscatter) with a speckle index of {speckle}.",
                 "confidence": 0.85,
                 "confidence_level": "High",
                 "evidence": {
                     "sar_sensor": sar_sensor,
+                    "mean_signal_level_db": mean_db,
                     "mean_backscatter_db": mean_db,
                     "speckle_index": speckle
                 },
@@ -103,13 +104,44 @@ class OpticalSARFusionEngine:
         h_opt, w_opt = optical_img.shape[:2]
         h_sar, w_sar = sar_img.shape[:2]
 
-        # Resample SAR to optical pixel grid if slight 1-2px discrepancy
-        sar_aligned = sar_img
+        sar_gray = cv2.cvtColor(sar_img, cv2.COLOR_BGR2GRAY) if len(sar_img.shape) == 3 else sar_img
+        mean_intensity = float(np.mean(sar_gray))
+        mean_db = round(10.0 * np.log10(max(mean_intensity, 1e-4) / 255.0), 1)
+        speckle = round(float(np.std(sar_gray) / (mean_intensity + 1e-5)), 3)
+
         if (h_opt, w_opt) != (h_sar, w_sar):
-            sar_aligned = cv2.resize(sar_img, (w_opt, h_opt), interpolation=cv2.INTER_LINEAR)
+            # Silent resize disabled: do not claim pixel-level similarity for unaligned grids
+            answer = (
+                f"Joint {optical_sensor.upper()} (Optical) + {sar_sensor.upper()} (SAR) independent analysis complete. "
+                f"Cross-modal pixel alignment is unavailable due to dimension disparity ({w_opt}x{h_opt} vs {w_sar}x{h_sar}); "
+                f"silent pixel alignment is disabled. "
+                f"SAR mean signal level derived from raw amplitude: {mean_db} dB (uncalibrated to sigma-nought backscatter), speckle index: {speckle}."
+            )
+            return {
+                "success": True,
+                "mode": "optical_sar",
+                "answer": answer,
+                "confidence": 0.80,
+                "confidence_level": "Medium",
+                "evidence": {
+                    "optical_sensor": optical_sensor,
+                    "sar_sensor": sar_sensor,
+                    "structural_similarity": None,
+                    "cross_correlation": None,
+                    "mean_signal_level_db": mean_db,
+                    "mean_backscatter_db": mean_db,
+                    "speckle_index": speckle,
+                    "co_registration": "unverified"
+                },
+                "warnings": val_report.get("warnings", []) + [
+                    f"Dimension disparity ({w_opt}x{h_opt} vs {w_sar}x{h_sar}): cross-modal pixel alignment bypassed."
+                ],
+                "model": "Optical-SAR Cross-Modal Telemetry Extractor",
+                "model_version": "2.0.0",
+                "duration_ms": (time.time() - t0) * 1000
+            }
 
         opt_gray = cv2.cvtColor(optical_img, cv2.COLOR_BGR2GRAY) if len(optical_img.shape) == 3 else optical_img
-        sar_gray = cv2.cvtColor(sar_aligned, cv2.COLOR_BGR2GRAY) if len(sar_aligned.shape) == 3 else sar_aligned
 
         # 1. Structural Similarity Index (SSIM) approximation
         mu_x = cv2.GaussianBlur(opt_gray.astype(np.float32), (11, 11), 1.5)
@@ -127,15 +159,10 @@ class OpticalSARFusionEngine:
         norm_sar = (sar_gray - np.mean(sar_gray)) / (np.std(sar_gray) + 1e-5)
         ncc = round(float(np.mean(norm_opt * norm_sar)), 3)
 
-        # 3. Radar backscatter & speckle
-        mean_intensity = float(np.mean(sar_gray))
-        mean_db = round(10.0 * np.log10(max(mean_intensity, 1e-4) / 255.0), 1)
-        speckle = round(float(np.std(sar_gray) / (mean_intensity + 1e-5)), 3)
-
         answer = (
             f"Joint {optical_sensor.upper()} (Optical) + {sar_sensor.upper()} (SAR) cross-modal analysis complete. "
             f"Structural similarity (SSIM) between sensors is {ssim_val}; cross-correlation is {ncc}. "
-            f"SAR backscatter intensity: {mean_db} dB, speckle index: {speckle}."
+            f"SAR mean signal level derived from raw amplitude: {mean_db} dB (uncalibrated to sigma-nought backscatter), speckle index: {speckle}."
         )
 
         return {
@@ -149,6 +176,7 @@ class OpticalSARFusionEngine:
                 "sar_sensor": sar_sensor,
                 "structural_similarity": ssim_val,
                 "cross_correlation": ncc,
+                "mean_signal_level_db": mean_db,
                 "mean_backscatter_db": mean_db,
                 "speckle_index": speckle,
                 "co_registration": "verified"

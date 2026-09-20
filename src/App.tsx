@@ -31,13 +31,13 @@ const C = {
   borderHover: 'rgba(56,189,248,0.32)',
 } as const
 
-// ── Official ISRO/SAC Representative Queries ──────────────────────────────────
+// ── Representative Natural-Language Queries ──────────────────────────────────
 export const OFFICIAL_REPRESENTATIVE_QUERIES = [
-  { query: 'Describe the land-cover and major objects visible in this image.',   task: 'VRSBench Scene Captioning',       badge: 'CAPTION',     color: C.cyan   },
-  { query: 'Highlight the water body referred to in the query.',                 task: 'RSVQA Text-Guided Grounding',    badge: 'GROUNDING',   color: C.mint   },
-  { query: 'What changed between these two dates, and where did the change occur?', task: 'CDVQA Change Detection',      badge: 'CHANGE-VQA',  color: C.orange },
-  { query: 'Use the optical and SAR images together to identify built-up and water-covered regions.', task: 'Optical–SAR Cross-Modal Fusion', badge: 'CROSS-MODAL', color: C.cyan },
-  { query: 'Has the built-up area increased, decreased, or remained unchanged?', task: 'Bi-Temporal Change VQA',         badge: 'CHANGE-VQA',  color: C.orange },
+  { query: 'Describe this scene.', task: 'Scene overview & land cover', badge: 'SCENE', color: C.cyan },
+  { query: 'What type of land is present?', task: 'Dominant land-cover classification', badge: 'LAND COVER', color: C.mint },
+  { query: 'Is there vegetation present?', task: 'Vegetation assessment', badge: 'VEGETATION', color: C.mint },
+  { query: 'What changed between these images?', task: 'Bi-temporal change detection', badge: 'CHANGE', color: C.orange },
+  { query: 'Compare the optical and radar observations.', task: 'Optical + SAR cross-modal analysis', badge: 'OPTICAL+SAR', color: C.cyan },
 ]
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -136,11 +136,11 @@ const BEN_DEMO_LABELS: BENLabelScore[] = [
 
 // ── Default telemetry ─────────────────────────────────────────────────────────
 export const DEFAULT_TELEMETRY: ImageTelemetry = {
-  landClass: 'Urban', landClassPct: '67%', buildingCount: '—', waterPct: '8.2%',
-  vegetationPct: '24.6%', terrain: 'urban',
-  locationTag: '40°42′N  74°00′W · NEW YORK · LANDSAT-9',
-  landSub: 'Urban', buildingSub: 'Run detection to audit footprints',
-  waterSub: 'Hudson River basin', vegSub: '−18% NE sector',
+  landClass: '—', landClassPct: '—', buildingCount: '—', waterPct: '—',
+  vegetationPct: '—', terrain: 'urban',
+  locationTag: '',
+  landSub: 'Awaiting analysis', buildingSub: '',
+  waterSub: '', vegSub: '',
 }
 
 // ── Image analysis caches ─────────────────────────────────────────────────────
@@ -190,49 +190,10 @@ async function compressImage(file: File): Promise<{ dataUrl: string; telemetry: 
     })
   }
 
-  let telemetry: ImageTelemetry = { ...DEFAULT_TELEMETRY }
-  try {
-    const imgData = ctx?.getImageData(0, 0, canvas.width, canvas.height).data
-    if (imgData && imgData.length > 0) {
-      let waterCount = 0, vegCount = 0, aridCount = 0, urbanCount = 0, totalSamples = 0
-      const step = Math.max(4, Math.floor(imgData.length / 8000) * 4)
-      for (let i = 0; i < imgData.length; i += step) {
-        const r = imgData[i], g = imgData[i+1], b = imgData[i+2]
-        totalSamples++
-        if ((b > r*1.15 && b > g*0.95 && b > 35) || (b > 70 && r < 60 && g < 90)) waterCount++
-        else if (g > r*1.08 && g > b*1.06 && g > 40) vegCount++
-        else if (r > 125 && g > 90 && b < 100 && (r-b) > 30) aridCount++
-        else urbanCount++
-      }
-      if (totalSamples > 0) {
-        const wPct = Math.round((waterCount/totalSamples)*1000)/10
-        const vPct = Math.round((vegCount/totalSamples)*1000)/10
-        const aPct = Math.round((aridCount/totalSamples)*1000)/10
-        const uPct = Math.max(0, Math.round((100-wPct-vPct-aPct)*10)/10)
-        let terrain: Terrain = 'urban', landClass = 'Urban', landClassPct = `${uPct}%`
-        let landSub = 'Metropolitan Built-up Grid'
-        let waterSub = wPct > 3 ? `${wPct}% Inland Basin` : 'Paved Drainage Network'
-        let vegSub = `${vPct}% Urban Canopy Cover`
-        if (wPct >= vPct && wPct >= aPct && wPct >= uPct && wPct > 35) {
-          terrain = 'water'; landClass = 'Hydrological'; landClassPct = `${wPct}%`
-          landSub = 'Open Water Surface'; waterSub = 'Surface Inundation'
-          vegSub = vPct > 4 ? `${vPct}% Riparian Buffer` : 'Minimal Littoral Canopy'
-        } else if (vPct >= aPct && vPct >= uPct && vPct > 30) {
-          terrain = 'vegetation'; landClass = 'Agricultural / Canopy'; landClassPct = `${vPct}%`
-          landSub = 'Photosynthetic Crop & Forest'; waterSub = wPct > 2 ? `${wPct}% Irrigation` : 'Zero Flood Risk'
-          vegSub = 'Healthy Biomass (NDVI ~0.76)'
-        } else if (aPct >= uPct && aPct > 30) {
-          terrain = 'arid'; landClass = 'Arid / Mineral Soil'; landClassPct = `${aPct}%`
-          landSub = 'Exposed Mineral Substrate'; vegSub = `${vPct}% Moisture-Stressed Scrub`
-        }
-        telemetry = {
-          landClass, landClassPct, buildingCount: '—', waterPct: `${wPct}%`, vegetationPct: `${vPct}%`,
-          terrain, locationTag: `● SATELLITE PASS · ${landClass.toUpperCase()} SURVEY · MULTI-SPECTRAL`,
-          landSub, buildingSub: 'Run detection to audit footprints', waterSub, vegSub,
-        }
-      }
-    }
-  } catch { /* fallback */ }
+  const telemetry: ImageTelemetry = {
+    ...DEFAULT_TELEMETRY,
+    locationTag: `${canvas.width}×${canvas.height} px · ${file.name}`,
+  }
 
   const dataUrl = canvas.toDataURL('image/jpeg', 0.82)
   imageTerrainCache.set(dataUrl, telemetry.terrain)
@@ -594,62 +555,34 @@ function Navbar({
               <circle cx="14" cy="14" r="12" stroke={C.cyan} strokeWidth="1.5" />
               <ellipse cx="14" cy="14" rx="5" ry="12" stroke={C.cyan} strokeWidth="1.5" />
               <line x1="2" y1="14" x2="26" y2="14" stroke={C.cyan} strokeWidth="1.5" />
-              <circle cx="14" cy="14" r="2.5" fill={C.cyan} className="glow-pulse" />
+              <circle cx="14" cy="14" r="2.5" fill={C.cyan} />
             </svg>
           </div>
           <div className="text-left">
             <span className="text-sm font-bold tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif", color: C.white }}>
-              SATQUERY<span style={{ color: C.cyan }}>AI</span>
+              ORBITAL<span style={{ color: C.cyan }}>-AI</span>
             </span>
-            <div className="text-[9px] font-mono tracking-widest leading-none" style={{ color: C.muted }}>REMOTE SENSING VLM</div>
+            <div className="text-[9px] font-mono tracking-widest leading-none" style={{ color: C.muted }}>GEOSPATIAL INTELLIGENCE</div>
           </div>
         </button>
 
         {/* Desktop links */}
-        <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-1 flex-1">
+        <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-2 flex-1 ml-6">
           <button
-            onClick={() => { setActiveView('workspace'); scrollTo('explore') }}
-            className="px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium text-slate-300 hover:text-white hover:bg-slate-800/40"
-          >
-            Platform
-          </button>
-          <button
-            onClick={() => { setActiveView('workspace'); setAppMode('single'); scrollTo('analyze') }}
+            onClick={() => { setActiveView('workspace'); scrollTo('analyze') }}
             className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium ${
-              activeView === 'workspace' && appMode === 'single' ? 'text-cyan-400 font-semibold bg-cyan-950/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
+              activeView === 'workspace' ? 'text-cyan-400 font-semibold bg-cyan-950/40 border border-cyan-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
             }`}
           >
-            Workspace
-          </button>
-          <button
-            onClick={() => { setActiveView('workspace'); setAppMode('fusion'); scrollTo('analyze') }}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium ${
-              activeView === 'workspace' && appMode === 'fusion' ? 'text-cyan-400 font-semibold bg-cyan-950/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-            }`}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-emerald-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>Fusion
-          </button>
-          <button
-            onClick={() => { setActiveView('workspace'); setAppMode('compare'); scrollTo('compare-section') }}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium ${
-              appMode === 'compare' ? 'text-orange-400 font-semibold bg-orange-950/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-            }`}
-          >
-            Compare
-          </button>
-          <button
-            onClick={() => scrollTo('features')}
-            className="px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium text-slate-300 hover:text-white hover:bg-slate-800/40"
-          >
-            Features
+            Analyze
           </button>
           <button
             onClick={() => { setActiveView('dashboard'); scrollTo('analyze') }}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer font-medium ${
               activeView === 'dashboard' ? 'text-cyan-400 font-semibold bg-cyan-950/40 border border-cyan-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
             }`}
           >
-            <span>Dashboard</span>
+            History
           </button>
           <button
             onClick={onOpenDocs}
@@ -667,27 +600,6 @@ function Navbar({
 
         {/* Right actions */}
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={onEval}
-            className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg btn-outline-cyan font-mono font-bold"
-            title="Evaluation Protocol"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21" /><path d="M3 9l9-6 9 6" /><path d="M9 21h6" /><path d="M4 10h5L6 18" /><path d="M15 10h5l-3 8" /></svg>
-            <span className="hidden md:inline">EVAL CRITERIA</span>
-          </button>
-          <button
-            onClick={onOpenContact}
-            className="hidden md:flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg btn-ghost font-mono"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
-            <span>Contact</span>
-          </button>
-          <button
-            onClick={onUpload}
-            className="hidden md:block btn-ghost text-xs px-3 py-1.5 font-medium"
-          >
-            Upload Image
-          </button>
           <button
             onClick={() => { setActiveView('workspace'); onAnalyze() }}
             className="btn-primary text-xs px-4 py-2 font-semibold shadow-md shadow-cyan-950"
@@ -710,52 +622,28 @@ function Navbar({
       {mobileOpen && (
         <nav aria-label="Mobile Navigation" className="lg:hidden border-t px-5 py-4 space-y-1.5" style={{ borderColor: C.border, background: 'rgba(3,7,18,0.98)', backdropFilter: 'blur(24px)' }}>
           <button
-            onClick={() => { setActiveView('workspace'); scrollTo('explore') }}
+            onClick={() => { setActiveView('workspace'); scrollTo('analyze'); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            Platform
+            Analyze
           </button>
           <button
-            onClick={() => { setActiveView('workspace'); setAppMode('single'); scrollTo('analyze') }}
+            onClick={() => { setActiveView('dashboard'); scrollTo('analyze'); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            Workspace (Single Image)
-          </button>
-          <button
-            onClick={() => { setActiveView('workspace'); setAppMode('fusion'); scrollTo('analyze') }}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
-          >
-            Optical-SAR Fusion
-          </button>
-          <button
-            onClick={() => { setActiveView('workspace'); setAppMode('compare'); scrollTo('compare-section') }}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
-          >
-            ⇄ Bi-Temporal Compare
-          </button>
-          <button
-            onClick={() => { setActiveView('dashboard'); scrollTo('analyze') }}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-cyan-400 font-bold bg-cyan-950/30"
-          >
-            Operational Dashboard
+            History
           </button>
           <button
             onClick={() => { onOpenDocs(); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            Technical Documentation
+            Documentation
           </button>
           <button
-            onClick={() => { onOpenContact(); setMobileOpen(false) }}
+            onClick={() => { scrollTo('about'); setMobileOpen(false) }}
             className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
           >
-            Contact Researchers
-          </button>
-          <button
-            onClick={() => scrollTo('features')}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-200 hover:bg-slate-800/50"
-          >
-            Core Features
+            About
           </button>
           <div className="pt-2 flex gap-2">
             <button onClick={() => { onEval(); setMobileOpen(false) }} className="btn-outline-cyan text-xs px-3 py-2 font-mono flex-1">
@@ -833,38 +721,34 @@ function HeroSection({
             <div className="inline-flex items-center gap-2 mb-8 px-3 py-1.5 rounded-md"
               style={{ background: 'rgba(32,217,255,0.08)', border: `1px solid ${C.borderHover}` }}>
               <span className="w-2 h-2 rounded-full pulse-dot" style={{ background: C.cyan }} />
-              <span className="text-xs font-mono tracking-[0.2em] uppercase" style={{ color: C.cyan }}>REMOTE-SENSING VISION-LANGUAGE ASSISTANT</span>
+              <span className="text-xs font-mono tracking-[0.2em] uppercase" style={{ color: C.cyan }}>GEOSPATIAL VISION-LANGUAGE SYSTEM</span>
             </div>
 
             {/* Headline */}
             <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.02] mb-6" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}>
-              Query Satellite Imagery.
+              Ask One Question About Satellite Imagery.
               <br />
-              <span style={{ color: 'var(--cyan)' }}>Understand What Changed.</span>
+              <span style={{ color: 'var(--cyan)' }}>The System Routes the Workflow.</span>
             </h1>
 
             <p className="text-lg leading-relaxed mb-10 max-w-lg" style={{ color: C.muted, lineHeight: 1.8 }}>
-              Upload satellite imagery and ask questions in natural language. SatQuery AI supports single-image visual question answering, bi-temporal change analysis, and optical-SAR image fusion, with an execution trace showing how each request is processed.
+              ORBITAL-AI automatically infers required remote-sensing specialists from natural-language queries across single-image observation, bi-temporal change analysis, and optical-SAR fusion — with an observable execution trace behind every finding.
             </p>
 
             {/* CTA buttons */}
             <div className="flex flex-wrap gap-3 mb-12">
-              <button onClick={onUpload} className="btn-primary flex items-center gap-2 px-6 py-3 text-sm">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M2 6l5-5 5 5M2 13h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                Upload Satellite Image
-              </button>
-              <button onClick={onAnalyze} className="btn-ghost px-6 py-3 text-sm font-medium">
-                Launch workspace →
+              <button onClick={onAnalyze} className="btn-primary flex items-center gap-2 px-6 py-3 text-sm">
+                Open Analysis Workspace →
               </button>
             </div>
 
             {/* Stats */}
             <div className="flex flex-wrap gap-8 pt-6 mb-10" style={{ borderTop: `1px solid ${C.border}` }}>
               {[
-                { val: '19', label: 'BigEarthNet classes', col: C.mint },
-                { val: '3', label: 'Analysis modes', col: C.cyan },
-                { val: '2', label: 'Image comparison inputs', col: C.orange },
-                { val: 'TRACE', label: 'Execution visibility', col: C.white },
+                { val: '3', label: 'Analysis Input Modes', col: C.cyan },
+                { val: 'MULTI', label: 'Specialist Ensemble', col: C.mint },
+                { val: '100%', label: 'Deterministic Routing', col: C.orange },
+                { val: 'TRACE', label: 'Observable Verification', col: C.white },
               ].map(s => (
                 <div key={s.label}>
                   <div className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif", color: s.col }}>{s.val}</div>
@@ -873,23 +757,22 @@ function HeroSection({
               ))}
             </div>
 
-            {/* 5 Representative Queries */}
+            {/* Representative Queries */}
             <div className="space-y-2">
-              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>EXAMPLE ANALYSIS QUERIES</div>
+              <div className="text-[10px] font-mono tracking-widest uppercase mb-3" style={{ color: C.dim }}>EXAMPLE NATURAL-LANGUAGE QUERIES</div>
               <div className="flex flex-wrap gap-2">
                 {OFFICIAL_REPRESENTATIVE_QUERIES.map(q => (
                   <button key={q.badge} onClick={() => onQueryChip(q.query)}
                     className="query-chip text-left text-[11px] px-3 py-1.5 rounded-lg font-mono"
                     style={{ background: `${q.color}10`, border: `1px solid ${q.color}33`, color: q.color }}>
-                    <span className="opacity-60 mr-1">[{q.badge}]</span>
-                    {q.task}
+                    <span className="opacity-60 mr-1">"{q.query}"</span>
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Right: Globe + telemetry cards */}
+          {/* Right: Globe + telemetry status */}
           <div className="relative flex items-center justify-center float-anim" style={{ minHeight: 540 }}>
             {/* Orbital ring decoration */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -903,29 +786,11 @@ function HeroSection({
             {/* Globe */}
             <Globe style={{ width: '100%', height: 520, maxWidth: 560 }} />
 
-            {/* Floating telemetry cards */}
-            <div className="absolute top-6 left-0 glass card-border rounded-xl px-3.5 py-2.5 text-xs font-mono"
-              style={{ minWidth: 180 }}>
-              <div className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: C.muted }}>LAND CLASSIFICATION</div>
-              <div className="font-bold text-base" style={{ color: C.cyan }}>{imageTelemetry.landClass}</div>
-              <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>{imageTelemetry.landClassPct} · {imageTelemetry.terrain}</div>
-            </div>
-
-            <div className="absolute bottom-16 right-0 glass card-border rounded-xl px-3.5 py-2.5 text-xs font-mono"
-              style={{ minWidth: 170 }}>
-              <div className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: C.muted }}>BUILDINGS DETECTED</div>
-              <div className="font-bold text-base" style={{ color: C.white }}>
-                {buildingAnalysis ? buildingAnalysis.building_count : imageTelemetry.buildingCount}
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: C.mint }}>
-                {buildingAnalysis ? `${buildingAnalysis.high_confidence_count} high conf.` : 'Run audit →'}
-              </div>
-            </div>
-
-            <div className="absolute bottom-6 left-0 glass card-border rounded-xl px-3.5 py-2.5 text-xs font-mono">
-              <div className="text-[9px] uppercase tracking-widest mb-1.5" style={{ color: C.muted }}>LIVE STATUS</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full glow-pulse" style={{ background: C.mint }} /><span style={{ color: C.mint }}>System Online</span></div>
-              <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>BigEarthNet v2.0 active</div>
+            {/* Clean Live Status indicator */}
+            <div className="absolute bottom-6 left-0 glass card-border rounded-xl px-4 py-3 text-xs font-mono">
+              <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: C.muted }}>PIPELINE STATUS</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full glow-pulse" style={{ background: C.mint }} /><span style={{ color: C.mint, fontWeight: 600 }}>System Online</span></div>
+              <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>Awaiting remote sensing imagery & query</div>
             </div>
           </div>
         </div>
@@ -992,7 +857,7 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
 export default function App() {
   // ── State ─────────────────────────────────────────────────────────────────
   const [scrolled, setScrolled] = useState(false)
-  const [activeLayer, setActiveLayer] = useState('RGB')
+
   const [activeRegion, setActiveRegion] = useState<{ region: Region; label: string; confidence_percent?: number } | null>(null)
   const [beforePct, setBeforePct] = useState(50)
   const [dragging, setDragging] = useState(false)
@@ -1665,9 +1530,7 @@ export default function App() {
     addToast('Analysis report exported as Markdown', 'success')
   }
 
-  const layers = ['RGB','NDVI','Thermal','SAR']
-  const overlayLayers: HiddenLayer[] = ['drought','harvest','flood','urban','roads']
-  const overlayColors = { drought: C.orange, harvest: C.mint, flood: C.cyan, urban: C.cyan, roads: C.orange }
+
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1900,49 +1763,16 @@ export default function App() {
 
                 {/* Image viewer card */}
                 <div className="rounded-2xl overflow-hidden" style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: '0 0 60px rgba(32,217,255,0.04)' }}>
-                  {/* Toolbar */}
-                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs font-mono" style={{ background: `${C.base}BB`, borderBottom: `1px solid ${C.border}` }}>
-                    <div className="flex gap-1.5 shrink-0">
-                      {['#FF5F57','#FFBD2E','#28CA42'].map((col,i) => <span key={i} className="w-2.5 h-2.5 rounded-full" style={{ background: col }} />)}
-                    </div>
-                    <div className="flex gap-1 items-center flex-wrap">
-                      {layers.map(l => (
-                        <button key={l} onClick={() => setActiveLayer(l)}
-                          className="px-2.5 py-1 rounded-lg transition-all text-[10px] cursor-pointer"
-                          style={{ background: activeLayer === l ? `${C.cyan}20` : 'transparent', color: activeLayer === l ? C.cyan : C.muted, border: activeLayer === l ? `1px solid ${C.cyan}40` : '1px solid transparent' }}>
-                          {l}
-                        </button>
-                      ))}
-                      <span className="text-gray-700 mx-1">|</span>
-                      {overlayLayers.map(layer => {
-                        const isActive = activeOverlay === layer
-                        const col = overlayColors[layer]
-                        return (
-                          <button key={layer} onClick={() => setActiveOverlay(isActive ? null : layer)}
-                            className="px-2 py-0.5 rounded text-[9px] font-mono transition-all cursor-pointer uppercase"
-                            style={{ background: isActive ? `${col}24` : 'transparent', color: isActive ? col : C.dim, border: `1px solid ${isActive ? col : C.border}`, boxShadow: isActive ? `0 0 10px ${col}44` : 'none' }}>
-                            {isActive ? '● ' : ''}{layer}
-                          </button>
-                        )
-                      })}
-                      <span className="text-gray-700 mx-1">|</span>
-                      <button onClick={() => runBuildingDetection()} disabled={isDetectingBuildings}
-                        className="px-2 py-0.5 rounded text-[9px] font-mono transition-all cursor-pointer flex items-center gap-1"
-                        style={{ background: `${C.cyan}18`, color: C.cyan, border: `1px solid ${C.cyan}66` }}>
-                        {isDetectingBuildings ? '⟳ Auditing…' : '⬚ Audit Buildings'}
-                      </button>
-                      {buildingAnalysis && (
-                        <button onClick={() => setShowBuildingsOverlay(!showBuildingsOverlay)}
-                          className="px-2 py-0.5 rounded text-[9px] font-mono transition-all cursor-pointer"
-                          style={{ background: showBuildingsOverlay ? `${C.cyan}28` : 'transparent', color: showBuildingsOverlay ? C.white : C.muted, border: `1px solid ${showBuildingsOverlay ? C.cyan : C.border}` }}>
-                          {showBuildingsOverlay ? 'Footprints: ON' : 'Show Footprints'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="ml-auto flex items-center gap-3 text-[10px]" style={{ color: C.muted }}>
-                      <span style={{ color: busy || isDetectingBuildings ? C.orange : C.mint }}>
-                        ● {isDetectingBuildings ? 'SEGMENTING' : status.toUpperCase()}
+                  {/* Image Viewer Toolbar */}
+                  <div className="flex items-center gap-3 px-4 py-2.5 text-xs font-mono" style={{ background: `${C.base}BB`, borderBottom: `1px solid ${C.border}` }}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      <span className="truncate text-[10px]" style={{ color: C.muted }}>
+                        {imagePreview ? imageTelemetry.locationTag || 'Image loaded' : 'No image loaded'}
                       </span>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 shrink-0">
+                      <span className="text-[10px]" style={{ color: busy ? C.orange : C.mint }}>● {busy ? 'ANALYZING' : status.split('·')[0].trim().toUpperCase()}</span>
                     </div>
                   </div>
 
@@ -2026,21 +1856,13 @@ export default function App() {
                       </svg>
                     )}
 
-                    {/* Status banner */}
-                    {imagePreview && (buildingAnalysis && showBuildingsOverlay ? (
+                    {/* Analysis region badge */}
+                    {imagePreview && activeRegion && (
                       <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono glass-strong" style={{ border: `1px solid ${C.cyan}`, color: C.cyan }}>
                         <span className="w-2 h-2 rounded-full" style={{ background: C.cyan, boxShadow: `0 0 6px ${C.cyan}` }} />
-                        <span className="font-semibold">{buildingAnalysis.building_count} Footprints Detected</span>
-                        <span className="text-[10px] opacity-70">(H:{buildingAnalysis.high_confidence_count} M:{buildingAnalysis.medium_confidence_count} P:{buildingAnalysis.partial_count})</span>
+                        <span className="font-semibold">{activeRegion.label}</span>
                       </div>
-                    ) : activeOverlay ? (
-                      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono glass-strong"
-                        style={{ border: `1px solid ${overlayColors[activeOverlay]}`, color: overlayColors[activeOverlay] }}>
-                        <span className="w-2 h-2 rounded-full animate-ping" style={{ background: overlayColors[activeOverlay] }} />
-                        <span className="font-semibold">Hidden Layer: {activeOverlay.toUpperCase()}</span>
-                        <button onClick={() => setActiveOverlay(null)} className="ml-1 hover:text-white cursor-pointer text-[10px] opacity-60 hover:opacity-100">✕</button>
-                      </div>
-                    ) : null)}
+                    )}
 
                     {/* Zoom controls */}
                     <div className="absolute bottom-3 left-3 flex flex-col gap-1 rounded-xl p-1" style={{ background: `${C.surface}CC`, border: `1px solid ${C.border}` }}>
@@ -2058,25 +1880,17 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Telemetry stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4" style={{ borderTop: `1px solid ${C.border}` }}>
-                    {[
-                      { label: 'Land Classification', val: imageTelemetry.landClassPct, sub: imageTelemetry.landSub, col: imageTelemetry.terrain === 'water' ? C.cyan : imageTelemetry.terrain === 'vegetation' ? C.mint : imageTelemetry.terrain === 'arid' ? C.orange : C.cyan, active: activeOverlay === 'urban' },
-                      { label: 'Buildings', val: buildingAnalysis ? String(buildingAnalysis.building_count) : imageTelemetry.buildingCount, sub: buildingAnalysis ? `High: ${buildingAnalysis.high_confidence_count} · Med: ${buildingAnalysis.medium_confidence_count}` : imageTelemetry.buildingSub, col: C.white, active: !!buildingAnalysis },
-                      { label: 'Water Coverage', val: imageTelemetry.waterPct, sub: activeOverlay === 'flood' ? 'Safe: 140m buffer' : imageTelemetry.waterSub, col: C.cyan, active: activeOverlay === 'flood' },
-                      { label: 'Vegetation', val: imageTelemetry.vegetationPct, sub: activeOverlay === 'drought' ? '-38% Moisture Stress' : activeOverlay === 'harvest' ? '88% Harvest Ready' : imageTelemetry.vegSub, col: activeOverlay === 'drought' ? C.orange : C.mint, active: activeOverlay === 'drought' || activeOverlay === 'harvest' },
-                    ].map((s, i) => (
-                      <div key={i} className="px-5 py-4 stat-card transition-all duration-300"
-                        style={{ borderRight: i < 3 ? `1px solid ${C.border}` : 'none', background: s.active ? `${s.col}0A` : 'transparent' }}>
-                        <div className="text-[10px] font-mono mb-1.5 flex items-center justify-between" style={{ color: C.dim }}>
-                          <span>{s.label}</span>
-                          {s.active && <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: `${s.col}22`, color: s.col }}>LIVE</span>}
-                        </div>
-                        <div className="text-2xl font-bold mb-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", color: s.col }}>{s.val}</div>
-                        <div className="text-[10px] font-mono truncate" style={{ color: s.active ? s.col : C.muted }}>{s.sub}</div>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Provenance bar — only shown after real analysis */}
+                  {history.length > 0 && (
+                    <div className="px-5 py-3 flex items-center gap-4 text-[10px] font-mono flex-wrap" style={{ borderTop: `1px solid ${C.border}`, background: `${C.base}66` }}>
+                      <span style={{ color: C.dim }}>LAST ANALYSIS</span>
+                      <span style={{ color: C.cyan }}>{history[history.length - 1]?.label || 'Query complete'}</span>
+                      <span style={{ color: C.dim }}>·</span>
+                      <span style={{ color: C.mint }}>Confidence: {history[history.length - 1]?.confidence_percent ?? '—'}%</span>
+                      <span style={{ color: C.dim }}>·</span>
+                      <span style={{ color: C.muted }}>{history[history.length - 1]?.timestamp}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* BigEarthNet Classification Panel */}
@@ -2273,11 +2087,10 @@ export default function App() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { icon: '◉', color: C.cyan, badge: 'VRSBench', title: 'Single-Image VQA', desc: 'Multi-attribute natural-language visual question answering and descriptions for land-cover, dominant objects, and spatial layout.', detail: 'BigEarthNet taxonomy · Multi-label classification · ResNet-50 backbone' },
-              { icon: '⊕', color: C.mint, badge: 'RSVQA', title: 'Text-Guided Grounding', desc: 'Localizes requested geographical objects with percentage-based bounding coordinates. Highlights water bodies, buildings, and terrain patches on demand.', detail: 'Normalized bbox output · RSVQA evaluation protocol' },
-              { icon: '△', color: C.orange, badge: 'CDVQA', title: 'Bi-Temporal Change Detection', desc: 'Quantifies structural, vegetation, and hydrological changes between co-registered image pairs. Reports expansion rates, area deltas, and confidence bounds.', detail: 'Coregistration ≤2px tolerance · CDVQA change protocol' },
-              { icon: '⬡', color: C.mint, badge: 'RISAT/Cartosat', title: 'Optical-SAR Analysis', desc: 'Combines optical NIR reflectance with SAR microwave backscatter for all-weather, cloud-penetrating analysis of built-up and water-covered regions.', detail: 'SSIM + CrossCorr · C-band · VV/VH polarization' },
-              { icon: '⬚', color: C.cyan, badge: 'YOLO-Seg', title: 'Building Footprint Detection', desc: 'Tiled deep-learning instance segmentation with IoU NMS deduplication. Returns unique polygon coordinates, per-structure confidence, and count statistics.', detail: 'YOLOv8-Seg · 512px tiles · 64px overlap' },
+              { icon: '◉', color: C.cyan, badge: 'VQA', title: 'Single-Image VQA', desc: 'Multi-attribute natural-language visual question answering and scene descriptions for land-cover, dominant objects, and spatial layout.', detail: 'BigEarthNet taxonomy · Multi-label classification · ResNet-50 backbone' },
+              { icon: '⊕', color: C.mint, badge: 'Land Cover', title: 'Land Cover Classification', desc: 'Classifies dominant land cover type from a satellite image using the BigEarthNet 19-class taxonomy with confidence scoring.', detail: 'Normalized bbox output · RSVQA evaluation protocol' },
+              { icon: '△', color: C.orange, badge: 'Change', title: 'Bi-Temporal Change Detection', desc: 'Quantifies structural, vegetation, and hydrological changes between co-registered image pairs. Reports expansion rates, area deltas, and confidence bounds.', detail: 'Coregistration ≤2px tolerance · CDVQA change protocol' },
+              { icon: '⬡', color: C.mint, badge: 'Fusion', title: 'Optical-SAR Analysis', desc: 'Combines optical NIR reflectance with SAR microwave backscatter for all-weather, cloud-penetrating analysis of built-up and water-covered regions.', detail: 'SSIM + CrossCorr · C-band · VV/VH polarization' },
               { icon: '◎', color: C.orange, badge: 'Agentic', title: 'Traceable Task Routing', desc: 'Every query passes through a transparent task classifier → tool registry → specialist model pipeline. Full execution trace viewable and exportable.', detail: 'Observable trace · Permitted parameters · JSON export' },
             ].map((f, i) => (
               <div key={i} className="rounded-2xl p-6 transition-all duration-300 cursor-default group stat-card"
@@ -2402,12 +2215,12 @@ export default function App() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { q: 'How much of this area is covered by water?', a: '8.2% · Hudson River tributaries. +0.4% vs June baseline. Zero turbidity signatures detected.', col: C.cyan, badge: 'HYDROLOGY' },
-              { q: 'Are there any new roads or buildings since last year?', a: '14 new structures in NW sector (March 2025). 2.3km road extension confirmed via CDVQA.', col: C.orange, badge: 'CHANGE-VQA' },
-              { q: 'Has vegetation increased or decreased?', a: 'Net −18.3% canopy loss in NE quadrant. Urban expansion event. NDVI delta: −0.21.', col: C.mint, badge: 'VEGETATION' },
-              { q: 'Identify industrial zones in this image.', a: '3 large industrial clusters. Total footprint: 2.4 km². Elevated thermal signature in sector B2.', col: C.orange, badge: 'CAPTION' },
-              { q: 'Use optical and SAR images to identify built-up regions.', a: 'SAR double-bounce confirms 84% built-up density. Optical NIR distinguishes canopy from structures (SSIM: 0.74).', col: C.mint, badge: 'CROSS-MODAL' },
-              { q: 'Has the coastline shifted in the last decade?', a: 'Shoreline retreated 4.2m westward (avg). Northern sector most affected. Confidence: 94%.', col: C.cyan, badge: 'TEMPORAL' },
+              { q: 'How much of this area is covered by water?', a: 'The system will identify and describe any water bodies present, their extent, and relevant hydrological features.', col: C.cyan, badge: 'HYDROLOGY' },
+              { q: 'Are there any new roads or buildings since last year?', a: 'Bi-temporal comparison will detect and quantify structural additions, removals, and area changes between the two images.', col: C.orange, badge: 'CHANGE' },
+              { q: 'Has vegetation increased or decreased?', a: 'Vegetation coverage is assessed using spectral analysis and the change specialist returns directional and magnitude estimates.', col: C.mint, badge: 'VEGETATION' },
+              { q: 'Identify the dominant land use in this image.', a: 'The land cover specialist classifies the scene using the BigEarthNet 19-class taxonomy, returning top labels and confidence.', col: C.orange, badge: 'LAND COVER' },
+              { q: 'Use optical and SAR images to identify built-up regions.', a: 'Cross-modal analysis correlates optical reflectance and SAR backscatter to highlight built-up areas penetrating cloud or canopy cover.', col: C.mint, badge: 'CROSS-MODAL' },
+              { q: 'Describe this satellite image.', a: 'The caption specialist produces a natural-language scene description covering terrain type, land cover, and salient objects.', col: C.cyan, badge: 'SCENE' },
             ].map((item, i) => (
               <div key={i} className="rounded-2xl p-5 stat-card" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <div className="flex items-center justify-between mb-3">
@@ -2435,8 +2248,7 @@ export default function App() {
           </h2>
           <p className="text-lg mb-12 max-w-lg mx-auto" style={{ color: C.muted, lineHeight: 1.8 }}>Explore satellite imagery through natural-language questions, image comparison, and optical-SAR analysis. Review the analysis output and inspect the execution trace behind each request.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <button onClick={focusWorkspace} className="btn-primary px-8 py-4 text-sm font-semibold rounded-xl">Upload Image & Start →</button>
-            <button onClick={() => setShowEvalModal(true)} className="btn-ghost px-8 py-4 text-sm font-medium rounded-xl">View Evaluation Criteria</button>
+            <button onClick={focusWorkspace} className="btn-primary px-8 py-4 text-sm font-semibold rounded-xl">Upload Image &amp; Start →</button>
           </div>
 
           {/* Tech stack badges */}
@@ -2505,16 +2317,7 @@ export default function App() {
                 >
                   Optical–SAR Fusion
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveView('workspace'); focusWorkspace(); runBuildingDetection() }}
-                  className="block text-left transition-colors cursor-pointer"
-                  style={{ color: C.muted }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.white}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = C.muted}
-                >
-                  Building Footprint Audit
-                </button>
+
                 <button
                   type="button"
                   onClick={() => { setActiveView('dashboard'); focusWorkspace() }}
@@ -2571,15 +2374,7 @@ export default function App() {
                 >
                   BigEarthNet 19-Class Taxonomy
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEvalModal(true)}
-                  className="block text-left transition-colors cursor-pointer text-emerald-400"
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = C.mint}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#35E0B8'}
-                >
-                  Evaluation Protocol
-                </button>
+
               </div>
             </div>
 
@@ -2660,15 +2455,7 @@ export default function App() {
               >
                 Strict Data Policy
               </button>
-              <div className="w-1 h-1 rounded-full" style={{ background: C.dim }} />
-              <button
-                type="button"
-                onClick={() => setShowEvalModal(true)}
-                className="hover:text-white transition-colors cursor-pointer"
-                style={{ background: 'none', border: 'none', color: 'inherit' }}
-              >
-                Evaluation Criteria
-              </button>
+
             </div>
           </div>
         </div>

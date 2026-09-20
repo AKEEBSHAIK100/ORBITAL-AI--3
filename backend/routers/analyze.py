@@ -56,6 +56,7 @@ async def get_models():
     return {"models": reg.list_specialists()}
 
 @router.get("/api/model-status")
+@router.get("/api/models/status")
 @router.get("/api/system/status")
 async def get_model_and_dataset_status():
     """
@@ -63,18 +64,74 @@ async def get_model_and_dataset_status():
     - Dataset presence (AVAILABLE vs NOT_DOWNLOADED)
     - Specialist availability & checkpoints
     - Real completed benchmark evaluation results
+    - Actual adapter runtime verification (weights, base model, device, state)
     Never fabricates metrics.
     """
     dreg = DatasetRegistry.get_instance()
     mreg = ModelRegistry.get_instance()
     bstorage = BenchmarkStorage()
 
+    from ..services.rs_adapters import RSAdapterRuntime, SpecialistState, CAPTION_ADAPTER_PATH, VQA_ADAPTER_PATH
+    runtime = RSAdapterRuntime.get_instance()
+
+    caption_weights_present = runtime._has_adapter_weights(CAPTION_ADAPTER_PATH)
+    vqa_weights_present = runtime._has_adapter_weights(VQA_ADAPTER_PATH)
+
+    caption_status = {
+        "is_available": runtime.caption_state == SpecialistState.AVAILABLE,
+        "state": runtime.caption_state.value,
+        "adapter_path": str(CAPTION_ADAPTER_PATH),
+        "weights_present": caption_weights_present,
+        "base_model": runtime.caption_base_id,
+        "device": runtime.device,
+        "error": runtime.caption_unavailable_reason if runtime.caption_state != SpecialistState.AVAILABLE else None,
+    }
+
+    vqa_status = {
+        "is_available": runtime.vqa_state == SpecialistState.AVAILABLE,
+        "state": runtime.vqa_state.value,
+        "adapter_path": str(VQA_ADAPTER_PATH),
+        "weights_present": vqa_weights_present,
+        "base_model": runtime.vqa_base_id,
+        "device": runtime.device,
+        "error": runtime.vqa_unavailable_reason if runtime.vqa_state != SpecialistState.AVAILABLE else None,
+    }
+
+    specialists = []
+    for spec in mreg.list_specialists():
+        spec_copy = dict(spec)
+        if spec_copy.get("id") in ("rs_caption_adapted", "captioning"):
+            spec_copy.update({
+                "state": caption_status["state"],
+                "adapter_path": caption_status["adapter_path"],
+                "weights_present": caption_status["weights_present"],
+                "base_model": caption_status["base_model"],
+                "device": caption_status["device"],
+                "error": caption_status["error"],
+            })
+        elif spec_copy.get("id") in ("rs_vqa_adapted", "rs_vqa"):
+            spec_copy.update({
+                "state": vqa_status["state"],
+                "adapter_path": vqa_status["adapter_path"],
+                "weights_present": vqa_status["weights_present"],
+                "base_model": vqa_status["base_model"],
+                "device": vqa_status["device"],
+                "error": vqa_status["error"],
+            })
+        specialists.append(spec_copy)
+
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "datasets": dreg.list_datasets(),
-        "specialists": mreg.list_specialists(),
-        "evaluations": bstorage.list_all_runs()
+        "specialists": specialists,
+        "evaluations": bstorage.list_all_runs(),
+        "adapters": {
+            "caption": caption_status,
+            "vqa": vqa_status,
+        },
+        "caption_specialist": caption_status,
+        "vqa_specialist": vqa_status,
     }
 
 @router.get("/api/tools")

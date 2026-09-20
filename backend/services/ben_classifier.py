@@ -192,6 +192,26 @@ class BENClassifier:
             logger.warning(f"[BEN] Could not load pretrained model: {exc}")
             self._available = False
 
+    def ensure_model_loaded(self) -> bool:
+        """Ensures the model is loaded in memory. If unloaded, attempts to re-load."""
+        if self._model is None and not self._load_error:
+            self._load_model()
+        return self._available
+
+    def unload_model(self) -> None:
+        """Release loaded ResNet-50 model weights from memory and clear GPU cache."""
+        import gc
+        self._model = None
+        self._available = False
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+        logger.info("[BEN] Model unloaded successfully.")
+
     def classify_image(
         self,
         image_bytes: bytes,
@@ -217,6 +237,8 @@ class BENClassifier:
                 "note":       str,
             }
         """
+        if not self._available and self._model is None and not self._load_error:
+            self.ensure_model_loaded()
         if self._available and self._model is not None:
             return self._run_model_inference(image_bytes, top_k, threshold)
         else:

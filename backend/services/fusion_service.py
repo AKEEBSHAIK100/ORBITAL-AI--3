@@ -3,11 +3,10 @@ import numpy as np
 from typing import Dict, Any, Tuple
 
 def ensure_same_size(img_a: np.ndarray, img_b: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Ensure both images have the same dimensions by resizing img_b to match img_a."""
-    h_a, w_a = img_a.shape[:2]
-    h_b, w_b = img_b.shape[:2]
-    if (h_a, w_a) != (h_b, w_b):
-        img_b = cv2.resize(img_b, (w_a, h_a), interpolation=cv2.INTER_LINEAR)
+    """
+    Check dimensions. Silent resizing is disabled to prevent unverified cross-modal pixel alignment.
+    Returns (img_a, img_b) unchanged.
+    """
     return img_a, img_b
 
 def extract_optical_features(img_bgr: np.ndarray) -> Dict[str, float]:
@@ -52,10 +51,10 @@ def extract_optical_features(img_bgr: np.ndarray) -> Dict[str, float]:
         "texture_entropy": round(texture_entropy, 2),
     }
 
-def extract_sar_features(img_sar: np.ndarray) -> Dict[str, float]:
+def extract_sar_features(img_sar: np.ndarray) -> Dict[str, Any]:
     """
     Extract synthetic aperture radar (SAR) microwave telemetry:
-    - Backscatter intensity mean & standard deviation in dB
+    - Signal level mean & standard deviation derived from raw amplitude (relative dB against 8-bit dynamic range; NOT radiometrically calibrated to sigma-nought)
     - Speckle index (variance / mean^2, modeling multiplicative radar noise)
     - High-dielectric structural edge density (double-bounce radar returns)
     - Rough surface / volume scattering fraction
@@ -70,7 +69,7 @@ def extract_sar_features(img_sar: np.ndarray) -> Dict[str, float]:
     std_val = float(np.std(intensity))
     total_pixels = float(sar_gray.size)
 
-    # Convert to approximate calibrated decibels (normalized against 8-bit dynamic range)
+    # Convert to relative dB scale against 8-bit dynamic range (raw amplitude proxy, uncalibrated)
     norm_mean = max(1e-4, mean_val / 255.0)
     norm_std = max(1e-4, std_val / 255.0)
     mean_db = 10.0 * np.log10(norm_mean)
@@ -80,7 +79,11 @@ def extract_sar_features(img_sar: np.ndarray) -> Dict[str, float]:
     speckle_index = (std_val ** 2) / (max(1e-4, mean_val) ** 2)
 
     # Edge density: high-frequency double-bounce radar returns (buildings, metallic structures)
-    edges = cv2.Canny(sar_gray, 60, 160)
+    if sar_gray.dtype != np.uint8:
+        sar_u8 = cv2.normalize(sar_gray, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    else:
+        sar_u8 = sar_gray
+    edges = cv2.Canny(sar_u8, 60, 160)
     edge_density = float(np.count_nonzero(edges) / total_pixels)
 
     # Rough surface fraction (elevated backscatter from diffuse rough scattering)
@@ -88,25 +91,50 @@ def extract_sar_features(img_sar: np.ndarray) -> Dict[str, float]:
     rough_surface_fraction = float(np.count_nonzero(rough_mask) / total_pixels)
 
     return {
-        "mean_backscatter_db": round(float(mean_db), 2),
-        "std_backscatter_db": round(float(std_db), 2),
+        "mean_signal_level_db": round(float(mean_db), 2),
+        "mean_backscatter_db": round(float(mean_db), 2),  # preserved for schema compatibility
+        "std_signal_level_db": round(float(std_db), 2),
+        "std_backscatter_db": round(float(std_db), 2),   # preserved for schema compatibility
         "speckle_index": round(float(speckle_index), 3),
         "edge_density": round(edge_density, 4),
         "rough_surface_fraction": round(rough_surface_fraction, 4),
+        "calibration_status": "uncalibrated_raw_amplitude",
+        "description": "SAR mean signal level derived from raw amplitude (not radiometrically calibrated to sigma-nought backscatter)",
     }
 
-def compute_cross_modal_metrics(img_optical: np.ndarray, img_sar: np.ndarray) -> Dict[str, Any]:
+def compute_cross_modal_metrics(
+    img_optical: np.ndarray,
+    img_sar: np.ndarray,
+    is_coregistered: bool = False
+) -> Dict[str, Any]:
     """
     Compute joint optical-SAR cross-modal fusion telemetry:
     - Structural Similarity (SSIM proxy between optical luminance and SAR intensity)
     - Pearson Cross-Correlation Coefficient
     - Complementarity Index (identifying features visible in SAR through clouds/shadows)
     - Fusion Confidence rating
-    """
-    optical, sar = ensure_same_size(img_optical, img_sar)
 
-    opt_gray = cv2.cvtColor(optical, cv2.COLOR_BGR2GRAY) if len(optical.shape) == 3 else optical
-    sar_gray = cv2.cvtColor(sar, cv2.COLOR_BGR2GRAY) if len(sar.shape) == 3 else sar
+    If dimensions differ or registration is unverified, silent pixel alignment is disabled
+    and pixel-level metrics (SSIM, cross-correlation) are reported as unavailable.
+    """
+    if img_optical.shape[:2] != img_sar.shape[:2] or not is_coregistered:
+        diff_desc = (
+            f"dimension disparity: optical {img_optical.shape[1]}x{img_optical.shape[0]} vs SAR {img_sar.shape[1]}x{img_sar.shape[0]}"
+            if img_optical.shape[:2] != img_sar.shape[:2]
+            else "unverified geospatial co-registration"
+        )
+        return {
+            "alignment_status": "unavailable",
+            "registration_verified": False,
+            "structural_similarity": None,
+            "cross_correlation": None,
+            "complementarity_index": None,
+            "fusion_confidence": "unavailable",
+            "message": f"Cross-modal pixel alignment is unavailable ({diff_desc}). Silent pixel alignment is disabled.",
+        }
+
+    opt_gray = cv2.cvtColor(img_optical, cv2.COLOR_BGR2GRAY) if len(img_optical.shape) == 3 else img_optical
+    sar_gray = cv2.cvtColor(img_sar, cv2.COLOR_BGR2GRAY) if len(img_sar.shape) == 3 else img_sar
 
     opt_f = opt_gray.astype(np.float32)
     sar_f = sar_gray.astype(np.float32)
@@ -146,17 +174,23 @@ def compute_cross_modal_metrics(img_optical: np.ndarray, img_sar: np.ndarray) ->
         fusion_conf = "low"
 
     return {
+        "alignment_status": "verified",
+        "registration_verified": True,
         "structural_similarity": round(ssim, 3),
         "cross_correlation": round(correlation, 3),
         "complementarity_index": round(complementarity, 3),
         "fusion_confidence": fusion_conf,
     }
 
-def analyze_fusion_pair(optical_img: np.ndarray, sar_img: np.ndarray) -> Dict[str, Any]:
-    """Execute complete multi-modal fusion analysis pipeline."""
+def analyze_fusion_pair(
+    optical_img: np.ndarray,
+    sar_img: np.ndarray,
+    is_coregistered: bool = False
+) -> Dict[str, Any]:
+    """Execute multi-modal fusion analysis pipeline without silent pixel alignment."""
     optical_feats = extract_optical_features(optical_img)
     sar_feats = extract_sar_features(sar_img)
-    cross_metrics = compute_cross_modal_metrics(optical_img, sar_img)
+    cross_metrics = compute_cross_modal_metrics(optical_img, sar_img, is_coregistered=is_coregistered)
 
     return {
         "optical": optical_feats,

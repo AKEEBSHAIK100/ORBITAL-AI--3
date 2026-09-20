@@ -284,7 +284,7 @@ class ModelRegistry:
             version="1.0.0",
             modality=["optical", "multispectral"],
             supported_input_types=["image/tiff", "image/png", "image/jpeg"],
-            checkpoint_location=str(checkpoints_dir / "rs_vqa_adapter") if vqa_avail else None,
+            checkpoint_location="backend/models/adapters/blip_vqa_rs_lora" if vqa_avail else None,
             is_available=vqa_avail,
             unavailable_reason=vqa_unavail_reason,
             inference_fn=run_rs_vqa
@@ -314,7 +314,7 @@ class ModelRegistry:
             version="1.0.0",
             modality=["optical", "multispectral"],
             supported_input_types=["image/tiff", "image/png", "image/jpeg"],
-            checkpoint_location=str(checkpoints_dir / "rs_caption_adapter") if caption_avail else None,
+            checkpoint_location="backend/models/adapters/blip_rs_lora" if caption_avail else None,
             is_available=caption_avail,
             unavailable_reason=caption_unavail_reason,
             inference_fn=run_captioning
@@ -351,6 +351,50 @@ class ModelRegistry:
             checkpoint_location=None,
             is_available=True,
             inference_fn=run_grounding
+        )
+
+        # 9. Remote Sensing Generalist Multimodal Fallback Specialist (Unadapted VLM candidate)
+        gen_weights_dir = self.workspace_root / "backend" / "models" / "generalist" / "qwen2_vl"
+        gen_avail = gen_weights_dir.exists() and any(gen_weights_dir.glob("*.safetensors"))
+        gen_unavail_reason = None if gen_avail else (
+            "Base model 'Qwen/Qwen2-VL-2B-Instruct' or RS adapter is not installed locally. "
+            "Automatic downloads are disabled to prevent unexpected multi-GB transfers."
+        )
+
+        def run_generalist(**kw):
+            from backend.tools.generalist import GeneralistTool
+            tool = GeneralistTool(weights_dir=gen_weights_dir)
+            res = tool.run(kw, kw.get("parameters"))
+            return {
+                "status": res.get("status", "SUCCESS"),
+                "answer": res.get("answer", ""),
+                "confidence": res.get("confidence"),
+                "confidence_level": res.get("confidence_status", "UNAVAILABLE"),
+                "confidence_status": res.get("confidence_status", "not_calibrated"),
+                "evidence": res.get("evidence"),
+                "evidence_source": "generalist_vlm",
+                "model": res.get("model", "Qwen/Qwen2-VL-2B-Instruct"),
+                "base_model": res.get("base_model", "Qwen/Qwen2-VL-2B-Instruct"),
+                "adapter": res.get("adapter"),
+                "model_type": res.get("model_type", "general_multimodal_vlm"),
+                "device": res.get("device", "cpu"),
+                "inference_time_ms": res.get("inference_time_ms", 0.0),
+                "provenance": res.get("provenance"),
+                "warnings": res.get("warnings", []),
+            }
+
+        self._specialists["rs_generalist"] = SpecialistEntry(
+            id="rs_generalist",
+            name="Remote-Sensing Generalist Multimodal Fallback Specialist",
+            task="general_vqa",
+            model_id="Qwen/Qwen2-VL-2B-Instruct",
+            version="0.1.0-unadapted",
+            modality=["optical", "multispectral", "sar"],
+            supported_input_types=["image/tiff", "image/png", "image/jpeg"],
+            checkpoint_location=str(gen_weights_dir) if gen_avail else None,
+            is_available=gen_avail,
+            unavailable_reason=gen_unavail_reason,
+            inference_fn=run_generalist
         )
 
     def get_specialist(self, specialist_id: str) -> Optional[SpecialistEntry]:
