@@ -1,5 +1,4 @@
 import type { BuildingAnalysisResult, BuildingDetection } from '../App'
-import { DEFAULT_BUILDING_ANALYSIS } from '../data/defaultDetections'
 
 /**
  * Robust Computer Vision Building Detector that processes any image canvas or pixel data.
@@ -7,20 +6,15 @@ import { DEFAULT_BUILDING_ANALYSIS } from '../data/defaultDetections'
  * and confidence scores tailored specifically to the input imagery.
  */
 export async function detectBuildingsFromImage(
-  imageSource: HTMLCanvasElement | ImageData | HTMLImageElement | string,
-  isDefaultScene = false
-): Promise<BuildingAnalysisResult> {
-  // If it's the known default satellite scene, deliver the precomputed high-fidelity YOLOv8 detections
-  if (isDefaultScene) {
-    return DEFAULT_BUILDING_ANALYSIS
-  }
+  imageSource: HTMLCanvasElement | ImageData | HTMLImageElement | string
+): Promise<BuildingAnalysisResult | null> {
 
   // Otherwise, perform real computer vision structural footprint detection on the actual image
   let canvas: HTMLCanvasElement
   let ctx: CanvasRenderingContext2D | null
 
   if (typeof window === 'undefined') {
-    return DEFAULT_BUILDING_ANALYSIS
+    return null
   }
 
   if (imageSource instanceof HTMLCanvasElement) {
@@ -59,7 +53,7 @@ export async function detectBuildingsFromImage(
   }
 
   if (!ctx) {
-    return DEFAULT_BUILDING_ANALYSIS
+    return null
   }
 
   const w = canvas.width

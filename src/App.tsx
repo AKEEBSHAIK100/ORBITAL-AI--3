@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Globe from './components/Globe'
 import { SESSION_CALL_LIMIT } from './lib/constants'
-import { DEFAULT_BUILDING_ANALYSIS } from './data/defaultDetections'
 import { detectBuildingsFromImage } from './utils/buildingVisionDetector'
 import AgentTraceModal from './components/AgentTraceModal'
 import OpticalSarFusionPanel from './components/OpticalSarFusionPanel'
@@ -1021,8 +1020,8 @@ export default function App() {
             const sig = await res.json().catch(() => null)
             if (sig?.custom_analysis_required) {
               setStatus('Running client-side detection…')
-              data = await detectBuildingsFromImage(imagePreview!, isDefault)
-              if (data && !isDefault) {
+              data = await detectBuildingsFromImage(imagePreview!)
+              if (data) {
                 data.validation_status = 'Client-side edge estimation (YOLO server service busy)'
                 data.mode = 'synthetic_fallback'
               }
@@ -1031,16 +1030,13 @@ export default function App() {
           }
         } catch { /* try next */ }
       }
-      if (!data) {
-        if (isDefault) {
-          data = { ...DEFAULT_BUILDING_ANALYSIS, mode: 'demo_scene' }
-        } else if (imagePreview) {
-          setStatus('Running client-side preview detection…')
-          data = await detectBuildingsFromImage(imagePreview, false)
-          if (data) {
-            data.validation_status = 'Client-side edge estimation (YOLO server service unreachable)'
-            data.mode = 'synthetic_fallback'
-          }
+
+      if (!data && imagePreview) {
+        setStatus('Running client-side preview detection…')
+        data = await detectBuildingsFromImage(imagePreview)
+        if (data) {
+          data.validation_status = 'Client-side edge estimation (YOLO server service unreachable)'
+          data.mode = 'synthetic_fallback'
         }
       }
       if (!data) {
@@ -1059,12 +1055,6 @@ export default function App() {
       addToast(`Found ${data.building_count} building footprints (${data.confidence_level} confidence)`, 'success')
       return data
     } catch (err) {
-      if (isDefault) {
-        setBuildingAnalysis(DEFAULT_BUILDING_ANALYSIS)
-        setShowBuildingsOverlay(true)
-        setStatus(`Detected ${DEFAULT_BUILDING_ANALYSIS.building_count} buildings (Demo Scene)`)
-        return DEFAULT_BUILDING_ANALYSIS
-      }
       const msg = err instanceof Error ? err.message : 'Specialist YOLO building detection service is not reachable.'
       setError(msg)
       setStatus('Detection unavailable')
