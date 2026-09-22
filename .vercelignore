@@ -1,16 +1,20 @@
 # Python backend, ML models, datasets, and tests (not deployed to Vercel)
-backend/
-training/
-evaluation/
-models/
-docs/
-tests/
-data/
-db/
+/backend/
+/training/
+/evaluation/
+/models/
+/docs/
+/tests/
+/data/
+/db/
+
+# Ensure frontend source assets are never ignored
+!/src/**
 
 # Dev tooling & scratch
-scratch/
+/scratch/
 *.pt
 *.safetensors
 *.bin
 *.log
+
