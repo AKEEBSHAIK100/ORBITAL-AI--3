@@ -2092,7 +2092,7 @@ export default function App() {
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span>Session request guard reached ({SESSION_CALL_LIMIT} queries). Refresh or reset session from the dashboard to continue analysis.</span>
+                      <span>Session request guard reached ({SESSION_CALL_LIMIT} queries). Refresh the page or use the dashboard → Clear Session Log to continue analysis.</span>
                     </div>
                   )}
                   <div ref={chatBottomRef} />
@@ -2119,7 +2119,7 @@ export default function App() {
                     <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2.5 input-field text-xs">
                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: atCap ? C.orange : C.cyan, boxShadow: `0 0 6px ${atCap ? C.orange : C.cyan}` }} />
                       <input value={question} onChange={e => setQuestion(e.target.value)}
-                        placeholder={atCap ? `Session request guard reached (${SESSION_CALL_LIMIT} queries). Reset or refresh to continue` : 'Ask anything about this image…'}
+                        placeholder={atCap ? `Session limit reached (${SESSION_CALL_LIMIT} queries). Refresh the page to continue.` : 'Ask anything about this image…'}
                         disabled={atCap} className="flex-1 bg-transparent outline-none disabled:opacity-50 text-xs"
                         style={{ color: C.white, fontFamily: 'Inter, sans-serif' }} />
                     </div>
