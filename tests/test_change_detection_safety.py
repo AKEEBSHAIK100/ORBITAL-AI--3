@@ -99,7 +99,10 @@ class TestChangeDetectionSafety(unittest.TestCase):
         result = self.tool.run({"image": self.t1_100, "secondary_image": self.t2_100})
         self.assertEqual(result.get("status"), "success")
         self.assertEqual(result.get("geospatial_compatibility"), "unverified")
-        self.assertIn("could not be independently verified", result.get("geospatial_note", ""))
+        note = result.get("geospatial_note", "")
+        self.assertIn("could not be verified", note)
+        self.assertIn("metadata", note.lower())
+        self.assertNotEqual(result.get("geospatial_compatibility"), "verified")
 
     def test_metadata_compatible_crs_accepted(self):
         inputs = {

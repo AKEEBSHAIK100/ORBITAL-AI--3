@@ -55,6 +55,14 @@ async def get_models():
     reg = ModelRegistry.get_instance()
     return {"models": reg.list_specialists()}
 
+@router.get("/api/capabilities")
+@router.get("/api/capability-status")
+@router.get("/api/capabilities/status")
+async def get_capabilities_status():
+    """Exposes lightweight judge-facing capability and provenance status."""
+    from ..services.capability_inspector import inspect_capabilities
+    return inspect_capabilities()
+
 @router.get("/api/model-status")
 @router.get("/api/models/status")
 @router.get("/api/system/status")

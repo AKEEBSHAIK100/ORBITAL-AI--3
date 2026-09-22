@@ -14,6 +14,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import net from 'node:net'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -25,7 +26,8 @@ try {
 } catch { /* dotenv may not be importable directly — env should already be set */ }
 
 const HAS_DB = Boolean(process.env.DATABASE_URL)
-const API_BASE = `http://localhost:${process.env.API_PORT ?? 8787}`
+const API_PORT = Number(process.env.API_PORT ?? 8787)
+const API_BASE = `http://localhost:${API_PORT}`
 
 let passed = 0
 let skipped = 0
@@ -245,48 +247,85 @@ await test('Model registry returns 7 models all unavailable', async () => {
 }, true)
 
 // ─── 5. HTTP endpoint tests (requires server running) ─────────────────────────
-console.log('\n[Phase 4 Tests] HTTP endpoints (requires server on port ' + (process.env.API_PORT ?? 8787) + ')')
+console.log('\n[Phase 4 Tests] HTTP endpoints (requires server on port ' + API_PORT + ')')
+
+async function checkServerAvailable(port, baseUrl) {
+  const probe = (host) =>
+    new Promise((resolve) => {
+      const socket = net.createConnection({ port, host, timeout: 500 }, () => {
+        socket.destroy()
+        resolve(true)
+      })
+      socket.on('error', () => {
+        socket.destroy()
+        resolve(false)
+      })
+      socket.on('timeout', () => {
+        socket.destroy()
+        resolve(false)
+      })
+    })
+
+  if (await probe('127.0.0.1')) return true
+  if (await probe('localhost')) return true
+  try {
+    await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(1000) })
+    return true
+  } catch {
+    return false
+  }
+}
 
 async function httpGet(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(3000) })
   return response
 }
 
-await test('GET /api/health returns ok:true', async () => {
-  const res = await httpGet(`${API_BASE}/api/health`)
-  const body = await res.json()
-  assert.equal(res.status, 200)
-  assert.equal(body.ok, true)
-  assert.ok('database' in body, 'Health must include database field')
-  assert.ok('datasets' in body, 'Health must include datasets field')
-  assert.ok('models' in body, 'Health must include models field')
-}).catch(() => skip('GET /api/health', 'server not running'))
+const serverAvailable = await checkServerAvailable(API_PORT, API_BASE)
 
-await test('GET /api/catalog/datasets returns dataset list', async () => {
-  const res = await httpGet(`${API_BASE}/api/catalog/datasets`)
-  assert.equal(res.status, 200)
-  const body = await res.json()
-  assert.ok(Array.isArray(body.datasets))
-  assert.ok(body.total >= 10)
-}).catch(() => skip('GET /api/catalog/datasets', 'server not running'))
+if (!serverAvailable) {
+  console.log(`  [INFO] Port ${API_PORT} is unavailable — skipping HTTP endpoint tests cleanly.`)
+  skip('GET /api/health returns ok:true', `port ${API_PORT} unavailable (server not running)`)
+  skip('GET /api/catalog/datasets returns dataset list', `port ${API_PORT} unavailable (server not running)`)
+  skip('GET /api/catalog/models returns model list', `port ${API_PORT} unavailable (server not running)`)
+  skip('GET /api/agent/tools returns tool registry with availability', `port ${API_PORT} unavailable (server not running)`)
+} else {
+  await test('GET /api/health returns ok:true', async () => {
+    const res = await httpGet(`${API_BASE}/api/health`)
+    const body = await res.json()
+    assert.equal(res.status, 200)
+    assert.equal(body.ok, true)
+    assert.ok('database' in body, 'Health must include database field')
+    assert.ok('datasets' in body, 'Health must include datasets field')
+    assert.ok('models' in body, 'Health must include models field')
+  })
 
-await test('GET /api/catalog/models returns model list', async () => {
-  const res = await httpGet(`${API_BASE}/api/catalog/models`)
-  assert.equal(res.status, 200)
-  const body = await res.json()
-  assert.ok(Array.isArray(body.models))
-  assert.ok(body.total >= 7)
-}).catch(() => skip('GET /api/catalog/models', 'server not running'))
+  await test('GET /api/catalog/datasets returns dataset list', async () => {
+    const res = await httpGet(`${API_BASE}/api/catalog/datasets`)
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.ok(Array.isArray(body.datasets))
+    assert.ok(body.total >= 10)
+  })
 
-await test('GET /api/agent/tools returns tool registry with availability', async () => {
-  const res = await httpGet(`${API_BASE}/api/agent/tools`)
-  assert.equal(res.status, 200)
-  const body = await res.json()
-  assert.ok(Array.isArray(body.tools))
-  const building = body.tools.find((t) => t.id === 'rs_building_detector')
-  assert.ok(building, 'rs_building_detector must be in tool registry')
-  assert.equal(building.availability, 'unavailable')
-}).catch(() => skip('GET /api/agent/tools', 'server not running'))
+  await test('GET /api/catalog/models returns model list', async () => {
+    const res = await httpGet(`${API_BASE}/api/catalog/models`)
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.ok(Array.isArray(body.models))
+    assert.ok(body.total >= 7)
+  })
+
+  await test('GET /api/agent/tools returns tool registry with availability', async () => {
+    const res = await httpGet(`${API_BASE}/api/agent/tools`)
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.ok(Array.isArray(body.tools))
+    const building = body.tools.find((t) => t.id === 'rs_building_detector')
+    assert.ok(building, 'rs_building_detector must be in tool registry')
+    assert.equal(building.availability, 'unavailable')
+  })
+}
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(60)}`)

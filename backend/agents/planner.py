@@ -54,7 +54,8 @@ OPEN_VISUAL_OBJECT_KEYWORDS = [
     "crane", "cranes", "helicopter", "helicopters",
     "tank", "tanks", "storage tank", "oil tank",
     "stadium", "tennis court", "baseball", "golf course",
-    "playground", "fence", "power line", "wind turbine"
+    "playground", "fence", "power line", "wind turbine",
+    "unusual structure", "unusual structures", "infrastructure"
 ]
 
 
@@ -90,6 +91,27 @@ def extract_vqa_sub_question(q: str) -> Tuple[Optional[str], Optional[str]]:
         return f"Is there {target} in this image?", target
 
     return None, None
+
+
+def _get_open_vlm_specialist() -> Tuple[str, str]:
+    """
+    Selects between AdaptLLM (domain-adapted VLM candidate) if available/enabled,
+    or falls through to generalist Qwen2-VL.
+    Returns (specialist_id, evidence_requirement).
+    """
+    try:
+        from ..tools.adaptllm import is_adaptllm_available
+        if is_adaptllm_available():
+            return (
+                "rs_adaptllm",
+                "Remote-sensing domain-adapted visual observation reasoning (uncalibrated)"
+            )
+    except Exception:
+        pass
+    return (
+        "rs_generalist",
+        "Qualitative general multimodal vision-language observation reasoning (uncalibrated)"
+    )
 
 
 def create_query_plan(
@@ -251,6 +273,109 @@ def create_query_plan(
             task_category="COMPLEX_KNOWN_TASK",
         )
 
+    # Compound E: Building Detection + Land Cover
+    # e.g. "Audit the buildings in this urban area and classify the surrounding land cover"
+    # or "Count the buildings and tell me what kind of land surrounds them"
+    has_surrounding_land = any(k in q for k in [
+        "surrounding land", "surrounding terrain", "kind of land surrounds",
+        "land surrounds", "classify the surrounding", "what kind of land", "surrounds them"
+    ])
+    if (has_building_request or "buildings" in q) and (has_land_cover_request or has_surrounding_land):
+        return QueryPlan(
+            intent="multi_task",
+            required_images=1,
+            required_modalities=["optical"],
+            required_tasks=["building_detection", "land_cover"],
+            specialists=["building_detection", "land_cover"],
+            execution_order=["building_detection", "land_cover"],
+            evidence_requirements=[
+                "Tiled YOLO structural footprint count with confidence stratification",
+                "BigEarthNet v2.0 Corine 19-class semantic land-cover labels"
+            ],
+            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+            task_category="COMPLEX_KNOWN_TASK",
+        )
+
+    # Compound F: Grounding + Land Cover (Water / Terrain / Road / Infrastructure)
+    # e.g. "Locate the water body and identify the surrounding terrain"
+    # or "Highlight roads and verify if transport infrastructure is present"
+    has_grounding_keyword = any(k in q for k in [
+        "locate", "highlight", "find the", "where is", "pinpoint", "demarcate", "bounding box"
+    ])
+    is_grounding_with_terrain = (
+        has_grounding_keyword and (
+            (has_water_request and (has_land_cover_request or "surrounding terrain" in q or "surrounding land" in q or "terrain" in q or "identify the surrounding" in q)) or
+            (("road" in q or "roads" in q or "highway" in q) and ("transport" in q or "infrastructure" in q or has_land_cover_request or "verify" in q)) or
+            (has_land_cover_request and ("road" in q or has_water_request))
+        )
+    )
+    if is_grounding_with_terrain:
+        return QueryPlan(
+            intent="multi_task",
+            required_images=1,
+            required_modalities=["optical"],
+            required_tasks=["grounding", "land_cover"],
+            specialists=["visual_grounding", "land_cover"],
+            execution_order=["visual_grounding", "land_cover"],
+            evidence_requirements=[
+                "Text-guided spatial grounding coordinates for target geographical feature",
+                "BigEarthNet v2.0 Corine 19-class semantic land-cover labels"
+            ],
+            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+            task_category="COMPLEX_KNOWN_TASK",
+        )
+
+    # Compound G: Grounding + Temporal Change (e.g. Water body change)
+    # e.g. "Where is the water body and has it changed?"
+    has_target_change = (
+        has_grounding_keyword and (
+            has_change_request or "has it changed" in q or "have they changed" in q or "what changed" in q
+        )
+    )
+    if has_target_change:
+        return QueryPlan(
+            intent="change_vqa" if ("what changed" in q or "?" in q) else "change_detection",
+            required_images=2,
+            required_modalities=["optical"],
+            required_tasks=["grounding", "change_detection", "change_vqa"],
+            specialists=["visual_grounding", "change_detection", "change_vqa"],
+            execution_order=["visual_grounding", "change_detection", "change_vqa"],
+            evidence_requirements=[
+                "Spatial grounding of targeted geographic feature",
+                "Bi-temporal change detection surface difference metrics",
+                "Change-VQA temporal alteration assessment"
+            ],
+            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+            task_category="COMPLEX_KNOWN_TASK",
+        )
+
+    # Compound H: Optical-Only Vegetation Proxy + Land Cover
+    # e.g. "Assess the vegetation coverage and greenery in this image"
+    # or "What is the vegetation index?", "How green is this area?"
+    is_veg_proxy_query = (
+        "vegetation coverage" in q or
+        "greenery" in q or
+        "vegetation index" in q or
+        "how green" in q or
+        ("assess" in q and has_vegetation_request) or
+        ("coverage" in q and has_vegetation_request)
+    ) and not has_change_request and image_count == 1
+    if is_veg_proxy_query:
+        return QueryPlan(
+            intent="multi_task",
+            required_images=1,
+            required_modalities=["optical"],
+            required_tasks=["land_cover", "optical_sar_analysis"],
+            specialists=["land_cover", "optical_sar_fusion"],
+            execution_order=["land_cover", "optical_sar_fusion"],
+            evidence_requirements=[
+                "BigEarthNet v2.0 Corine vegetation land-cover classification",
+                "Visible-Band Vegetation Proxy (Green-Red Ratio) and Excess Green Index"
+            ],
+            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+            task_category="COMPLEX_KNOWN_TASK",
+        )
+
     # ── 3. Optical-SAR Joint Analysis ────────────────────────────────────────
     if (
         "optical and sar" in q or
@@ -390,28 +515,66 @@ def create_query_plan(
             task_category="COMPLEX_KNOWN_TASK",
         )
 
-    if (
-        "where is" in q or
-        "where are" in q or
-        "locate" in q or
-        "find the" in q or
-        "highlight" in q or
-        "pinpoint" in q or
-        "bounding box" in q
-    ):
-        return QueryPlan(
-            intent="grounding",
-            required_images=1,
-            required_modalities=["optical"],
-            required_tasks=["grounding"],
-            specialists=["visual_grounding"],
-            execution_order=["visual_grounding"],
-            evidence_requirements=[
-                "Normalized bounding box coordinates of targeted spatial feature"
-            ],
-            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
-            task_category="KNOWN_TASK",
-        )
+    # Grounding route: only use classical CV grounding for spectrally-groundable targets.
+    # If query uses spatial keywords but targets an open-vocabulary entity (airplanes,
+    # cars, ships, etc.) that the classical spectral grounding baseline cannot demarcate,
+    # fall through to the generalist.
+    GROUNDING_SPATIAL_KEYWORDS = ["where is", "where are", "locate", "find the", "highlight", "pinpoint", "bounding box"]
+    CLASSICAL_GROUNDING_TARGETS = [
+        "water", "river", "lake", "ocean", "pond", "sea", "stream", "reservoir", "canal", "wetland",
+        "vegetation", "canopy", "forest", "tree", "trees", "crop", "crops", "greenery", "grass",
+        "road", "roads", "highway", "runway", "runways", "street", "streets",
+        "building", "buildings", "house", "houses", "structure", "structures", "rooftop", "rooftops", "built-up"
+    ]
+    has_spatial_keyword = any(kw in q for kw in GROUNDING_SPATIAL_KEYWORDS)
+    has_classical_target = any(kw in q for kw in CLASSICAL_GROUNDING_TARGETS)
+    has_open_vocab_target = has_open_visual_request
+
+    if has_spatial_keyword:
+        if has_classical_target:
+            # Classical spectral grounding is able to demarcate this target
+            return QueryPlan(
+                intent="grounding",
+                required_images=1,
+                required_modalities=["optical"],
+                required_tasks=["grounding"],
+                specialists=["visual_grounding"],
+                execution_order=["visual_grounding"],
+                evidence_requirements=[
+                    "Normalized bounding box coordinates of targeted spatial feature"
+                ],
+                planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+                task_category="KNOWN_TASK",
+            )
+        elif has_open_vocab_target:
+            # Open-vocabulary object (e.g. airplanes, cars) — route to AdaptLLM if available, else generalist
+            open_spec, open_req = _get_open_vlm_specialist()
+            return QueryPlan(
+                intent="general_vqa",
+                required_images=1,
+                required_modalities=["optical"],
+                required_tasks=["general_vqa"],
+                specialists=[open_spec],
+                execution_order=[open_spec],
+                evidence_requirements=[open_req],
+                planner_disposition=DISPOSITION_GENERALIST_FALLBACK,
+                task_category="OPEN_REMOTE_SENSING_QUESTION",
+            )
+        else:
+            # Spatial query with unknown target — attempt grounding with classical CV
+            return QueryPlan(
+                intent="grounding",
+                required_images=1,
+                required_modalities=["optical"],
+                required_tasks=["grounding"],
+                specialists=["visual_grounding"],
+                execution_order=["visual_grounding"],
+                evidence_requirements=[
+                    "Normalized bounding box coordinates of targeted spatial feature"
+                ],
+                planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+                task_category="KNOWN_TASK",
+            )
 
     # ── 7. Land Cover Classification ─────────────────────────────────────────
     if (
@@ -461,19 +624,18 @@ def create_query_plan(
             task_category="KNOWN_TASK",
         )
 
-    # ── 9. Open Visual Object Requests (Direct Route to Generalist) ──────────
+    # ── 9. Open Visual Object Requests (Route to AdaptLLM if available, else Generalist) ──
     # Specific open-vocabulary objects not covered by domain-adapted specialists
     if has_open_visual_request:
+        open_spec, open_req = _get_open_vlm_specialist()
         return QueryPlan(
             intent="general_vqa",
             required_images=1,
             required_modalities=["optical"],
             required_tasks=["general_vqa"],
-            specialists=["rs_generalist"],
-            execution_order=["rs_generalist"],
-            evidence_requirements=[
-                "Qualitative general multimodal vision-language observation reasoning (uncalibrated)"
-            ],
+            specialists=[open_spec],
+            execution_order=[open_spec],
+            evidence_requirements=[open_req],
             planner_disposition=DISPOSITION_GENERALIST_FALLBACK,
             task_category="OPEN_REMOTE_SENSING_QUESTION",
         )
@@ -519,19 +681,17 @@ def create_query_plan(
             task_category="KNOWN_TASK",
         )
 
-    # ── 12. Open Remote-Sensing Question / Generalist Fallback ────────────────
-    # Fallback to generalist multimodal VLM when query is an unexpected visual question
-    # about the scene not covered by task-specific specialists.
+    # ── 12. Open Remote-Sensing Question / AdaptLLM or Generalist Fallback ───
+    # Route to domain-adapted VLM candidate if available, else generalist multimodal VLM
+    open_spec, open_req = _get_open_vlm_specialist()
     return QueryPlan(
         intent="general_vqa",
         required_images=1,
         required_modalities=["optical"],
         required_tasks=["general_vqa"],
-        specialists=["rs_generalist"],
-        execution_order=["rs_generalist"],
-        evidence_requirements=[
-            "Qualitative general multimodal vision-language observation reasoning (uncalibrated)"
-        ],
+        specialists=[open_spec],
+        execution_order=[open_spec],
+        evidence_requirements=[open_req],
         planner_disposition=DISPOSITION_GENERALIST_FALLBACK,
         task_category="OPEN_REMOTE_SENSING_QUESTION",
     )

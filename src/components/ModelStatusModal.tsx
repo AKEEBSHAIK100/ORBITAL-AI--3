@@ -184,7 +184,7 @@ export default function ModelStatusModal({ isOpen, onClose }: Props) {
                             border: `1px solid ${spec.is_available ? MNT : ORG}55`
                           }}
                         >
-                          {spec.is_available ? 'AVAILABLE' : 'UNAVAILABLE'}
+                          {spec.id === 'rs_generalist' && !spec.is_available ? 'NOT INSTALLED (SAFE)' : spec.is_available ? 'AVAILABLE' : 'UNAVAILABLE'}
                         </span>
                       </div>
                       <div className="text-[11px] mb-1" style={{ color: CYN }}>
@@ -193,6 +193,11 @@ export default function ModelStatusModal({ isOpen, onClose }: Props) {
                       <div className="text-[11px] mb-1" style={{ color: GRY }}>
                         Task: <span className="text-white">{spec.task}</span> | Modalities: {spec.modality.join(', ')}
                       </div>
+                      {spec.id === 'rs_generalist' && !spec.is_available && (
+                        <div className="text-[10px] text-amber-300/80 mb-1">
+                          Status: Generalist Qwen2-VL: Not installed — safe unavailable state
+                        </div>
+                      )}
                       {spec.checkpoint_location && (
                         <div className="text-[10px] truncate" style={{ color: GRY }}>
                           Checkpoint: {spec.checkpoint_location}

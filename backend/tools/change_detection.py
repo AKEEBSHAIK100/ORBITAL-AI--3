@@ -96,16 +96,29 @@ class ChangeDetectionTool(BaseTool):
                         "t2_geotransform": gt2,
                     }
 
-        if crs1 or gt1:
+        gsd1 = meta1.get("gsd") or meta1.get("pixel_size")
+        gsd2 = meta2.get("gsd") or meta2.get("pixel_size")
+        if gsd1 is not None and gsd2 is not None:
+            try:
+                if abs(float(gsd1) - float(gsd2)) > 1e-4:
+                    return {
+                        "error": (
+                            f"Ground Sample Distance (GSD) mismatch: T1 GSD is {gsd1}m, T2 GSD is {gsd2}m. "
+                            "Observations must share identical ground sample distance for bi-temporal comparison."
+                        ),
+                        "status": "error",
+                        "t1_gsd": gsd1,
+                        "t2_gsd": gsd2,
+                    }
+            except (ValueError, TypeError):
+                pass
+
+        if crs1 or gt1 or (gsd1 and gsd2):
             geospatial_compatibility = "verified"
             geospatial_note = f"Geospatial co-registration verified from metadata (CRS: {crs1 or 'consistent'})."
         else:
             geospatial_compatibility = "unverified"
-            geospatial_note = (
-                "Geospatial co-registration (CRS/affine) could not be independently "
-                "verified from the supplied inputs. Pixel-grid alignment is assumed "
-                "but not guaranteed."
-            )
+            geospatial_note = "Geospatial co-registration could not be verified from the supplied metadata."
 
 
         # Convert to grayscale

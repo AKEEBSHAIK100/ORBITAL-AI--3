@@ -26,6 +26,18 @@ class SpecialistEntry:
     is_available: bool
     unavailable_reason: Optional[str] = None
     inference_fn: Optional[Callable[..., Dict[str, Any]]] = None
+    base_model: Optional[str] = None
+    model_type: Optional[str] = None
+    is_remote_sensing_adapted: bool = False
+    is_remote_sensing_expert: bool = False
+    adaptation_scope: Optional[str] = None
+    benchmark_accuracy_claim: Optional[str] = None
+    confidence: Optional[float] = None
+    confidence_status: str = "calibrated"
+
+    @property
+    def model(self) -> str:
+        return self.model_id
 
     def execute_or_fallback(self, **kwargs) -> Dict[str, Any]:
         """
@@ -336,8 +348,9 @@ class ModelRegistry:
                 "answer": ans,
                 "confidence": 0.80 if top_reg else 0.40,
                 "confidence_level": "High" if top_reg else "Medium",
-                "evidence": {"regions": res.get("regions", []), "target": res.get("target")},
-                "grounding": res.get("regions", [])
+                "evidence": {"regions": res.get("regions", []), "target": res.get("target"), "targets": res.get("targets", [])},
+                "grounding": res.get("regions", []),
+                "targets": res.get("targets", [])
             }
 
         self._specialists["visual_grounding"] = SpecialistEntry(
@@ -394,7 +407,83 @@ class ModelRegistry:
             checkpoint_location=str(gen_weights_dir) if gen_avail else None,
             is_available=gen_avail,
             unavailable_reason=gen_unavail_reason,
-            inference_fn=run_generalist
+            inference_fn=run_generalist,
+            base_model="Qwen/Qwen2-VL-2B-Instruct",
+            model_type="general_multimodal_vlm",
+            is_remote_sensing_adapted=False,
+            is_remote_sensing_expert=False,
+            adaptation_scope="unadapted_foundation_model",
+            benchmark_accuracy_claim=None,
+            confidence=None,
+            confidence_status="not_calibrated",
+        )
+
+        # 10. AdaptLLM Remote-Sensing VLM Specialist (Domain-adapted VLM candidate)
+        adaptllm_path_env = os.getenv("ADAPTLLM_MODEL_PATH")
+        adaptllm_weights_dir = (
+            Path(adaptllm_path_env).resolve()
+            if adaptllm_path_env
+            else (self.workspace_root / "backend" / "models" / "generalist" / "adaptllm")
+        )
+        adaptllm_enabled = (
+            os.getenv("ENABLE_ADAPTLLM", "false").lower() in ("true", "1", "yes")
+            or bool(adaptllm_path_env)
+        )
+        adaptllm_avail = (
+            adaptllm_enabled
+            and adaptllm_weights_dir.exists()
+            and (any(adaptllm_weights_dir.glob("*.safetensors")) or any(adaptllm_weights_dir.glob("*.bin")))
+        )
+        adaptllm_unavail_reason = None if adaptllm_avail else (
+            "AdaptLLM remote-sensing VLM weights are not installed or enabled."
+        )
+
+        def run_adaptllm(**kw):
+            from backend.tools.adaptllm import AdaptLLMTool
+            tool = AdaptLLMTool(weights_dir=adaptllm_weights_dir)
+            res = tool.run(kw, kw.get("parameters"))
+            return {
+                "status": res.get("status", "SUCCESS"),
+                "answer": res.get("answer", ""),
+                "confidence": None,
+                "confidence_level": "UNAVAILABLE",
+                "confidence_status": "not_calibrated",
+                "evidence": res.get("evidence"),
+                "evidence_source": "adaptllm_vlm",
+                "model": "AdaptLLM/remote-sensing-Qwen2-VL-2B-Instruct",
+                "base_model": "Qwen/Qwen2-VL-2B-Instruct",
+                "adapter": None,
+                "model_type": "remote_sensing_vlm",
+                "is_remote_sensing_adapted": True,
+                "is_remote_sensing_expert": True,
+                "adaptation_scope": "remote_sensing_domain_post_training",
+                "benchmark_accuracy_claim": None,
+                "device": res.get("device", "cpu"),
+                "inference_time_ms": res.get("inference_time_ms", 0.0),
+                "provenance": res.get("provenance"),
+                "warnings": res.get("warnings", []),
+            }
+
+        self._specialists["rs_adaptllm"] = SpecialistEntry(
+            id="rs_adaptllm",
+            name="AdaptLLM Remote-Sensing VLM Specialist",
+            task="general_vqa",
+            model_id="AdaptLLM/remote-sensing-Qwen2-VL-2B-Instruct",
+            version="0.1.0-domain-adapted",
+            modality=["optical", "multispectral", "sar"],
+            supported_input_types=["image/tiff", "image/png", "image/jpeg"],
+            checkpoint_location=str(adaptllm_weights_dir) if adaptllm_avail else None,
+            is_available=adaptllm_avail,
+            unavailable_reason=adaptllm_unavail_reason,
+            inference_fn=run_adaptllm,
+            base_model="Qwen/Qwen2-VL-2B-Instruct",
+            model_type="remote_sensing_vlm",
+            is_remote_sensing_adapted=True,
+            is_remote_sensing_expert=True,
+            adaptation_scope="remote_sensing_domain_post_training",
+            benchmark_accuracy_claim=None,
+            confidence=None,
+            confidence_status="not_calibrated",
         )
 
     def get_specialist(self, specialist_id: str) -> Optional[SpecialistEntry]:
@@ -407,12 +496,21 @@ class ModelRegistry:
                 "name": s.name,
                 "task": s.task,
                 "model_id": s.model_id,
+                "model": s.model_id,
+                "base_model": s.base_model,
+                "model_type": s.model_type,
                 "version": s.version,
                 "modality": s.modality,
                 "supported_input_types": s.supported_input_types,
                 "checkpoint_location": s.checkpoint_location,
                 "is_available": s.is_available,
-                "unavailable_reason": s.unavailable_reason
+                "unavailable_reason": s.unavailable_reason,
+                "is_remote_sensing_adapted": s.is_remote_sensing_adapted,
+                "is_remote_sensing_expert": s.is_remote_sensing_expert,
+                "adaptation_scope": s.adaptation_scope,
+                "benchmark_accuracy_claim": s.benchmark_accuracy_claim,
+                "confidence": s.confidence,
+                "confidence_status": s.confidence_status,
             }
             for s in self._specialists.values()
         ]

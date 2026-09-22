@@ -1269,12 +1269,12 @@ export default function App() {
     setStatus('Running change detection…')
     compareRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     let compAnswer = (beforeImage && afterImage)
-      ? 'Multi-temporal comparison of your uploaded imagery reveals: +12.4% built-up expansion with delineated geometric boundaries, and 8.3% localized vegetation reduction. Coregistration confidence: 96%.'
-      : 'Temporal comparison (2024→2026 satellite pass): +12.4% expansion in built-up footprint, −8.3% localized canopy reduction. Coregistration confidence: 96%.'
-    let confScore = 96
-    let features = ['Vegetation shift', 'Built-up expansion', 'Riparian boundary', 'Coregistered baseline']
+      ? 'Change detection analysis requires the backend specialist service. Submit your image pair to receive a real bi-temporal comparison. (Backend service did not respond.)'
+      : 'Change detection requires the backend specialist service. Upload a before/after image pair and ensure the analysis backend is running to receive real results. (Backend service did not respond.)'
+    let confScore = 0
+    let features: string[] = ['Change Detection Unavailable']
     let traceData: ExecutionTrace | null = null
-    let mode: string = 'model'
+    let mode: string = 'synthetic_fallback'
     try {
       const res = await fetch(`${API_BASE}/api/analyze/change`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

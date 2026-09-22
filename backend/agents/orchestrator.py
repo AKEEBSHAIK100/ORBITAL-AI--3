@@ -36,7 +36,15 @@ from .validator import validate_input_imagery
 from .synthesizer import synthesize_response
 from .aggregator import build_observable_trace
 from ..tools.registry import get_tool
-from models.registry import ModelRegistry
+try:
+    from models.registry import ModelRegistry
+except (ImportError, ModuleNotFoundError):
+    import sys
+    from pathlib import Path
+    _repo_root = str(Path(__file__).resolve().parents[2])
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+    from models.registry import ModelRegistry
 
 
 def run_orbital_analysis(
@@ -409,7 +417,7 @@ def run_orbital_analysis(
         conf_status = res.get("confidence_status", "calibrated" if tool_conf is not None else "not_calibrated")
         tool_warnings = res.get("warnings", [])
 
-        if specialist_id == "rs_generalist":
+        if specialist_id in ("rs_generalist", "rs_adaptllm"):
             tool_conf = None
             conf_status = "not_calibrated"
 

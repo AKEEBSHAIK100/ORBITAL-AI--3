@@ -31,6 +31,7 @@ CANONICAL_TOOL_IDS: List[str] = [
     "caption",
     "vqa",
     "rs_generalist",
+    "rs_adaptllm",
 ]
 
 ALL_TOOL_IDS: List[str] = [
@@ -47,6 +48,7 @@ ALL_TOOL_IDS: List[str] = [
     "change_detection",
     "change_vqa",
     "rs_generalist",
+    "rs_adaptllm",
 ]
 
 
@@ -79,6 +81,9 @@ def _create_tool(canonical_id: str) -> Optional[BaseTool]:
     elif canonical_id == "rs_generalist":
         from .generalist import GeneralistTool
         return GeneralistTool()
+    elif canonical_id == "rs_adaptllm":
+        from .adaptllm import AdaptLLMTool
+        return AdaptLLMTool()
     return None
 
 

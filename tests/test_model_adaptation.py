@@ -220,12 +220,19 @@ class TestTemporalPreprocessor(unittest.TestCase):
         self.assertFalse(is_valid, "Images with 100% dimension difference must be rejected")
 
     def test_minor_dimension_difference_handled(self):
-        """Minor dimension differences (≤15%) should be handled via resizing."""
+        """Mismatched dimensions must be rejected without silent resizing."""
         prep = self._get_preprocessor()
         img_a = np.zeros((256, 256, 3), dtype=np.uint8)
         img_b = np.zeros((260, 260, 3), dtype=np.uint8)  # ~1.5% difference
-        is_valid, _, _, report = prep.validate_and_align(img_a, img_b)
-        self.assertTrue(is_valid, "Minor dimension differences should be accepted with a warning")
+        orig_shape_b = img_b.shape
+        is_valid, out_a, out_b, report = prep.validate_and_align(img_a, img_b)
+        self.assertFalse(is_valid, "Dimension mismatch must be rejected; silent resizing is forbidden")
+        self.assertEqual(out_b.shape, orig_shape_b, "Secondary image must not be silently resized")
+        self.assertGreater(len(report.get("errors", [])), 0, "Validation errors must be returned")
+        self.assertTrue(
+            any("dimension mismatch" in e.lower() for e in report.get("errors", [])),
+            "Report must specify dimension mismatch error"
+        )
 
     def test_rejection_includes_error_in_report(self):
         prep = self._get_preprocessor()

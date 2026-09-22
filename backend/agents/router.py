@@ -137,6 +137,9 @@ def route_query_to_specialist(
     intent = classify_query_intent(query, image_count=image_count, modalities=modalities)
     reg = ModelRegistry.get_instance()
 
+    adaptllm_spec = reg.get_specialist("rs_adaptllm")
+    open_candidates = ["rs_adaptllm"] if (adaptllm_spec and adaptllm_spec.is_available) else ["rs_generalist"]
+
     # Map intent to candidate specialists in priority order
     intent_to_specialist_map = {
         "sar_optical_fusion": ["optical_sar_fusion"],
@@ -147,19 +150,19 @@ def route_query_to_specialist(
         "caption": ["rs_caption_adapted", "captioning"],
         "land_cover": ["land_cover", "rs_vqa_adapted"],
         "vqa": ["rs_vqa_adapted", "rs_vqa", "land_cover"],
-        "general_vqa": ["rs_generalist"],
-        "open_question": ["rs_generalist"],
+        "general_vqa": open_candidates,
+        "open_question": open_candidates,
     }
 
     candidates = intent_to_specialist_map.get(
         intent,
-        ["rs_generalist"] if intent in ("general_vqa", "open_question") else ["rs_vqa_adapted"]
+        open_candidates if intent in ("general_vqa", "open_question") else ["rs_vqa_adapted"]
     )
     chosen_id = candidates[0]
     specialist = reg.get_specialist(chosen_id)
 
-    # Fallback to secondary if primary unavailable
-    if (not specialist or not specialist.is_available) and len(candidates) > 1:
+    # Fallback to secondary if primary unavailable (never silently replace AdaptLLM with generalist)
+    if (not specialist or not specialist.is_available) and len(candidates) > 1 and chosen_id != "rs_adaptllm":
         alt = reg.get_specialist(candidates[1])
         if alt and alt.is_available:
             chosen_id = candidates[1]

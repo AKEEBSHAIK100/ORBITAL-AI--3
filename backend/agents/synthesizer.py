@@ -145,15 +145,36 @@ def synthesize_response(
         )
         return answer, conf, "calibrated", warnings
 
-    # Intent: grounding ("Where are the buildings?")
+    # Intent: grounding ("Where are the buildings?", "Highlight the road and the water body")
     if intent == "grounding":
         regions = ground_ev.evidence.get("regions", []) if ground_ev else []
+        targets = ground_ev.evidence.get("targets", []) if ground_ev else []
         top_reg = ground_ev.evidence.get("primary_region") if ground_ev else (regions[0]["region"] if regions else None)
         bldg_part = f" Concurrently, {bldg_ev.evidence.get('building_count', 0)} building footprints were demarcated." if bldg_ev else ""
-        if top_reg:
+
+        if len(targets) > 1:
+            target_parts: List[str] = []
+            for t in targets:
+                t_label = t.get("label", "target")
+                t_status = t.get("status")
+                t_cnt = t.get("count", len(t.get("regions", [])))
+                if t_status == "unsupported":
+                    target_parts.append(f"'{t_label}' is unsupported by classical spectral grounding")
+                elif t_cnt > 0:
+                    top_t_reg = t["regions"][0]["region"]
+                    loc_s = f"X: {top_t_reg.get('x_percent', 0)}%, Y: {top_t_reg.get('y_percent', 0)}%"
+                    target_parts.append(f"{t_label} ({t_cnt} region(s), primary at [{loc_s}])")
+                else:
+                    target_parts.append(f"no regions localized for {t_label}")
+            answer = (
+                f"The visual grounding specialist evaluated multiple targets: {'; '.join(target_parts)}.{bldg_part} "
+                "Confidence is not calibrated for this workflow."
+            )
+        elif top_reg:
+            target_name = ground_ev.evidence.get("target", "target structure") if ground_ev else "target structure"
             loc_str = f"X: {top_reg.get('x_percent', 0)}%, Y: {top_reg.get('y_percent', 0)}%, Width: {top_reg.get('w_percent', 0)}%, Height: {top_reg.get('h_percent', 0)}%"
             answer = (
-                f"The visual grounding specialist localized the requested structures at coordinates [{loc_str}].{bldg_part} "
+                f"The visual grounding specialist localized {target_name} at coordinates [{loc_str}].{bldg_part} "
                 "Confidence is not calibrated for this workflow."
             )
         else:
@@ -265,6 +286,35 @@ def synthesize_response(
             hi_cnt = bldg_ev.evidence.get("high_confidence_count", 0)
             parts.append(f"Structural audit: {b_cnt} building footprints detected ({hi_cnt} high certainty).")
 
+        if ground_ev:
+            g_targets = ground_ev.evidence.get("targets", [])
+            g_regions = ground_ev.evidence.get("regions", [])
+            if len(g_targets) > 1:
+                t_parts = [f"{t.get('label')}: {t.get('count', 0)} region(s)" for t in g_targets if t.get("status") == "success"]
+                parts.append(f"Spatial demarcation: {'; '.join(t_parts)}.")
+            elif g_regions:
+                top_r = ground_ev.evidence.get("primary_region") or g_regions[0].get("region", {})
+                loc_s = f"X: {top_r.get('x_percent', 0)}%, Y: {top_r.get('y_percent', 0)}%"
+                g_target = ground_ev.evidence.get("target") or "target feature"
+                parts.append(f"Spatial demarcation: localized {g_target} (primary at [{loc_s}]).")
+
+        if fusion_ev:
+            # Check optical-only vegetation proxy evidence
+            opt_metrics = fusion_ev.evidence.get("metrics", {}).get("optical", {}) if isinstance(fusion_ev.evidence.get("metrics"), dict) else {}
+            veg_proxy = opt_metrics.get("vegetation_proxy_value", opt_metrics.get("green_red_ratio", fusion_ev.evidence.get("vegetation_proxy_value")))
+            exg = opt_metrics.get("excess_green_index", fusion_ev.evidence.get("excess_green_index"))
+            if veg_proxy is not None:
+                parts.append(
+                    f"Visible-Band Vegetation Proxy (Green-Red Ratio): {veg_proxy:.2f}"
+                    + (f" (Excess Green Index: {exg:.1f})." if exg is not None else ".")
+                    + " Calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery."
+                )
+
+        if change_ev:
+            chg_pct = change_ev.evidence.get("change_percentage", 0.0)
+            clusters = change_ev.evidence.get("change_clusters", 0)
+            parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")
+
         parts.append("Confidence is not calibrated across this multi-specialist workflow.")
         answer = " ".join(parts)
         return answer, None, "not_calibrated", warnings
@@ -291,7 +341,17 @@ def synthesize_response(
         answer = f"{vqa_res} Confidence is not calibrated for this workflow."
         return answer, None, "not_calibrated", warnings
 
-    # Intent: general_vqa / open remote-sensing questions (rs_generalist fallback)
+    # Intent: general_vqa / open remote-sensing questions (rs_adaptllm specialist or rs_generalist fallback)
+    adapt_ev = ev_by_source.get("rs_adaptllm")
+    if adapt_ev:
+        ans_text = adapt_ev.result
+        answer = (
+            f"{ans_text} "
+            "[Source: AdaptLLM/remote-sensing-Qwen2-VL-2B-Instruct (remote-sensing domain-adapted VLM candidate, uncalibrated). "
+            "Qualitative observation only; confidence is not calibrated and spatial measurements are unverified.]"
+        )
+        return answer, None, "not_calibrated", warnings
+
     gen_ev = ev_by_source.get("rs_generalist") or ev_by_task.get("general_vqa")
     if intent in ["general_vqa", "open_question", "open_scene_description", "open_remote_sensing_question"] or gen_ev:
         ans_text = gen_ev.result if gen_ev else "General remote-sensing visual observation completed."
