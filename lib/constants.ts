@@ -11,5 +11,6 @@ export const MAX_TOKENS_ANALYZE = 700
 /** Max output tokens for before/after comparison. */
 export const MAX_TOKENS_COMPARE = 800
 
-/** Per-session hard cap enforced server-side (backs up the client-side soft cap). */
-export const SESSION_CALL_LIMIT = Number(process.env.SESSION_CALL_LIMIT ?? 18)
+/** Per-session soft request guard enforced server-side (backs up the client-side guard). */
+export const SESSION_CALL_LIMIT = Number(process.env.SESSION_CALL_LIMIT ?? 100)
+

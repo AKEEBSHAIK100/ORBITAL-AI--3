@@ -19,6 +19,7 @@ interface ChatMessage {
   confidenceScore: number
   confidence_percent: number
   confidence: 'high' | 'medium' | 'low'
+  confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
   label: string
@@ -118,7 +119,7 @@ export default function DashboardView({
             />
           </div>
           <div className="text-[10px] font-mono text-slate-400">
-            {sessionLimit - sessionCallCount} calls remaining before session cap
+            {Math.max(0, sessionLimit - sessionCallCount)} calls remaining before session request guard
           </div>
         </div>
 
@@ -133,8 +134,8 @@ export default function DashboardView({
           <div className="text-xl font-bold text-slate-100 truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             {benResults ? benResults.top_label : 'Awaiting analysis'}
           </div>
-          <div className="text-[10px] font-mono text-emerald-400">
-            {benResults ? `${benResults.confidence.toFixed(1)}% model confidence` : 'Zero unverified measurements'}
+          <div className="text-[10px] font-mono text-cyan-400">
+            {benResults ? `${benResults.confidence.toFixed(1)}% model score` : 'Zero unverified measurements'}
           </div>
         </div>
 
@@ -263,7 +264,7 @@ export default function DashboardView({
                   <th className="py-3 px-4">Time</th>
                   <th className="py-3 px-4">Query / Prompt</th>
                   <th className="py-3 px-4">Task Domain</th>
-                  <th className="py-3 px-4">Confidence</th>
+                  <th className="py-3 px-4">Confidence / Score</th>
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -280,14 +281,30 @@ export default function DashboardView({
                       </span>
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className="font-bold"
-                        style={{
-                          color: (item.confidence_percent ?? item.confidenceScore) >= 85 ? '#35E0B8' : '#FF9F43',
-                        }}
-                      >
-                        {item.confidence_percent ?? item.confidenceScore}%
-                      </span>
+                      {item.confidence_status === 'not_calibrated' ? (
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-mono text-amber-400 font-medium">Not calibrated</span>
+                          {(item.confidence_percent ?? item.confidenceScore) > 0 && (
+                            <span className="text-[10px] font-mono text-slate-400">Score: {item.confidence_percent ?? item.confidenceScore}%</span>
+                          )}
+                        </div>
+                      ) : item.confidence_status === 'calibrated' ? (
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-mono text-emerald-400 font-semibold">Calibrated</span>
+                          <span className="text-[10px] font-mono text-slate-300">{item.confidence_percent ?? item.confidenceScore}%</span>
+                        </div>
+                      ) : (item.confidence_percent ?? item.confidenceScore) === 0 ? (
+                        <span className="text-[11px] font-mono text-slate-500">Unavailable</span>
+                      ) : (
+                        <span
+                          className="font-bold font-mono text-xs"
+                          style={{
+                            color: (item.confidence_percent ?? item.confidenceScore) >= 85 ? '#35E0B8' : '#FF9F43',
+                          }}
+                        >
+                          Score: {item.confidence_percent ?? item.confidenceScore}%
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <button

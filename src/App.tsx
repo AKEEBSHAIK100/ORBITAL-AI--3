@@ -51,6 +51,7 @@ type Analysis = {
   confidence: 'high' | 'medium' | 'low'
   confidence_percent: number
   confidenceScore: number
+  confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
   suggested_followups: string[]
@@ -71,6 +72,7 @@ type ChatMessage = {
   confidenceScore: number
   confidence_percent: number
   confidence: 'high' | 'medium' | 'low'
+  confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
   label: string
@@ -395,29 +397,78 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[], onRemove: (id: 
 }
 
 // ── Confidence badge ──────────────────────────────────────────────────────────
-function ConfidenceBadge({ confidence, percent, reason }: { confidence: 'high'|'medium'|'low', percent: number, reason?: string }) {
+function ConfidenceBadge({
+  confidence,
+  percent,
+  confidence_status,
+  reason,
+  mode,
+}: {
+  confidence?: 'high' | 'medium' | 'low'
+  percent?: number | null
+  confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
+  reason?: string
+  mode?: string
+}) {
   const [tip, setTip] = useState(false)
-  const color = percent >= 85 ? C.mint : percent >= 65 ? C.orange : C.danger
+  const isSynthetic = mode === 'synthetic_fallback'
+  const isCalibrated = confidence_status === 'calibrated' && !isSynthetic
+  const isUnavailable = confidence_status === 'unavailable' || isSynthetic || (percent === 0 && !isCalibrated)
+
+  let badgeColor: string = C.cyan
+  let mainLabel = 'Confidence: Not calibrated'
+  let subLabel = ''
+
+  if (isUnavailable) {
+    badgeColor = C.danger
+    mainLabel = 'Confidence: Unavailable'
+  } else if (isCalibrated && percent != null) {
+    badgeColor = percent >= 85 ? C.mint : percent >= 65 ? C.orange : C.danger
+    mainLabel = 'Calibrated Confidence'
+    subLabel = `${percent}%`
+  } else {
+    // Uncalibrated model or heuristic score
+    badgeColor = C.cyan
+    mainLabel = 'Confidence: Not calibrated'
+    if (percent != null && percent > 0) {
+      subLabel = `Model score: ${percent}%`
+    }
+  }
+
   return (
     <div className="relative inline-flex items-center gap-1.5">
       <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] font-mono"
-        style={{ background: `${color}14`, border: `1px solid ${color}44`, color }}>
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
-        <span className="font-semibold capitalize">{confidence}</span>
-        <span className="opacity-60">·</span>
-        <span className="font-bold">{percent}%</span>
-        <div className="w-8 h-1 rounded-full overflow-hidden shrink-0" style={{ background: 'rgba(0,0,0,0.3)' }}>
-          <div className="h-full rounded-full" style={{ width: `${percent}%`, background: color, transition: 'width 0.5s ease' }} />
-        </div>
+        style={{ background: `${badgeColor}14`, border: `1px solid ${badgeColor}44`, color: badgeColor }}>
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: badgeColor, boxShadow: `0 0 6px ${badgeColor}` }} />
+        <span className="font-semibold">{mainLabel}</span>
+        {subLabel && (
+          <>
+            <span className="opacity-60">·</span>
+            <span className="font-bold">{subLabel}</span>
+          </>
+        )}
+        {percent != null && percent > 0 && !isUnavailable && (
+          <div className="w-8 h-1 rounded-full overflow-hidden shrink-0" style={{ background: 'rgba(0,0,0,0.3)' }}>
+            <div className="h-full rounded-full" style={{ width: `${percent}%`, background: badgeColor, transition: 'width 0.5s ease' }} />
+          </div>
+        )}
       </div>
       <div className="relative" onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
         <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] cursor-default"
           style={{ border: `1px solid ${C.border}`, color: C.muted, background: 'rgba(6,13,26,0.7)' }}>ⓘ</span>
         {tip && (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 p-2.5 rounded-lg text-[10px] leading-snug z-50 pointer-events-none"
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 rounded-lg text-[10px] leading-snug z-50 pointer-events-none"
             style={{ background: '#071022F5', border: `1px solid ${C.borderHover}`, color: '#D8F6FF', boxShadow: '0 4px 20px rgba(0,0,0,0.6)' }}>
-            <div className="font-semibold text-white mb-0.5">AI Self-Assessed Confidence</div>
-            <div>Based on image clarity and query specificity. Not a measured accuracy statistic.</div>
+            <div className="font-semibold text-white mb-0.5">
+              {isCalibrated ? 'Calibrated Empirical Confidence' : isUnavailable ? 'Service Unavailable' : 'Uncalibrated Model Output'}
+            </div>
+            <div>
+              {isCalibrated
+                ? 'Empirically calibrated confidence score verified against ground truth error bounds.'
+                : isUnavailable
+                ? 'Specialist model service is currently offline or unreachable.'
+                : 'Raw model prediction score/probability. Empirical error-rate calibration pending.'}
+            </div>
             {reason && <div className="mt-1 pt-1 text-[9px] text-slate-400 border-t border-slate-700/50">Factor: {reason}</div>}
           </div>
         )}
@@ -452,7 +503,9 @@ function BENPanel({ results, loading }: { results: BENResult | null, loading: bo
         {results && (
           <div className="text-right">
             <div className="text-xs font-mono font-bold" style={{ color: C.mint }}>{results.top_label}</div>
-            <div className="text-[10px] font-mono" style={{ color: C.muted }}>{results.confidence?.toFixed(1)}% confidence</div>
+            <div className="text-[10px] font-mono" style={{ color: C.muted }}>
+              {results.available ? `${results.confidence?.toFixed(1)}% model score` : `${results.confidence?.toFixed(1)}% heuristic score`}
+            </div>
           </div>
         )}
       </div>
@@ -810,8 +863,9 @@ function HeroSection({
 // ── Response Normalizer ────────────────────────────────────────────────────────
 // Adapts the FastAPI unified response schema to the frontend's Analysis type
 function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: string): Analysis {
-  const conf = typeof payload.confidence === 'number' ? payload.confidence : 0.85
-  const confPct = Math.round(conf * 100)
+  const confStatus = payload.confidence_status || (payload.available === false ? 'unavailable' : 'not_calibrated')
+  const rawConf = typeof payload.confidence === 'number' ? payload.confidence : (typeof payload.confidence_score === 'number' ? payload.confidence_score : null)
+  const confPct = rawConf !== null ? Math.round(rawConf * 100) : 0
   const taskType = payload.task_type || 'vqa'
 
   let label = 'Analysis'
@@ -842,7 +896,8 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
     confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
     confidence_percent: confPct,
     confidenceScore: confPct,
-    confidence_reason: payload.reasoning || ('Model pipeline inference with ' + confPct + '% confidence.'),
+    confidence_status: confStatus,
+    confidence_reason: payload.reasoning || (confStatus === 'not_calibrated' ? 'Model output score; empirical calibration pending.' : undefined),
     detected_features: detected_features.length > 0 ? detected_features : [label],
     label,
     suggested_followups: payload.suggested_followups || ['Analyze surrounding terrain', 'Assess water-body proximity', 'Audit vegetation density'],
@@ -891,6 +946,7 @@ export default function App() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [temporalResult, setTemporalResult] = useState<{
     question: string; answer: string; confidenceScore: number
+    confidence_status?: string
     features: string[]; execution_trace?: ExecutionTrace | null
     mode?: string
   } | null>(null)
@@ -1234,7 +1290,7 @@ export default function App() {
       setAnalysis(result)
       setHistory(prev => [...prev, {
         question: prompt, answer: result.answer, confidence_percent: confPct, confidenceScore: confPct,
-        confidence: result.confidence, confidence_reason: result.confidence_reason,
+        confidence: result.confidence, confidence_status: result.confidence_status, confidence_reason: result.confidence_reason,
         detected_features: result.detected_features || [], label: result.label || 'Analysis',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         region: result.region ?? null,
@@ -1252,8 +1308,8 @@ export default function App() {
       setStatus('Analysis failed')
       setHistory(prev => [...prev, {
         question: prompt, answer: errAnswer,
-        confidence_percent: 10, confidenceScore: 10,
-        confidence: 'low', confidence_reason: 'Pipeline execution threw an unhandled exception.',
+        confidence_percent: 0, confidenceScore: 0,
+        confidence: 'low', confidence_status: 'unavailable', confidence_reason: 'Pipeline execution threw an unhandled exception.',
         detected_features: ['Pipeline Failure'], label: 'Execution Error',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         region: null, execution_trace: null, fusion_features: null,
@@ -1272,6 +1328,7 @@ export default function App() {
       ? 'Change detection analysis requires the backend specialist service. Submit your image pair to receive a real bi-temporal comparison. (Backend service did not respond.)'
       : 'Change detection requires the backend specialist service. Upload a before/after image pair and ensure the analysis backend is running to receive real results. (Backend service did not respond.)'
     let confScore = 0
+    let confStatus: string = 'unavailable'
     let features: string[] = ['Change Detection Unavailable']
     let traceData: ExecutionTrace | null = null
     let mode: string = 'synthetic_fallback'
@@ -1292,6 +1349,7 @@ export default function App() {
         if (data.answer) {
           compAnswer = data.answer
           confScore = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (data.confidenceScore ?? 96)
+          confStatus = data.confidence_status || 'not_calibrated'
           if (data.detected_features?.length) features = data.detected_features
           if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
           mode = data.mode || 'model'
@@ -1305,24 +1363,28 @@ export default function App() {
           const data = await legacyRes.json()
           if (data.answer) {
             compAnswer = data.answer; confScore = data.confidenceScore ?? 96
+            confStatus = data.confidence_status || 'not_calibrated'
             if (data.detected_features?.length) features = data.detected_features
             if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
             mode = data.mode || 'model'
           }
         } else {
           mode = 'synthetic_fallback'
+          confStatus = 'unavailable'
         }
       }
     } catch {
       mode = 'synthetic_fallback'
+      confStatus = 'unavailable'
     }
 
-    setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, features, execution_trace: traceData, mode })
+    setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, confidence_status: confStatus, features, execution_trace: traceData, mode })
     setHistory(prev => [...prev, {
       question: queryPrompt, answer: compAnswer, confidence_percent: confScore, confidenceScore: confScore,
-      confidence: confScore >= 85 ? 'high' : 'medium', detected_features: features,
+      confidence: confScore >= 85 ? 'high' : 'medium', confidence_status: confStatus, detected_features: features,
       label: 'Bi-Temporal Change Detection', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       region: { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 55 }, execution_trace: traceData, fusion_features: null,
+      is_synthetic: mode === 'synthetic_fallback',
       mode,
     }])
     setStatus('Change detection complete')
@@ -1958,7 +2020,7 @@ export default function App() {
                         )}
 
                         <div className="flex items-center justify-between text-[10px] font-mono flex-wrap gap-1">
-                          <ConfidenceBadge confidence={m.confidence} percent={m.confidence_percent ?? m.confidenceScore ?? 94} reason={m.confidence_reason} />
+                          <ConfidenceBadge confidence={m.confidence} percent={m.confidence_percent ?? m.confidenceScore} confidence_status={m.confidence_status} reason={m.confidence_reason} mode={m.mode} />
                           <span style={{ color: C.dim }}>{m.timestamp}</span>
                         </div>
                         <div className="text-xs leading-relaxed" style={{ color: '#D0E0F0', lineHeight: 1.75 }}>{m.answer}</div>
@@ -2023,7 +2085,16 @@ export default function App() {
                   )}
 
                   {error && <div className="rounded-xl px-4 py-3 text-xs leading-relaxed" style={{ background: 'rgba(255,107,107,0.10)', border: `1px solid rgba(255,107,107,0.3)`, color: C.danger }}>{error}</div>}
-                  {atCap && <div className="rounded-xl px-4 py-3 text-xs font-medium flex items-center gap-2" style={{ background: `${C.orange}10`, border: `1px solid ${C.orange}50`, color: C.orange }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg> Session limit reached. Refresh to start a new session.</div>}
+                  {atCap && (
+                    <div className="rounded-xl px-4 py-3 text-xs font-medium flex items-center gap-2" style={{ background: `${C.orange}10`, border: `1px solid ${C.orange}50`, color: C.orange }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>Session request guard reached ({SESSION_CALL_LIMIT} queries). Refresh or reset session from the dashboard to continue analysis.</span>
+                    </div>
+                  )}
                   <div ref={chatBottomRef} />
                 </div>
 
@@ -2048,7 +2119,7 @@ export default function App() {
                     <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2.5 input-field text-xs">
                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: atCap ? C.orange : C.cyan, boxShadow: `0 0 6px ${atCap ? C.orange : C.cyan}` }} />
                       <input value={question} onChange={e => setQuestion(e.target.value)}
-                        placeholder={atCap ? 'Session limit reached. Refresh to continue' : 'Ask anything about this image…'}
+                        placeholder={atCap ? `Session request guard reached (${SESSION_CALL_LIMIT} queries). Reset or refresh to continue` : 'Ask anything about this image…'}
                         disabled={atCap} className="flex-1 bg-transparent outline-none disabled:opacity-50 text-xs"
                         style={{ color: C.white, fontFamily: 'Inter, sans-serif' }} />
                     </div>
@@ -2171,7 +2242,12 @@ export default function App() {
               {temporalResult && (
                 <div className="p-4 border-t space-y-3" style={{ borderColor: C.border }}>
                   <div className="flex items-center justify-between text-xs font-mono flex-wrap gap-2">
-                    <ConfidenceBadge confidence={temporalResult.confidenceScore >= 85 ? 'high' : 'medium'} percent={temporalResult.confidenceScore} />
+                    <ConfidenceBadge
+                      confidence={temporalResult.confidenceScore >= 85 ? 'high' : 'medium'}
+                      percent={temporalResult.confidenceScore}
+                      confidence_status={temporalResult.confidence_status || (temporalResult.mode === 'synthetic_fallback' ? 'unavailable' : 'not_calibrated')}
+                      mode={temporalResult.mode}
+                    />
                     <span className="text-[10px]" style={{ color: C.dim }}>Bi-Temporal CDVQA</span>
                   </div>
                   <p className="text-xs leading-relaxed" style={{ color: '#D0E0F0', lineHeight: 1.75 }}>{temporalResult.answer}</p>

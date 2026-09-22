@@ -12,10 +12,11 @@ export const MAX_TOKENS_ANALYZE = 700
 export const MAX_TOKENS_COMPARE = 800
 
 /**
- * Soft per-session call limit shown to users.
+ * Soft per-session request guard shown to users.
  * Override via VITE_SESSION_CALL_LIMIT env var (build-time, client-side).
- * Keep high during a live demo; lower during open testing.
+ * Configurable for live demo and testing environments.
  */
 export const SESSION_CALL_LIMIT = Number(
-  import.meta.env?.VITE_SESSION_CALL_LIMIT ?? 18,
+  import.meta.env?.VITE_SESSION_CALL_LIMIT ?? 100,
 )
+

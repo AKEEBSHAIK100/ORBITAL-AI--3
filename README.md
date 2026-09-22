@@ -28,8 +28,9 @@ npm run dev:full
 | `OPENAI_API_BASE` | — | Custom base URL (Gemini, Groq, OpenRouter etc.) |
 | `API_PORT` | — | API port, default `8787` |
 | `FRONTEND_ORIGIN` | — | CORS origin for the API, default `http://localhost:5173` |
-| `SESSION_CALL_LIMIT` | — | Server-side cap per session, default `18` |
-| `VITE_SESSION_CALL_LIMIT` | — | Client-side soft cap display, default `18` |
+| `SESSION_CALL_LIMIT` | — | Server-side soft guard per session, default `100` |
+| `VITE_SESSION_CALL_LIMIT` | — | Client-side soft guard display, default `100` |
+
 | `VITE_DEMO_MODE` | — | Set `true` to run without any API key (mock responses) |
 
 ---
