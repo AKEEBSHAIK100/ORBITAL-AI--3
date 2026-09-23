@@ -90,7 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const configuredPyUrl = process.env.PYTHON_BACKEND_URL?.trim()
     if (configuredPyUrl) {
       try {
-        const pyBase = configuredPyUrl.replace(/\/+$/, '')
+        const pyBase = configuredPyUrl
+          .replace(/\/api\/analyze\/?$/, '')
+          .replace(/\/api\/?$/, '')
+          .replace(/\/+$/, '')
         const pyRes = await fetch(`${pyBase}/api/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -99,8 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             image: image || undefined,
             task_type: (req.body as Record<string, unknown>).task_type,
           }),
-          // 12 s: leaves headroom for VLM fallback within Vercel's 30 s budget
-          signal: AbortSignal.timeout(12_000),
+          // 10 s: leaves headroom for VLM fallback within Vercel's 30 s budget
+          signal: AbortSignal.timeout(10_000),
         })
         if (pyRes.ok) {
           const pyData = (await pyRes.json()) as Record<string, any>
@@ -108,29 +111,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json(pyData)
           }
         } else {
-          // Python backend is reachable but returned a server error.
-          // Surface a structured error instead of silently falling through
-          // to a potentially slow VLM call that might also time out.
-          let errMsg = `Specialist analysis failed (HTTP ${pyRes.status})`
-          try {
-            const errBody = await pyRes.json() as Record<string, any>
-            if (errBody?.detail) errMsg = String(errBody.detail)
-            else if (errBody?.error) errMsg = String(errBody.error)
-          } catch { /* ignore json parse failure */ }
-          return res.status(200).json({
-            answer: `Remote sensing analysis unavailable: ${errMsg}`,
-            confidence: null,
-            confidence_percent: null,
-            confidenceScore: null,
-            confidence_status: 'unavailable',
-            confidence_reason: errMsg,
-            detected_features: ['Analysis Unavailable'],
-            label: 'Analysis Error',
-            suggested_followups: ['Verify specialist backend health', 'Retry analysis', 'Check backend logs'],
-          })
+          console.warn(`[Orbital-AI] Python backend returned HTTP ${pyRes.status}, falling through to built-in analysis engine`)
         }
-      } catch {
-        // Network error (ECONNREFUSED / timeout) — backend is offline, fall through to Node/VLM engine
+      } catch (err: any) {
+        console.warn(`[Orbital-AI] Python backend connection error (${err?.message || 'offline'}), falling through to built-in analysis engine`)
       }
     }
 

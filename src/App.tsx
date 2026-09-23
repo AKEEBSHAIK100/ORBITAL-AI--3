@@ -12,7 +12,15 @@ import ContactModal from './components/ContactModal'
 import DashboardView from './components/DashboardView'
 import { ExecutionTrace, ExecutionTraceStep, FusionFeatures, classifyTask } from './lib/agentController'
 
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+export const API_BASE = (() => {
+  const envUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      return ''
+    }
+  }
+  return envUrl
+})()
 
 // ── Design tokens (WCAG compliant high-contrast developer grade) ──────────────
 const C = {
@@ -1231,7 +1239,7 @@ export default function App() {
             history: history.map(h => ({ question: h.question, answer: h.answer })),
             sessionId,
           }
-          const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/analyze`, {
+          const res = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
           })
           const payload = await res.json().catch(() => ({}))
