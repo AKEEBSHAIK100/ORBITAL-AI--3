@@ -1255,8 +1255,9 @@ export default function App() {
             result = {
               answer: `Remote sensing analysis unavailable: ${errorMsg}`,
               confidence: 'low',
-              confidence_percent: 10,
-              confidenceScore: 10,
+              confidence_percent: 0,
+              confidenceScore: 0,
+              confidence_status: 'unavailable',
               confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
               detected_features: ['Analysis Unavailable'],
               label: 'Analysis Error',
@@ -1268,8 +1269,9 @@ export default function App() {
           result = {
             answer: `Analysis unavailable: could not contact specialist analysis service (${fetchErr?.message || 'Network error'}).`,
             confidence: 'low',
-            confidence_percent: 10,
-            confidenceScore: 10,
+            confidence_percent: 0,
+            confidenceScore: 0,
+            confidence_status: 'unavailable',
             confidence_reason: fetchErr?.message || 'Network connection to analysis API failed.',
             detected_features: ['Service Unreachable'],
             label: 'Connection Error',
@@ -1938,7 +1940,17 @@ export default function App() {
                       <span style={{ color: C.dim }}>LAST ANALYSIS</span>
                       <span style={{ color: C.cyan }}>{history[history.length - 1]?.label || 'Query complete'}</span>
                       <span style={{ color: C.dim }}>·</span>
-                      <span style={{ color: C.mint }}>Confidence: {history[history.length - 1]?.confidence_percent ?? '—'}%</span>
+                      {(() => {
+                        const last = history[history.length - 1]
+                        const cs = last?.confidence_status
+                        if (cs === 'calibrated' && typeof last?.confidence_percent === 'number' && last.confidence_percent > 0) {
+                          return <span style={{ color: C.mint }}>Confidence: {last.confidence_percent}%</span>
+                        } else if (cs === 'unavailable' || (typeof last?.confidence_percent === 'number' && last.confidence_percent === 0)) {
+                          return <span style={{ color: C.danger }}>Confidence: Unavailable</span>
+                        } else {
+                          return <span style={{ color: C.orange }}>Confidence: Not calibrated</span>
+                        }
+                      })()}
                       <span style={{ color: C.dim }}>·</span>
                       <span style={{ color: C.muted }}>{history[history.length - 1]?.timestamp}</span>
                     </div>
