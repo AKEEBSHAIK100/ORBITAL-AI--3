@@ -352,6 +352,137 @@ function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
   }
 }
 
+/**
+ * Emergency browser-side visual baseline.
+ *
+ * This is deliberately NOT presented as a trained remote-sensing model.
+ * It reads actual rendered RGB pixels from the uploaded image and provides
+ * qualitative evidence when the production specialist/VLM service is not
+ * configured. No spectral bands, calibrated percentages, confidence scores,
+ * NDVI, SAR measurements, or other unsupported measurements are invented.
+ */
+async function clientVisualBaseline(question: string, imageDataUrl: string): Promise<Analysis> {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Unable to read the uploaded image in the browser.'))
+    img.src = imageDataUrl
+  })
+
+  const canvas = document.createElement('canvas')
+  const width = 160
+  const height = 120
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('Browser image analysis is unavailable.')
+  ctx.drawImage(image, 0, 0, width, height)
+
+  const pixels = ctx.getImageData(0, 0, width, height).data
+  let green = 0
+  let blue = 0
+  let brightNeutral = 0
+  let dark = 0
+  let edges = 0
+  let samples = 0
+  let previousLuma: number | null = null
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i]
+    const g = pixels[i + 1]
+    const b = pixels[i + 2]
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b
+
+    if (g > r * 1.06 && g > b * 1.02 && g > 55) green++
+    if (b > r * 1.08 && b > g * 1.01 && b > 60) blue++
+    if (r > 105 && g > 105 && b > 105 && Math.max(r, g, b) - Math.min(r, g, b) < 35) brightNeutral++
+    if (luma < 65) dark++
+
+    if (previousLuma !== null && Math.abs(luma - previousLuma) > 42) edges++
+    previousLuma = luma
+    samples++
+  }
+
+  const greenRatio = green / Math.max(samples, 1)
+  const blueRatio = blue / Math.max(samples, 1)
+  const builtRatio = brightNeutral / Math.max(samples, 1)
+  const edgeRatio = edges / Math.max(samples, 1)
+  const q = question.toLowerCase()
+
+  let answer: string
+  let label = 'Browser Visual Baseline'
+  let features: string[] = []
+
+  if (q.includes('land cover') || q.includes('land-cover') || q.includes('type of land') || q.includes('kind of land') || q.includes('land use')) {
+    if (greenRatio > 0.22 && builtRatio > 0.08) {
+      answer = 'The RGB image shows a mixed developed-and-vegetated scene, with substantial green vegetation alongside built or paved areas.'
+      label = 'Mixed Developed + Vegetated Land'
+      features = ['Visible vegetation', 'Developed/paved surfaces', 'Mixed land cover', 'Aerial RGB imagery']
+    } else if (greenRatio > 0.22) {
+      answer = 'The RGB image is vegetation-dominant, with extensive green areas visible across the scene.'
+      label = 'Vegetated Land'
+      features = ['Visible vegetation', 'Green canopy/ground cover', 'Aerial RGB imagery']
+    } else {
+      answer = 'The RGB image appears predominantly developed or non-vegetated, with built/paved surfaces more visually prominent than green cover.'
+      label = 'Developed / Non-Vegetated Land'
+      features = ['Built/paved surfaces', 'Limited visible green cover', 'Aerial RGB imagery']
+    }
+  } else if (q.includes('vegetation') || q.includes('forest') || q.includes('crop') || q.includes('plant')) {
+    const present = greenRatio > 0.10
+    answer = present
+      ? 'Yes. Green vegetation is visibly present in the RGB imagery. This is a qualitative visual assessment; no NDVI or calibrated vegetation percentage was computed.'
+      : 'No strong vegetation signature is visible in the RGB imagery. This is a qualitative visual assessment; no NDVI or calibrated vegetation percentage was computed.'
+    label = 'Vegetation Visual Assessment'
+    features = present ? ['Visible green vegetation', 'Vegetated patches'] : ['Limited visible vegetation']
+  } else if (q.includes('water') || q.includes('lake') || q.includes('river') || q.includes('flood')) {
+    const possible = blueRatio > 0.04
+    answer = possible
+      ? 'Blue/dark regions are visible in the RGB image and may include water-like surfaces, but RGB pixels alone are insufficient to certify water coverage or hydrological measurements.'
+      : 'No large water-like region is confidently identified by this simple RGB baseline. A calibrated water detector or multispectral data is required for a stronger conclusion.'
+    label = 'Water Visual Assessment'
+    features = possible ? ['Water-like RGB regions', 'Dark/blue surface areas'] : ['No strong water-like RGB region']
+  } else if (q.includes('describe') || q.includes('caption') || q.includes('scene')) {
+    const parts: string[] = []
+    if (builtRatio > 0.08 || edgeRatio > 0.18) parts.push('developed or structured surfaces')
+    if (greenRatio > 0.12) parts.push('visible vegetation')
+    if (blueRatio > 0.04) parts.push('some blue/dark surface regions')
+    if (parts.length === 0) parts.push('mixed surface textures')
+    answer = `The uploaded RGB aerial image visibly contains ${parts.join(', ')}. This is a browser-side qualitative baseline, not a trained remote-sensing model.`
+    label = 'RGB Scene Description Baseline'
+    features = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1))
+  } else {
+    const vegetation = greenRatio > 0.10
+    answer = q.includes('are there') || q.includes('is there')
+      ? (vegetation
+        ? 'The image contains visible green vegetation. This qualitative browser baseline does not provide calibrated confidence or spectral measurements.'
+        : 'The requested feature is not reliably established by the browser RGB baseline. Use the configured specialist/VLM for a stronger answer.')
+      : 'The uploaded image was successfully inspected at the RGB-pixel level. The production specialist/VLM is currently unavailable, so this baseline provides qualitative evidence only.'
+    label = 'RGB Visual Baseline'
+    features = vegetation ? ['Visible vegetation', 'RGB pixel evidence'] : ['RGB pixel evidence']
+  }
+
+  return {
+    answer,
+    confidence: 'low',
+    confidence_percent: 0,
+    confidenceScore: 0,
+    confidence_status: 'unavailable',
+    confidence_reason: 'Production specialist/VLM was unavailable; browser RGB baseline used instead.',
+    detected_features: features.slice(0, 5),
+    suggested_followups: [
+      'Describe this image.',
+      'What type of land is present?',
+      'Is there vegetation present?',
+    ],
+    label,
+    region: null,
+    count_estimate: null,
+    count_uncertainty_factors: [],
+    mode: 'client_visual_baseline',
+    is_synthetic: false,
+  }
+}
+
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null)
@@ -1220,17 +1351,44 @@ export default function App() {
             const errorMsg = typeof payload.detail === 'string'
               ? payload.detail
               : (payload.error || `Specialist analysis failed (HTTP ${res.status})`)
-            result = {
-              answer: `Remote sensing analysis unavailable: ${errorMsg}`,
-              confidence: 'low',
-              confidence_percent: 0,
-              confidenceScore: 0,
-              confidence_status: 'unavailable',
-              confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
-              detected_features: ['Analysis Unavailable'],
-              label: 'Analysis Error',
-              suggested_followups: ['Verify image input requirements', 'Retry with co-registered dual-sensor pair'],
-              execution_trace: payload.execution_trace || null,
+            // The serverless API intentionally returns an honest unavailable response
+            // when no real specialist/VLM is configured. Keep that guard, but give the
+            // user a useful image-grounded browser baseline rather than a blank result.
+            const specialistUnavailable =
+              payload?.confidence_status === 'unavailable' ||
+              payload?.label === 'Analysis unavailable' ||
+              /serverless deployment|no executable specialist|no configured vlm/i.test(String(payload?.answer || ''))
+            if (imagePreview && specialistUnavailable) {
+              try {
+                result = await clientVisualBaseline(prompt, imagePreview)
+                if (payload.execution_trace) result.execution_trace = payload.execution_trace
+              } catch {
+                result = {
+                  answer: `Remote sensing analysis unavailable: ${errorMsg}`,
+                  confidence: 'low',
+                  confidence_percent: 0,
+                  confidenceScore: 0,
+                  confidence_status: 'unavailable',
+                  confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
+                  detected_features: ['Analysis Unavailable'],
+                  label: 'Analysis Error',
+                  suggested_followups: ['Configure the production VLM provider', 'Use the adapted specialist through the Python backend'],
+                  execution_trace: payload.execution_trace || null,
+                }
+              }
+            } else {
+              result = {
+                answer: `Remote sensing analysis unavailable: ${errorMsg}`,
+                confidence: 'low',
+                confidence_percent: 0,
+                confidenceScore: 0,
+                confidence_status: 'unavailable',
+                confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
+                detected_features: ['Analysis Unavailable'],
+                label: 'Analysis Error',
+                suggested_followups: ['Configure the production VLM provider', 'Use the adapted specialist through the Python backend'],
+                execution_trace: payload.execution_trace || null,
+              }
             }
           }
         } catch (fetchErr: any) {
