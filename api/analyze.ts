@@ -64,6 +64,41 @@ function dedupeStrings(arr: string[]): string[] {
   })
 }
 
+function buildUnavailableAnalysis(taskType: string) {
+      const taskLabel = taskType === 'land_cover'
+        ? 'land-cover classification'
+        : taskType === 'vegetation_analysis'
+          ? 'vegetation analysis'
+          : taskType === 'caption'
+            ? 'scene captioning'
+            : taskType === 'grounding'
+              ? 'spatial grounding'
+              : taskType === 'building_detection'
+                ? 'building detection'
+                : 'remote-sensing analysis'
+      return {
+        answer: `The requested ${taskLabel} is unavailable in this serverless deployment because no executable specialist or configured VLM provider is available. No unsupported spectral measurements, percentages, or confidence values are being estimated.`,
+        confidence: null,
+        confidence_percent: null,
+        confidenceScore: null,
+        confidence_source: 'none' as const,
+        confidence_reason: 'Analysis was not executed by an available specialist model or configured VLM provider.',
+        data_limitation_note: 'RGB/JPEG imagery does not provide multispectral or SAR measurements unless those bands and a corresponding computation are available.',
+        detected_features: [],
+        estimated_coverage_percent: null,
+        water_coverage_percent: null,
+        vegetation_percent: null,
+        count_estimate: null,
+        count_uncertainty_factors: [],
+        region: null,
+        label: 'Analysis unavailable',
+        suggested_followups: [
+          'Configure the production VLM provider and redeploy.',
+          'Use the adapted remote-sensing specialist through the Python backend.',
+          'Upload a supported multispectral or SAR product for sensor-specific analysis.',
+        ],
+      }
+    }
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' })
 
@@ -149,41 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
     const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
 
-    function buildUnavailableAnalysis(taskType: string) {
-      const taskLabel = taskType === 'land_cover'
-        ? 'land-cover classification'
-        : taskType === 'vegetation_analysis'
-          ? 'vegetation analysis'
-          : taskType === 'caption'
-            ? 'scene captioning'
-            : taskType === 'grounding'
-              ? 'spatial grounding'
-              : taskType === 'building_detection'
-                ? 'building detection'
-                : 'remote-sensing analysis'
-      return {
-        answer: `The requested ${taskLabel} is unavailable in this serverless deployment because no executable specialist or configured VLM provider is available. No unsupported spectral measurements, percentages, or confidence values are being estimated.`,
-        confidence: null,
-        confidence_percent: null,
-        confidenceScore: null,
-        confidence_source: 'none' as const,
-        confidence_reason: 'Analysis was not executed by an available specialist model or configured VLM provider.',
-        data_limitation_note: 'RGB/JPEG imagery does not provide multispectral or SAR measurements unless those bands and a corresponding computation are available.',
-        detected_features: [],
-        estimated_coverage_percent: null,
-        water_coverage_percent: null,
-        vegetation_percent: null,
-        count_estimate: null,
-        count_uncertainty_factors: [],
-        region: null,
-        label: 'Analysis unavailable',
-        suggested_followups: [
-          'Configure the production VLM provider and redeploy.',
-          'Use the adapted remote-sensing specialist through the Python backend.',
-          'Upload a supported multispectral or SAR product for sensor-specific analysis.',
-        ],
-      }
-    }
+
 
     // Vercel serverless does not have the trained BigEarthNet classifier.
     // Never synthesize a land-cover label from encoded JPEG bytes: that is not
@@ -292,7 +293,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (parsedResults.length === 0) {
           // All calls failed — fall back to demo
-          return res.status(200).json(buildUnavailableAnalysis(effectiveQuestion.trim(), resolvedImage))
+          return res.status(200).json(buildUnavailableAnalysis(taskType))
         }
 
         // Take the first valid result as base for non-count fields
