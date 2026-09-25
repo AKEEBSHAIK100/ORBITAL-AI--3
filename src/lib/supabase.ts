@@ -1,11 +1,10 @@
-type SupabaseConfig = { url: string; publishableKey: string }
+type SupabaseConfig = { url: string }
 
 const DEFAULT_URL = 'https://ywieebckhnozovocbjhd.supabase.co'
 
 function getConfig(): SupabaseConfig | null {
   const url = String(import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL).replace(/\/$/, '')
-  const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '')
-  return url && publishableKey ? { url, publishableKey } : null
+  return url ? { url } : null
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -14,7 +13,7 @@ export function isSupabaseConfigured(): boolean {
 
 async function dataPlaneRequest(body: Record<string, unknown>) {
   const config = getConfig()
-  if (!config) throw new Error('Supabase publishable key is not configured for this deployment.')
+  if (!config) throw new Error('Supabase data plane is not configured for this deployment.')
 
   const response = await fetch('/api/data-plane', {
     method: 'POST',
