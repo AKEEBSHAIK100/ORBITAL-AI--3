@@ -1334,7 +1334,15 @@ export default function App() {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
           })
           const payload = await res.json().catch(() => ({}))
-          if (res.ok && (payload.answer || payload.building_analysis)) {
+          // A 200 response can still be an honest "unavailable" result. Detect that
+          // BEFORE accepting payload.answer, otherwise the UI renders the unavailable
+          // message and never reaches the browser visual baseline.
+          const specialistUnavailable =
+            payload?.confidence_status === 'unavailable' ||
+            payload?.label === 'Analysis unavailable' ||
+            /serverless deployment|no executable specialist|no configured vlm/i.test(String(payload?.answer || ''))
+
+          if (res.ok && (payload.answer || payload.building_analysis) && !specialistUnavailable) {
             result = normalizeAnalyzeResponse(payload, prompt)
             if (payload.building_analysis) {
               setBuildingAnalysis(payload.building_analysis)
@@ -1354,10 +1362,6 @@ export default function App() {
             // The serverless API intentionally returns an honest unavailable response
             // when no real specialist/VLM is configured. Keep that guard, but give the
             // user a useful image-grounded browser baseline rather than a blank result.
-            const specialistUnavailable =
-              payload?.confidence_status === 'unavailable' ||
-              payload?.label === 'Analysis unavailable' ||
-              /serverless deployment|no executable specialist|no configured vlm/i.test(String(payload?.answer || ''))
             if (imagePreview && specialistUnavailable) {
               try {
                 result = await clientVisualBaseline(prompt, imagePreview)
