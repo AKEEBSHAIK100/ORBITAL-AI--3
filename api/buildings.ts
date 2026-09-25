@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const config = {
   api: {
@@ -16,7 +17,7 @@ function getDefaultDetections() {
   if (cachedDetections) return cachedDetections
   const possiblePaths = [
     path.join(process.cwd(), 'api', 'defaultDetections.json'),
-    path.join(__dirname, 'defaultDetections.json'),
+    fileURLToPath(new URL('./defaultDetections.json', import.meta.url)),
     path.join(process.cwd(), 'src', 'data', 'defaultDetections.json'),
   ]
   for (const p of possiblePaths) {

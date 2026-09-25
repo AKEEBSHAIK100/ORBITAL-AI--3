@@ -2,11 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   client, classifyError, cleanJson, generateRealisticComparison, imageContent, incrementCallCounter,
   MODEL, parseDataUrl, systemPrompt,
-} from './_lib'
-import { MAX_TOKENS_COMPARE } from '../lib/constants'
+} from './_lib.js'
+import { MAX_TOKENS_COMPARE } from '../lib/constants.js'
 import {
-  classifyTask, validateInputs, buildExecutionTrace, ExecutionTraceStep,
-} from '../lib/agentController'
+  classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep,
+} from '../lib/agentController.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } }
 

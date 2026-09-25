@@ -8,7 +8,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getBackendUrl } from './_lib'
+import { getBackendUrl } from './_lib.js'
 
 // ── BigEarthNet 19 classes ────────────────────────────────────────────────────
 const BEN_CLASSES = [

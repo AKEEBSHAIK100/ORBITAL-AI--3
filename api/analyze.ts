@@ -2,11 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   client, cleanJson, getCachedImage, historyText,
   imageContent, incrementCallCounter, MODEL, parseDataUrl, setCachedImage, systemPrompt,
-} from './_lib'
-import { MAX_TOKENS_ANALYZE } from '../lib/constants'
+} from './_lib.js'
+import { MAX_TOKENS_ANALYZE } from '../lib/constants.js'
 import {
-  classifyTask, validateInputs, buildExecutionTrace, ExecutionTraceStep,
-} from '../lib/agentController'
+  classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep,
+} from '../lib/agentController.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' }, maxDuration: 30 } }
 

@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
-import { MODEL } from '../lib/constants'
+import { MODEL } from '../lib/constants.js'
 
 // ─── OpenAI/Anthropic client ──────────────────────────────────────────────────
 export { MODEL }
