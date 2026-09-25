@@ -1,0 +1,5 @@
+transformers>=4.45,<5
+peft>=0.14
+safetensors>=0.4
+accelerate>=0.34
+Pillow>=10
