@@ -241,6 +241,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       resolvedImage = getCachedImage(sessionId)
     }
 
+    const effectiveQuestion = (question || promptText).trim()
+
+    // Land-cover is a deterministic specialist route and must run before the provider guard.
+    if (taskType === 'land_cover') {
+      incrementCallCounter()
+      const analysis = generateLandCoverAnalysis(resolvedImage)
+      traceSteps.push({
+        step: 3,
+        tool: 'rs_land_cover',
+        description: 'BigEarthNet 19-class land-cover classification with explicit Vercel heuristic fallback',
+        input_summary: 'Single optical observation',
+        output_summary: `Classified as ${analysis.label} (heuristic score; not calibrated confidence)`,
+        duration_ms: Math.max(1, Date.now() - step2Start),
+        status: 'success',
+        confidence_source: 'classical_cv_heuristic',
+        parameters: { heuristic_score: analysis.heuristic_score },
+      })
+      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_land_cover')
+      return res.status(200).json({ ...analysis, execution_trace: trace })
+    }
+
     if (isPlaceholderKey || (!resolvedImage && !sessionId && !image)) {
       incrementCallCounter()
       const analysis = buildUnavailableAnalysis(taskType)
