@@ -4,6 +4,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' })
 
   const pythonBackendConfigured = Boolean(process.env.PYTHON_BACKEND_URL?.trim())
+  const supabaseConfigured = Boolean(process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim())
   const providerConfigured = Boolean(
     (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('your-key')) ||
     (process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('your-key'))
@@ -43,6 +44,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     },
     runtime: {
       python_backend_configured: pythonBackendConfigured,
+      supabase_data_plane_configured: supabaseConfigured,
       vision_provider_configured: providerConfigured,
       note: pythonBackendConfigured
         ? 'Python remote-sensing backend is configured for production routing.'
