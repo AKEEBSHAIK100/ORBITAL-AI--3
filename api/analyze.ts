@@ -149,6 +149,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
     const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
 
+    function generateLandCoverAnalysis(imageData?: string | null) {
+      // Keep the Vercel-only fallback aligned with /api/classify and explicitly heuristic.
+      // This is NOT calibrated confidence and must not be presented as trained-model accuracy.
+      let top = { short: 'Urban Fabric', score: 0.78 }
+      try {
+        const sample = (imageData || '').replace(/^data:image\\/[^;]+;base64,/, '').slice(0, 3000)
+        let rSum = 0, gSum = 0, bSum = 0, count = 0
+        for (let i = 0; i < sample.length - 3; i += 4) {
+          const byte = sample.charCodeAt(i) & 0xFF
+          if (count % 3 === 0) rSum += byte
+          else if (count % 3 === 1) gSum += byte
+          else bSum += byte
+          count++
+        }
+        const denom = count / 3 + 1
+        const r = rSum / denom, g = gSum / denom, b = bSum / denom
+        if (b > r * 1.1 && b > 50) top = { short: 'Inland Waters', score: 0.82 }
+        else if (g > r * 1.08 && g > 40) top = { short: 'Broad-Leaved Forest', score: 0.74 }
+        else if (r > 120 && g > 90 && b < 90) top = { short: 'Natural Grassland', score: 0.68 }
+      } catch {
+        // Keep deterministic Urban Fabric fallback.
+      }
+      return {
+        answer: `Land-cover classification: ${top.short}. The displayed ${Math.round(top.score * 100)}% value is a heuristic score, not calibrated confidence.`,
+        confidence: null,
+        confidence_percent: null,
+        confidenceScore: null,
+        confidence_source: 'heuristic' as const,
+        confidence_reason: 'Vercel fallback uses a deterministic heuristic because the trained BigEarthNet classifier is not available in the serverless runtime.',
+        detected_features: [top.short],
+        label: top.short,
+        heuristic_score: Math.round(top.score * 100),
+        count_estimate: null,
+        count_uncertainty_factors: [],
+        suggested_followups: [
+          'Describe this image.',
+          'Is there vegetation in this image?',
+          'Are there buildings in this image?',
+        ],
+      }
+    }
+
     function generateRealisticAnalysis(qText: string, imageData?: string | null) {
       const terrain = imageData ? detectImageTerrain(imageData) : 'urban'
       const q = qText.toLowerCase()
@@ -462,6 +504,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const effectiveQuestion = (question || promptText).trim()
+    if (taskType === 'land_cover') {
+      incrementCallCounter()
+      const analysis = generateLandCoverAnalysis(resolvedImage)
+      traceSteps.push({
+        step: 3,
+        tool: 'rs_land_cover',
+        description: 'BigEarthNet 19-class land-cover classification with explicit Vercel heuristic fallback',
+        input_summary: 'Single optical observation',
+        output_summary: `Classified as ${analysis.label} (heuristic score; not calibrated confidence)`,
+        duration_ms: Math.max(1, Date.now() - step2Start),
+        status: 'success',
+        confidence_source: 'classical_cv_heuristic',
+        parameters: { heuristic_score: analysis.heuristic_score },
+      })
+      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_land_cover')
+      return res.status(200).json({ ...analysis, execution_trace: trace })
+    }
+
     const counting = isCountingQuestion(effectiveQuestion)
 
     const userContent: any[] = [
@@ -597,13 +657,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
 
       const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      if (typeof parsed.confidence_percent !== 'number') {
-        parsed.confidence_percent = typeof parsed.confidenceScore === 'number'
-          ? parsed.confidenceScore
-          : (parsed.confidence === 'high' ? 95 : parsed.confidence === 'medium' ? 80 : 55)
+      if (typeof parsed.confidence_percent === 'number') {
+        parsed.confidence_percent = Math.max(0, Math.min(100, Math.round(parsed.confidence_percent)))
+        parsed.confidenceScore = parsed.confidence_percent
+      } else {
+        parsed.confidence_percent = null
+        parsed.confidenceScore = null
       }
-      parsed.confidence_percent = Math.max(0, Math.min(100, Math.round(parsed.confidence_percent)))
-      parsed.confidenceScore = parsed.confidence_percent
       if (typeof parsed.building_count === 'number') {
         parsed.building_count = Math.max(0, Math.round(parsed.building_count))
       }
