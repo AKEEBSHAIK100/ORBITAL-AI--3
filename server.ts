@@ -28,7 +28,12 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 const port = Number(process.env.API_PORT ?? 8787)
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173'
+const _rawFrontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:8443,https://localhost:8443'
+const _allowedOrigins = _rawFrontendOrigin.split(',').map(o => o.trim()).filter(Boolean)
+
+export const PYTHON_BACKEND_URL = (process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000')
+  .replace(/\/api\/analyze.*$/, '')
+  .replace(/\/+$/, '')
 
 // ─── OpenAI/Anthropic-compatible client ───────────────────────────────────────
 const client = new OpenAI({
@@ -165,7 +170,21 @@ Domain Adaptation & Reasoning Guidelines:
 }`
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors({ origin: frontendOrigin }))
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (
+      _allowedOrigins.includes('*') ||
+      _allowedOrigins.includes(origin) ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true)
+    }
+    return callback(new Error(`Origin ${origin} not allowed by CORS`))
+  },
+  credentials: true,
+}))
 app.use(express.json({ limit: '12mb' }))
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static('dist'))
@@ -241,9 +260,8 @@ app.get('/api/agent/tools', (_req, res) => {
 })
 
 app.get('/api/model-status', async (_req, res) => {
-  const pyBackend = (process.env.PYTHON_BACKEND_URL || 'http://localhost:8000').replace(/\/+$/, '')
   try {
-    const pyRes = await fetch(`${pyBackend}/api/model-status`, {
+    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/api/model-status`, {
       signal: AbortSignal.timeout(4000),
     })
     if (pyRes.ok) {
@@ -318,9 +336,8 @@ app.post(['/classify', '/api/classify'], async (req, res) => {
   const thresh = Math.min(Math.max(Number(threshold) || 0.25, 0), 1)
 
   // Try Python backend first
-  const pyBackend = process.env.PYTHON_BACKEND_URL ?? 'http://localhost:8000'
   try {
-    const pyRes = await fetch(`${pyBackend}/classify`, {
+    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/classify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, top_k: topK, threshold: thresh }),
       signal: AbortSignal.timeout(10000),
@@ -653,8 +670,9 @@ app.post('/api/analyze', async (req, res) => {
 
     // Try FastAPI master analysis first if Python backend is active
     try {
-      const pyBase = process.env.PYTHON_BACKEND_URL?.replace(/\/api\/analyze.*$/, '') ?? 'http://127.0.0.1:8000'
-      const pyRes = await fetch(`${pyBase}/api/analyze`, {
+      const targetUrl = `${PYTHON_BACKEND_URL}/api/analyze`
+      console.log(`[Orbital-AI] Dispatching specialist analysis: POST ${targetUrl} (task_type: ${(req.body as Record<string, unknown>).task_type || 'auto'})`)
+      const pyRes = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -662,16 +680,29 @@ app.post('/api/analyze', async (req, res) => {
           image: image || undefined,
           task_type: (req.body as Record<string, unknown>).task_type,
         }),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(60_000),
       })
+      console.log(`[Orbital-AI] Specialist response HTTP status: ${pyRes.status}`)
       if (pyRes.ok) {
         const pyData = (await pyRes.json()) as Record<string, any>
-        if (pyData && (pyData.answer || pyData.building_analysis)) {
+        console.log(`[Orbital-AI] Specialist response status: ${pyData?.status}, task_type: ${pyData?.task_type}`)
+        // Only pass through if FastAPI returned a genuine SUCCESS response with real content.
+        // If all specialists are unavailable (no local model weights), fall through to the
+        // Node/OpenAI engine which can answer using the configured API key.
+        const isSpecialistUnavailable = pyData?.status === 'SPECIALIST_UNAVAILABLE'
+          || String(pyData?.answer || '').startsWith('SPECIALIST UNAVAILABLE')
+          || String(pyData?.answer || '').startsWith('UNSUPPORTED QUERY')
+        const hasRealAnswer = pyData && (pyData.answer || pyData.building_analysis) && !isSpecialistUnavailable
+        if (hasRealAnswer) {
+          console.log('[Orbital-AI] Returning real specialist model analysis from FastAPI backend')
           return res.json(pyData)
         }
+      } else {
+        const errText = await pyRes.text().catch(() => '')
+        console.warn(`[Orbital-AI] Specialist analysis returned HTTP ${pyRes.status}: ${errText.slice(0, 300)}`)
       }
-    } catch {
-      // Python backend offline or timeout — fall back to Node/OpenAI engine
+    } catch (pyErr: any) {
+      console.warn(`[Orbital-AI] Specialist analysis dispatch error: ${pyErr?.message || pyErr}`)
     }
 
     // 1. Task classification step
@@ -846,8 +877,8 @@ async function proxyToPython(
   pythonPath: string,
   fallbackFn?: () => void
 ): Promise<void> {
-  const base = process.env.PYTHON_BACKEND_URL?.replace(/\/api\/analyze.*$/, '') ?? 'http://127.0.0.1:8000'
-  const targetUrl = `${base}${pythonPath}`
+  const targetUrl = `${PYTHON_BACKEND_URL}${pythonPath}`
+  console.log(`[Orbital-AI] Proxying specialist request: ${req.method} ${targetUrl}`)
   try {
     const response = await fetch(targetUrl, {
       method: req.method,
@@ -855,12 +886,17 @@ async function proxyToPython(
       body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
       signal: AbortSignal.timeout(60_000),
     })
+    console.log(`[Orbital-AI] Proxy response from ${targetUrl}: HTTP ${response.status}`)
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '')
+      console.warn(`[Orbital-AI] Proxy target ${targetUrl} returned HTTP ${response.status}: ${errText.slice(0, 300)}`)
+    }
     const data = await response.json()
     res.status(response.status).json(data)
-  } catch {
-    console.warn(`[Orbital-AI] Python backend not reachable at ${targetUrl}`)
+  } catch (err: any) {
+    console.warn(`[Orbital-AI] Python backend not reachable at ${targetUrl}: ${err?.message || err}`)
     if (fallbackFn) fallbackFn()
-    else res.status(502).json({ error: 'Python backend unavailable.' })
+    else res.status(502).json({ error: `Python backend unavailable at ${targetUrl}: ${err?.message || 'Connection failed'}` })
   }
 }
 
@@ -1016,18 +1052,15 @@ app.post('/api/fuse', async (req, res) => {
     let fusionFeatures = computeSimulatedFusionFeatures(opticalImage, sarImage)
     try {
       if (opticalImage && sarImage) {
-        const pyBackend = (process.env.PYTHON_BACKEND_URL || '').replace(/\/+$/, '')
-        if (pyBackend) {
-          const pyRes = await fetch(`${pyBackend}/analyze/fusion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage }),
-            signal: AbortSignal.timeout(1800),
-          })
-          if (pyRes.ok) {
-            const pyJson = (await pyRes.json()) as Record<string, any>
-            if (pyJson && pyJson.fusion_features) fusionFeatures = pyJson.fusion_features
-          }
+        const pyRes = await fetch(`${PYTHON_BACKEND_URL}/analyze/fusion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage }),
+          signal: AbortSignal.timeout(5000),
+        })
+        if (pyRes.ok) {
+          const pyJson = (await pyRes.json()) as Record<string, any>
+          if (pyJson && pyJson.fusion_features) fusionFeatures = pyJson.fusion_features
         }
       }
     } catch {

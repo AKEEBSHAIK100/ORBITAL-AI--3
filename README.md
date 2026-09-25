@@ -24,7 +24,7 @@ npm run dev:full
 | Variable | Required | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | ✅ | Anthropic/OpenAI-compatible API key |
-| `OPENAI_VISION_MODEL` | — | Defaults to `claude-sonnet-5` |
+| `OPENAI_VISION_MODEL` | — | Defaults to `claude-3-5-sonnet-20241022` |
 | `OPENAI_API_BASE` | — | Custom base URL (Gemini, Groq, OpenRouter etc.) |
 | `API_PORT` | — | API port, default `8787` |
 | `FRONTEND_ORIGIN` | — | CORS origin for the API, default `http://localhost:5173` |
@@ -39,7 +39,7 @@ npm run dev:full
 
 This app is built to use API credits deliberately:
 
-- **Single model constant** — `claude-sonnet-5` defined in `lib/constants.ts`, never hardcoded elsewhere.
+- **Single model constant** — `claude-3-5-sonnet-20241022` defined in `lib/constants.ts`, never hardcoded elsewhere.
 - **Conservative `max_tokens`** — 700 for analysis, 800 for comparison (caps worst-case cost per call).
 - **Client-side image compression** — images are downscaled to ≤1600px and JPEG-compressed before sending (image tokens scale with resolution).
 - **Server-side image caching** — each image upload generates a `sessionId`. The backend caches the image for 30 minutes. Follow-up questions about the same image only send text + history — no re-transmission of the full image.
@@ -56,7 +56,7 @@ Run through this **at least 30 minutes before** any demo or judging session:
 ### 1. Confirm API key and credits are live
 ```bash
 curl http://localhost:8787/api/health
-# Expected: { "ok": true, "configured": true, "model": "claude-sonnet-5", "totalCallsThisDeployment": 0 }
+# Expected: { "ok": true, "configured": true, "model": "claude-3-5-sonnet-20241022", "totalCallsThisDeployment": 0 }
 ```
 If `configured` is `false` or you get a billing error, fix the key **before** presenting.
 

@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
+    css: {
+      // Tailwind v4 runs through @tailwindcss/vite (not PostCSS).
+      // Setting postcss to an empty object prevents Vite 8 from
+      // searching parent directories for a postcss config file.
+      postcss: {},
+    },
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,
       minify: !emitSourcemaps,
@@ -42,13 +48,26 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api/buildings': {
-          target: 'http://localhost:8000',
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/buildings/, '/analyze/buildings'),
         },
-        '/analyze/buildings': 'http://localhost:8000',
-        '/analyze/fusion': 'http://localhost:8000',
-        '/classify': 'http://localhost:8787',
-        '/api': 'http://localhost:8787',
+        '/analyze/buildings': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
+        '/analyze/fusion': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
+        '/classify': {
+          target: 'http://127.0.0.1:8787',
+          changeOrigin: true,
+        },
+        '/api': {
+          target: 'http://127.0.0.1:8787',
+          changeOrigin: true,
+        },
       },
       watch: { ignored: ['**/.figma/**'] },
     },
