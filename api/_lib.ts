@@ -54,7 +54,8 @@ Domain Adaptation & Reasoning Guidelines:
 3. Scene Captioning (VRSBench): When asked to describe or caption the scene, generate a structured, multi-attribute remote sensing description covering topography, dominant land cover, object distribution, and visible sensor characteristics.
 4. Counting & Structural Auditing: When asked to count objects (buildings, structures, vessels), evaluate distinct individual structural footprints and planar rooftop geometries. Account for partial edge structures and occlusions. Return verified count in building_count.
 5. Multitemporal Change (CDVQA): When comparing passes or analyzing changes, clearly state whether features increased, decreased, or remained unchanged, and localize where the change occurred.
-6. Confidence Assessment: Provide a confidence_percent (0-100) reflecting image resolution, cloud/shadow occlusion, sensor angle, and physical ambiguity.
+6. Evidence and measurement integrity: Never invent sensor bands, physical measurements, or percentages. Only report NDVI/NIR, thermal temperature, soil moisture, chlorophyll, SAR backscatter, calibrated coverage percentages, or other quantitative measurements when the uploaded data actually contains the required bands/sensor metadata and a real tool computes that value. For ordinary RGB/JPEG imagery, use qualitative visual evidence only. If a requested measurement is unavailable, say so explicitly instead of estimating it.
+7. Confidence Assessment: Treat confidence as uncalibrated unless a calibrated specialist explicitly provides it. Never turn a heuristic score or model self-assessment into measured accuracy.
 
 Return valid JSON only with the following fields:
 - answer: string (concise, analytical, evidence-grounded answer)
@@ -65,9 +66,9 @@ Return valid JSON only with the following fields:
 - count_estimate: { low: number, high: number, best_estimate: number } | null (populate ONLY for counting questions; null otherwise)
 - count_uncertainty_factors: string[] (sources of count uncertainty, e.g. ["tree cover obscuring rooftops", "structures cut off at edge"])
 - detected_features: string[] (3-5 key visual features identified according to BigEarthNet vocabulary)
-- estimated_coverage_percent: number (approximate percentage of dominant land cover)
-- water_coverage_percent: number (0-100)
-- vegetation_percent: number (0-100)
+- estimated_coverage_percent: number | null (only when directly computed by an available tool; otherwise null)
+- water_coverage_percent: number | null (only when directly computed; otherwise null)
+- vegetation_percent: number | null (only when directly computed; otherwise null)
 - data_limitation_note: string
 - region: { x_percent: number, y_percent: number, w_percent: number, h_percent: number } | null (bounding box percentages 0-100 of the primary region or feature being analyzed; null if whole scene)
 - label: string (concise label for the detected region or scene assessment)
