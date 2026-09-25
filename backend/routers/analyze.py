@@ -187,20 +187,7 @@ async def analyze_master(req: AnalyzeRequest):
     from ..agents.planner import is_query_unsupported
     is_unsupported = is_query_unsupported(req.query)
 
-    # Fallback to default aerial imagery if no image provided (for single image demo/test)
-    if img1_bgr is None and not is_unsupported:
-        default_aerial_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "default_aerial.jpg")
-        if os.path.exists(default_aerial_path):
-            img1_bgr = cv2.imread(default_aerial_path)
-            if img1_bgr is not None:
-                meta1 = {
-                    "source": "default_aerial.jpg",
-                    "format": "jpeg",
-                    "dimensions": {"width": img1_bgr.shape[1], "height": img1_bgr.shape[0]},
-                    "channels": img1_bgr.shape[2] if len(img1_bgr.shape) > 2 else 1
-                }
-
-    images = [img for img in [img1_bgr, img2_bgr] if img is not None]
+    # Never substitute a bundled/demo image for missing user input.\n    # SIH evaluation must operate on the supplied observation(s).\n\n    images = [img for img in [img1_bgr, img2_bgr] if img is not None]
     metadata_list = [m for m in [meta1, meta2] if m]
 
     modalities = [req.modality or "optical"]
