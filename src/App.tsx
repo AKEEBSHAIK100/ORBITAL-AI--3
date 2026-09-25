@@ -1232,7 +1232,7 @@ export default function App() {
       setImageTelemetry(telemetry)
       setAnalysis(null); setHistory([]); setSuggestions(OFFICIAL_REPRESENTATIVE_QUERIES.map(q => q.query))
       setActiveOverlay(null); setActiveRegion(null); setRevealedLayers([])
-      setSessionId(crypto.randomUUID()); setSessionCallCount(0); setTemporalResult(null)
+      setSessionId(null); setSessionCallCount(0); setTemporalResult(null)
       setStatus('Image loaded · Ask a question')
       focusWorkspace()
       addToast(`Image loaded: ${file.name} (${(file.size/1024).toFixed(0)}KB)`, 'info')
@@ -1339,7 +1339,7 @@ export default function App() {
             task_type,
             image: imagePreview || undefined,
             history: history.map(h => ({ question: h.question, answer: h.answer })),
-            sessionId,
+            sessionId: activeSessionId || undefined,
           }
           const res = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -1370,10 +1370,9 @@ export default function App() {
             const errorMsg = typeof payload.detail === 'string'
               ? payload.detail
               : (payload.error || `Specialist analysis failed (HTTP ${res.status})`)
-            // The serverless API intentionally returns an honest unavailable response
-            // when no real specialist/VLM is configured. Keep that guard, but give the
-            // user a useful image-grounded browser baseline rather than a blank result.
-            if (imagePreview && specialistUnavailable) {
+            // Production integrity guard: an unavailable specialist remains unavailable.
+            // A browser RGB heuristic is only allowed when explicitly opted in for development.
+            if (import.meta.env.VITE_ALLOW_BROWSER_HEURISTIC === 'true' && imagePreview && specialistUnavailable) {
               try {
                 result = await clientVisualBaseline(prompt, imagePreview)
                 if (payload.execution_trace) result.execution_trace = payload.execution_trace
@@ -1421,10 +1420,14 @@ export default function App() {
         }
       }
 
-      const confPct = typeof result.confidence_percent === 'number'
+      // Never manufacture confidence from qualitative labels. Only a calibrated
+      // source may populate a numeric confidence value in the judge-facing UI.
+      const isCalibrated = result.confidence_status === 'calibrated'
+      const confPct = isCalibrated && typeof result.confidence_percent === 'number'
         ? Math.max(0, Math.min(100, Math.round(result.confidence_percent)))
-        : result.confidenceScore ?? (result.confidence === 'high' ? 95 : result.confidence === 'medium' ? 78 : 55)
-      result.confidence_percent = confPct; result.confidenceScore = confPct
+        : 0
+      result.confidence_percent = confPct
+      result.confidenceScore = confPct
 
       if (result.region && typeof result.region.x_percent === 'number') {
         setActiveRegion({ region: result.region, label: result.label || 'Analysis Target', confidence_percent: confPct })
@@ -1933,7 +1936,7 @@ export default function App() {
               onResetSession={() => {
                 setHistory([])
                 setSessionCallCount(0)
-                setSessionId(crypto.randomUUID())
+                setSessionId(null)
                 setAnalysis(null)
                 setActiveRegion(null)
                 setTemporalResult(null)
