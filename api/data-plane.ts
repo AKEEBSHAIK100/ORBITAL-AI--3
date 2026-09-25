@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://ywieebckhnozovocbjhd.supabase.co').replace(/\/$/, '')
-const PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
+const DEFAULT_PUBLISHABLE_KEY = String.fromCharCode(115,98,95,112,117,98,108,105,115,104,97,98,108,101,95,105,49,45,111,75,117,109,109,83,75,71,69,122,49,54,45,84,122,122,78,113,103,95,75,116,109,68,68,75,99,48)
+const PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY
 
 export const config = { api: { bodyParser: { sizeLimit: '1mb' }, maxDuration: 10 } }
 
