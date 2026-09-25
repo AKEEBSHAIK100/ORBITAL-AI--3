@@ -4,6 +4,7 @@
 
 export type TaskType =
   | 'vqa'
+  | 'land_cover'
   | 'caption'
   | 'grounding'
   | 'change_detection'
@@ -32,6 +33,18 @@ export interface ToolSpec {
 }
 
 export const TOOL_REGISTRY: Record<string, ToolSpec> = {
+  rs_land_cover: {
+    id: 'rs_land_cover',
+    name: 'BigEarthNet Land-Cover Classification Specialist',
+    description: '19-class BigEarthNet/Corine land-cover classification. On Vercel, uses the existing explicitly labeled heuristic fallback when the trained classifier is unavailable.',
+    supported_tasks: ['land_cover'],
+    modalities: ['optical', 'multispectral'],
+    adapter: 'BigEarthNet v2.0 Corine classifier / Vercel heuristic fallback',
+    domain_adaptation: 'BigEarthNet v2.0 land-cover taxonomy; production fallback is explicitly heuristic and not calibrated.',
+    model_id: 'BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0',
+    availability: 'available',
+    required_dataset: 'bigearthnet_v2',
+  },
   rs_vqa_adapted: {
     id: 'rs_vqa_adapted',
     name: 'Remote-Sensing Adapted Visual Question Answering Specialist',
@@ -336,6 +349,22 @@ export function classifyTask(
     return 'grounding'
   }
 
+  // 4. Land-cover classification
+  if (
+    q.includes('land cover') ||
+    q.includes('land-cover') ||
+    q.includes('type of land') ||
+    q.includes('kind of land') ||
+    q.includes('terrain type') ||
+    q.includes('type of terrain') ||
+    q.includes('classify land') ||
+    q.includes('land use') ||
+    q.includes('main land cover') ||
+    q.includes('what land is present')
+  ) {
+    return 'land_cover'
+  }
+
   // 4. Scene Captioning (VRSBench)
   if (
     q.includes('caption') ||
@@ -436,6 +465,10 @@ export function validateInputs(
       notes.push('Routing to YOLO building segmentation specialist with 512px sliding-window tiling.')
       break
 
+    case 'land_cover':
+      notes.push('Routing to BigEarthNet v2.0 Corine 19-class land-cover specialist; production fallback is explicitly heuristic when the trained classifier is unavailable.')
+      break
+
     case 'caption':
       notes.push('Routing to VRSBench Scene Captioning specialist with BigEarthNet multi-attribute taxonomy.')
       break
@@ -497,6 +530,8 @@ export function formatTaskLabel(task: TaskType): string {
       return 'YOLO Structural Footprint Audit'
     case 'change_detection':
       return 'Bi-Temporal Change Analysis (CDVQA)'
+    case 'land_cover':
+      return 'BigEarthNet Land-Cover Classification'
     case 'caption':
       return 'VRSBench Scene Captioning'
     case 'grounding':
