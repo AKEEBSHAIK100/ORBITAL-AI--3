@@ -154,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // This is NOT calibrated confidence and must not be presented as trained-model accuracy.
       let top = { short: 'Urban Fabric', score: 0.78 }
       try {
-        const sample = (imageData || '').replace(/^data:image\\/[^;]+;base64,/, '').slice(0, 3000)
+        const sample = (imageData || '').replace(/^data:image\/[^;]+;base64,/, '').slice(0, 3000)
         let rSum = 0, gSum = 0, bSum = 0, count = 0
         for (let i = 0; i < sample.length - 3; i += 4) {
           const byte = sample.charCodeAt(i) & 0xFF
