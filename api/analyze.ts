@@ -443,15 +443,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
       return res.status(200).json({ ...parsed, execution_trace: trace })
     } catch {
-      const fallback = buildUnavailableAnalysis(effectiveQuestion.trim(), resolvedImage)
+      const fallback = buildUnavailableAnalysis(taskType)
       traceSteps.push({
         step: 3,
-        tool: 'rs_vqa',
-        description: 'Telemetry fallback analysis with domain adaptation',
-        input_summary: 'Provider interruption fallback',
-        output_summary: 'Delivered reliable baseline telemetry',
-        duration_ms: Math.max(8, Date.now() - step2Start),
-        status: 'success',
+        tool: 'rs_provider_guard',
+        description: 'Provider interruption guard; no fabricated fallback analysis',
+        input_summary: 'Single optical observation',
+        output_summary: 'Provider failed and no substitute specialist was executed',
+        duration_ms: Math.max(1, Date.now() - step2Start),
+        status: 'unavailable',
+        confidence_source: 'none',
         parameters: { fallback: true },
       })
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
