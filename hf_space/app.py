@@ -94,8 +94,7 @@ def _unavailable(task: str, reason: str) -> dict:
     }
 
 
-@spaces.GPU(duration=120)
-def vqa(image: Any, question: str) -> dict:
+def _vqa_core(image: Any, question: str) -> dict:
     started = time.perf_counter()
     image = _image(image)
     question = (question or "").strip()
@@ -123,8 +122,7 @@ def vqa(image: Any, question: str) -> dict:
     }
 
 
-@spaces.GPU(duration=120)
-def caption(image: Any) -> dict:
+def _caption_core(image: Any) -> dict:
     started = time.perf_counter()
     image = _image(image)
     processor, model = _load_caption()
@@ -156,13 +154,23 @@ def analyze(image: Any, query: str) -> dict:
     q = query.lower()
 
     if any(k in q for k in ("describe", "caption", "scene description", "scene overview")):
-        result = caption(image)
+        result = _caption_core(image)
         result["routed_by"] = "worker_task_router"
         return result
 
-    result = vqa(image, query)
+    result = _vqa_core(image, query)
     result["routed_by"] = "worker_task_router"
     return result
+
+
+@spaces.GPU(duration=120)
+def vqa(image: Any, question: str) -> dict:
+    return _vqa_core(image, question)
+
+
+@spaces.GPU(duration=120)
+def caption(image: Any) -> dict:
+    return _caption_core(image)
 
 
 def _gray_array(value: Any) -> np.ndarray:
