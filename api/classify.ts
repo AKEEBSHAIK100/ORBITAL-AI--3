@@ -33,68 +33,9 @@ const BEN_CLASSES = [
   { name: 'Marine waters',                                                         short: 'Marine Waters' },
 ]
 
-// ── Heuristic pixel-based land-cover fallback ─────────────────────────────────
-function heuristicBENScores(imageBase64: string): Record<string, number> {
-  // Decode a small sample of the base64 string to estimate spectral content
-  try {
-    const sample = imageBase64.replace(/^data:image\/[^;]+;base64,/, '').slice(0, 3000)
-    let rSum = 0, gSum = 0, bSum = 0, count = 0
-    for (let i = 0; i < sample.length - 3; i += 4) {
-      const byte = sample.charCodeAt(i) & 0xFF
-      if (count % 3 === 0) rSum += byte
-      else if (count % 3 === 1) gSum += byte
-      else bSum += byte
-      count++
-    }
-    const r = rSum / (count / 3 + 1), g = gSum / (count / 3 + 1), b = bSum / (count / 3 + 1)
-    const scores: number[] = new Array(19).fill(0)
-    if (b > r * 1.1 && b > 50) {
-      // Water dominant
-      scores[17] = 0.82; scores[15] = 0.30; scores[16] = 0.22
-    } else if (g > r * 1.08 && g > 40) {
-      // Vegetation dominant
-      scores[8] = 0.74; scores[2] = 0.52; scores[4] = 0.40; scores[10] = 0.28
-    } else if (r > 120 && g > 90 && b < 90) {
-      // Arid
-      scores[11] = 0.68; scores[13] = 0.48; scores[14] = 0.35
-    } else {
-      // Urban
-      scores[0] = 0.78; scores[1] = 0.42; scores[2] = 0.18
-    }
-    return Object.fromEntries(scores.map((s, i) => [String(i), s]))
-  } catch {
-    const scores: Record<string, number> = {}
-    scores['0'] = 0.60 // Urban fabric fallback
-    return scores
-  }
-}
-
-function buildHeuristicResponse(imageBase64: string, topK: number, threshold: number) {
-  const rawScores = heuristicBENScores(imageBase64)
-  const labels = BEN_CLASSES.map((cls, i) => ({
-    name: cls.name,
-    short: cls.short,
-    score: rawScores[String(i)] ?? 0,
-    active: (rawScores[String(i)] ?? 0) >= threshold,
-  })).sort((a, b) => b.score - a.score)
-
-  const topLabels = labels.slice(0, topK)
-  const activeLabels = labels.filter(l => l.active).slice(0, topK)
-  const top = topLabels[0]
-
-  return {
-    labels: topLabels,
-    active_labels: activeLabels,
-    top_label: top?.short ?? 'Unknown',
-    confidence: Math.round((top?.score ?? 0) * 100 * 10) / 10,
-    model_id: 'heuristic-vercel-fallback',
-    available: false,
-    device: 'cpu',
-    note: 'Heuristic estimation — Python backend with configilm not available on Vercel.',
-    citation: '',
-  }
-}
-
+// Vercel serverless does not ship the trained BigEarthNet classifier weights.
+ // Never derive a land-cover prediction from encoded JPEG/base64 bytes.
+ 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS preflight
@@ -131,7 +72,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ── Heuristic fallback ────────────────────────────────────────────────────
-  const result = buildHeuristicResponse(image, topK, thresh)
-  return res.status(200).json(result)
+  return res.status(503).json({
+    labels: [],
+    active_labels: [],
+    top_label: null,
+    confidence: null,
+    model_id: null,
+    available: false,
+    device: null,
+    note: 'The trained BigEarthNet classifier is not available in the Vercel serverless runtime. No heuristic land-cover prediction is generated.',
+  })
 }
