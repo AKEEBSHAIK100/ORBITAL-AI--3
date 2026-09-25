@@ -36,15 +36,7 @@ from .validator import validate_input_imagery
 from .synthesizer import synthesize_response
 from .aggregator import build_observable_trace
 from ..tools.registry import get_tool
-try:
-    from models.registry import ModelRegistry
-except (ImportError, ModuleNotFoundError):
-    import sys
-    from pathlib import Path
-    _repo_root = str(Path(__file__).resolve().parents[2])
-    if _repo_root not in sys.path:
-        sys.path.insert(0, _repo_root)
-    from models.registry import ModelRegistry
+from ..models.registry import ModelRegistry
 
 
 def run_orbital_analysis(
