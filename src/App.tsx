@@ -11,6 +11,7 @@ import DocumentationModal from './components/DocumentationModal'
 import ContactModal from './components/ContactModal'
 import DashboardView from './components/DashboardView'
 import { ExecutionTrace, ExecutionTraceStep, FusionFeatures, classifyTask } from './lib/agentController'
+import { createAnalysisSession, recordAnalysisRun } from './lib/supabase'
 
 export const API_BASE = (() => {
   const envUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
@@ -1265,12 +1266,22 @@ export default function App() {
   const askQuestion = useCallback(async (preset?: string) => {
     const prompt = (preset ?? question).trim()
     if (!prompt || busy || atCap) return
+    let activeSessionId = sessionId
     setQuestion(''); setError(''); setBusy(true)
     const detectedLayer = detectHiddenLayer(prompt)
     if (detectedLayer) { setActiveOverlay(detectedLayer); setRevealedLayers(prev => Array.from(new Set([...prev, detectedLayer]))) }
 
     try {
       setStatus('Analyzing scene…')
+      if (!activeSessionId) {
+        try {
+          const session = await createAnalysisSession({ query: prompt, modality: appMode === 'single' ? 'optical' : appMode, taskType: classifyTask(prompt, 1, ['optical']) })
+          activeSessionId = session?.id || null
+          if (activeSessionId) setSessionId(activeSessionId)
+        } catch (sessionErr) {
+          console.warn('[Orbital-AI] Supabase session persistence unavailable:', sessionErr)
+        }
+      }
       let result: Analysis
 
       const lowerPrompt = prompt.toLowerCase()
@@ -1420,6 +1431,23 @@ export default function App() {
       } else setActiveRegion(null)
 
       setAnalysis(result)
+      if (activeSessionId) {
+        try {
+          await recordAnalysisRun({
+            sessionId: activeSessionId,
+            taskType: classifyTask(prompt, 1, ['optical']),
+            modelName: result.execution_trace?.steps?.find((step: any) => step?.tool)?.tool || null,
+            modelAdaptation: result.mode === 'synthetic_fallback' || result.is_synthetic ? 'not_applicable_or_synthetic' : null,
+            result,
+            executionTrace: result.execution_trace,
+            confidence: typeof result.confidence_percent === 'number' ? result.confidence_percent / 100 : null,
+            confidenceStatus: result.confidence_status || 'not_calibrated',
+            status: result.confidence_status === 'unavailable' ? 'unavailable' : 'completed',
+          })
+        } catch (persistErr) {
+          console.warn('[Orbital-AI] Supabase result persistence unavailable:', persistErr)
+        }
+      }
       setHistory(prev => [...prev, {
         question: prompt, answer: result.answer, confidence_percent: confPct, confidenceScore: confPct,
         confidence: result.confidence, confidence_status: result.confidence_status, confidence_reason: result.confidence_reason,
