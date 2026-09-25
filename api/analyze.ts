@@ -4,6 +4,7 @@ import {
   imageContent, incrementCallCounter, MODEL, parseDataUrl, setCachedImage, systemPrompt,
 } from './_lib.js'
 import { MAX_TOKENS_ANALYZE } from '../lib/constants.js'
+import { runWorkerVqaOrCaption } from './_hfWorker.js'
 import {
   classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep,
 } from '../lib/agentController.js'
@@ -180,6 +181,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: 'success',
       parameters: { compatibility: validation.compatibility },
     })
+
+    // Free Hugging Face ZeroGPU worker is the preferred no-cost remote specialist path
+    // when explicitly enabled. It executes the adapted BLIP VQA/caption worker without a paid API.
+    if (process.env.ENABLE_HF_RS_WORKER === 'true' && resolvedImage) {
+      try {
+        const workerResult = await runWorkerVqaOrCaption(resolvedImage, effectiveQuestion)
+        if (workerResult && typeof workerResult === 'object' && (workerResult as any).ok) {
+          const worker = workerResult as Record<string, any>
+          const workerTask = String(worker.task || taskType)
+          traceSteps.push({
+            step: 3,
+            tool: workerTask === 'caption' ? 'rs_caption_adapted' : 'rs_vqa_adapted',
+            description: 'Hugging Face ZeroGPU remote-sensing adapted specialist execution',
+            input_summary: 'Single optical observation',
+            output_summary: 'BigEarthNet-derived LoRA specialist returned a generated result',
+            duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
+            status: 'success',
+            confidence_source: 'none',
+            parameters: {
+              model: worker.model,
+              adapter: worker.adapter,
+              remote_sensing_adapted: true,
+              confidence_status: 'not_calibrated',
+            },
+          })
+          const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, workerTask === 'caption' ? 'rs_caption_adapted' : 'rs_vqa_adapted')
+          return res.status(200).json({
+            answer: String(worker.answer || ''),
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'none',
+            confidence_status: 'not_calibrated',
+            confidence_reason: 'Specialist executed successfully, but no calibrated confidence metric is available.',
+            detected_features: [],
+            suggested_followups: [],
+            label: workerTask === 'caption' ? 'Remote-Sensing Adapted Caption' : 'Remote-Sensing Adapted VQA',
+            mode: 'hf_zero_gpu_specialist',
+            is_synthetic: false,
+            data_limitation_note: 'Inference used the adapted BLIP specialist. Quantitative confidence was not calibrated.',
+            execution_trace: trace,
+          })
+        }
+      } catch (workerError: any) {
+        console.warn('[Orbital-AI] HF ZeroGPU worker unavailable:', workerError?.message || workerError)
+      }
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
     const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
