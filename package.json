@@ -42,5 +42,8 @@
   },
   "devDependencies": {
     "oxfmt": "^0.2.0"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
