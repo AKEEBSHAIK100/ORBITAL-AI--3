@@ -1306,25 +1306,27 @@ export default function App() {
           } else {
             result = {
               answer: 'Building detection unavailable for this scene. The specialist YOLO segmentation service did not return footprints.',
-              confidence: 'low',
-              confidence_percent: 15,
-              confidenceScore: 15,
+              confidence: 'unavailable',
+              confidence_percent: 0,
+              confidenceScore: 0,
+              confidence_status: 'unavailable',
               confidence_reason: 'Building detector service returned null or no valid footprints.',
-              detected_features: ['Footprint Audit Incomplete'],
+              detected_features: ['Footprint Audit Unavailable'],
               label: 'Building Audit Unavailable',
-              suggested_followups: ['Retry building audit with high-resolution imagery', 'Run general land-cover classification'],
+              suggested_followups: ['Retry building audit with high-resolution imagery', 'Use a supported high-resolution optical product'],
             }
           }
         } catch (bErr: any) {
           result = {
             answer: `Building footprint analysis failed: ${bErr?.message || 'Specialist model service unreachable.'}`,
-            confidence: 'low',
-            confidence_percent: 10,
-            confidenceScore: 10,
+            confidence: 'unavailable',
+            confidence_percent: 0,
+            confidenceScore: 0,
+            confidence_status: 'unavailable',
             confidence_reason: bErr?.message || 'Building detection model service failed.',
             detected_features: ['Model Service Unavailable'],
             label: 'Building Footprint Error',
-            suggested_followups: ['Verify backend service is running', 'Retry analysis'],
+            suggested_followups: ['Verify the specialist backend is running', 'Retry analysis'],
           }
         }
       } else if (import.meta.env.VITE_DEMO_MODE === 'true') {
