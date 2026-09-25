@@ -24,7 +24,7 @@ npm run dev:full
 | Variable | Required | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | ✅ | Anthropic/OpenAI-compatible API key |
-| `OPENAI_VISION_MODEL` | — | Defaults to `claude-3-5-sonnet-20241022` |
+| `OPENAI_VISION_MODEL` | — | Defaults to `gpt-5.6-luna` |
 | `OPENAI_API_BASE` | — | Custom base URL (Gemini, Groq, OpenRouter etc.) |
 | `API_PORT` | — | API port, default `8787` |
 | `FRONTEND_ORIGIN` | — | CORS origin for the API, default `http://localhost:5173` |
@@ -82,7 +82,7 @@ If `configured` is `false` or you get a billing error, fix the key **before** pr
   VITE_DEMO_MODE=true
   ```
   Vite hot-reloads — no restart needed for this env var.
-- Demo mode shows realistic mock responses with confidence scoring and follow-up questions — indistinguishable to a non-technical judge.
+- Demo mode shows clearly labeled mock responses for UI development only; it must not be presented as real specialist inference during judging.
 
 ### 5. Watch the deployment counter
 The server logs every API call:
