@@ -8,7 +8,7 @@ import {
   classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep,
 } from '../lib/agentController.js'
 
-export const config = { api: { bodyParser: { sizeLimit: '12mb' }, maxDuration: 30 } }
+export const config = { api: { bodyParser: { sizeLimit: '12mb' }, maxDuration: 60 } }
 
 // ─── Counting-question intent detection ───────────────────────────────────────
 const COUNT_KEYWORDS = [
@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             task_type: (req.body as Record<string, unknown>).task_type,
           }),
           // 10 s: leaves headroom for VLM fallback within Vercel's 30 s budget
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(45_000),
         })
         if (pyRes.ok) {
           const pyData = (await pyRes.json()) as Record<string, any>
