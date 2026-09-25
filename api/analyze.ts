@@ -149,6 +149,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
     const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
 
+    function buildUnavailableAnalysis(taskType: string) {
+      const taskLabel = taskType === 'land_cover'
+        ? 'land-cover classification'
+        : taskType === 'vegetation_analysis'
+          ? 'vegetation analysis'
+          : taskType === 'caption'
+            ? 'scene captioning'
+            : taskType === 'grounding'
+              ? 'spatial grounding'
+              : taskType === 'building_detection'
+                ? 'building detection'
+                : 'remote-sensing analysis'
+      return {
+        answer: `The requested ${taskLabel} is unavailable in this serverless deployment because no executable specialist or configured VLM provider is available. No unsupported spectral measurements, percentages, or confidence values are being estimated.`,
+        confidence: null,
+        confidence_percent: null,
+        confidenceScore: null,
+        confidence_source: 'none' as const,
+        confidence_reason: 'Analysis was not executed by an available specialist model or configured VLM provider.',
+        data_limitation_note: 'RGB/JPEG imagery does not provide multispectral or SAR measurements unless those bands and a corresponding computation are available.',
+        detected_features: [],
+        estimated_coverage_percent: null,
+        water_coverage_percent: null,
+        vegetation_percent: null,
+        count_estimate: null,
+        count_uncertainty_factors: [],
+        region: null,
+        label: 'Analysis unavailable',
+        suggested_followups: [
+          'Configure the production VLM provider and redeploy.',
+          'Use the adapted remote-sensing specialist through the Python backend.',
+          'Upload a supported multispectral or SAR product for sensor-specific analysis.',
+        ],
+      }
+    }
+
     function generateLandCoverAnalysis(imageData?: string | null) {
       // Keep the Vercel-only fallback aligned with /api/classify and explicitly heuristic.
       // This is NOT calibrated confidence and must not be presented as trained-model accuracy.
@@ -191,7 +227,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    function generateRealisticAnalysis(qText: string, imageData?: string | null) {
+    function buildUnavailableAnalysis(qText: string, imageData?: string | null) {
       const terrain = imageData ? detectImageTerrain(imageData) : 'urban'
       const q = qText.toLowerCase()
 
@@ -488,37 +524,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (isPlaceholderKey || (!resolvedImage && !sessionId && !image)) {
       incrementCallCounter()
-      const analysis = generateRealisticAnalysis(promptText, resolvedImage)
+      const analysis = buildUnavailableAnalysis(taskType)
       traceSteps.push({
         step: 3,
-        tool: 'rs_vqa',
-        description: 'Visual evidence extraction using BigEarthNet domain taxonomy',
-        input_summary: `Observation scene: ${analysis.label || 'Optical Area'}`,
-        output_summary: `Extracted ${analysis.detected_features?.length || 0} remote-sensing indicators with ${analysis.confidence} confidence`,
-        duration_ms: Math.max(8, Date.now() - step2Start),
-        status: 'success',
-        parameters: { confidence_percent: analysis.confidence_percent || 95 },
+        tool: 'rs_provider_guard',
+        description: 'Production provider/model availability guard',
+        input_summary: resolvedImage ? 'Single optical observation' : 'No usable image/provider',
+        output_summary: 'Specialist/VLM execution unavailable; no fabricated visual measurements returned',
+        duration_ms: Math.max(1, Date.now() - step2Start),
+        status: 'unavailable',
+        confidence_source: 'none',
+        parameters: { provider_configured: !isPlaceholderKey, image_available: Boolean(resolvedImage) },
       })
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
-      return res.status(200).json({ ...analysis, execution_trace: trace })
-    }
-
-    const effectiveQuestion = (question || promptText).trim()
-    if (taskType === 'land_cover') {
-      incrementCallCounter()
-      const analysis = generateLandCoverAnalysis(resolvedImage)
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_land_cover',
-        description: 'BigEarthNet 19-class land-cover classification with explicit Vercel heuristic fallback',
-        input_summary: 'Single optical observation',
-        output_summary: `Classified as ${analysis.label} (heuristic score; not calibrated confidence)`,
-        duration_ms: Math.max(1, Date.now() - step2Start),
-        status: 'success',
-        confidence_source: 'classical_cv_heuristic',
-        parameters: { heuristic_score: analysis.heuristic_score },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_land_cover')
       return res.status(200).json({ ...analysis, execution_trace: trace })
     }
 
@@ -572,7 +590,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (parsedResults.length === 0) {
           // All calls failed — fall back to demo
-          return res.status(200).json(generateRealisticAnalysis(effectiveQuestion.trim(), resolvedImage))
+          return res.status(200).json(buildUnavailableAnalysis(effectiveQuestion.trim(), resolvedImage))
         }
 
         // Take the first valid result as base for non-count fields
@@ -617,13 +635,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             confPercents.push(p.confidenceScore)
           }
         }
-        const mergedConf = confPercents.length > 0
-          ? median(confPercents)
-          : (merged.confidence === 'high' ? 88 : merged.confidence === 'medium' ? 80 : 72)
-        merged.confidence_percent = Math.max(0, Math.min(100, Math.round(mergedConf)))
-        merged.confidenceScore = merged.confidence_percent
-        if (!merged.confidence_reason) {
-          merged.confidence_reason = 'Self-assessed confidence based on grid sub-counting consistency and visual scene clarity.'
+        if (confPercents.length > 0) {
+          const mergedConf = median(confPercents)
+          merged.confidence_percent = Math.max(0, Math.min(100, Math.round(mergedConf)))
+          merged.confidenceScore = merged.confidence_percent
+        } else {
+          merged.confidence_percent = null
+          merged.confidenceScore = null
+          merged.confidence_reason = 'Confidence was not provided by the model; no calibrated confidence is available.'
         }
         if (typeof merged.building_count === 'number') {
           merged.building_count = Math.max(0, Math.round(merged.building_count as number))
@@ -684,7 +703,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
       return res.status(200).json({ ...parsed, execution_trace: trace })
     } catch {
-      const fallback = generateRealisticAnalysis(effectiveQuestion.trim(), resolvedImage)
+      const fallback = buildUnavailableAnalysis(effectiveQuestion.trim(), resolvedImage)
       traceSteps.push({
         step: 3,
         tool: 'rs_vqa',
@@ -701,24 +720,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch {
     const fallbackTrace = buildExecutionTrace('vqa', traceSteps, Date.now() - startTime, validateInputs('vqa', 1), 'rs_vqa')
     return res.status(200).json({
-      answer: "Land classification indicates 67% urban development, 24.6% mixed vegetative cover, and 8.2% hydrological coverage with stable environmental margins.",
-      confidence: null,
-      confidence_percent: null,
-      confidenceScore: null,
-      confidence_source: 'heuristic',
-      confidence_reason: 'Fallback baseline scene classification without calibrated confidence score.',
-      region: { x_percent: 10, y_percent: 10, w_percent: 60, h_percent: 55 },
-      count_estimate: null,
-      count_uncertainty_factors: [],
-      detected_features: ['Urban Grid', 'Vegetation', 'Water Body'],
-      label: 'Scene Assessment',
-      suggested_followups: [
-        'Is this field healthy?',
-        'Are crops ready to harvest?',
-        'Any signs of drought stress?',
-        'Has flooding reached these buildings?',
-        'What is the land use here?'
-      ],
+      ...buildUnavailableAnalysis('vqa'),
       execution_trace: fallbackTrace,
     })
   }
