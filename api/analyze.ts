@@ -206,20 +206,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const effectiveQuestion = (question || promptText).trim()
 
-    // Land-cover is a deterministic specialist route and must run before the provider guard.
+    // Vercel does not contain the trained BigEarthNet specialist weights.
+    // Never fabricate a land-cover label or score from JPEG bytes.
     if (taskType === 'land_cover') {
       incrementCallCounter()
-      const analysis = generateLandCoverAnalysis(resolvedImage)
+      const analysis = buildUnavailableAnalysis(taskType)
       traceSteps.push({
         step: 3,
         tool: 'rs_land_cover',
-        description: 'BigEarthNet 19-class land-cover classification with explicit Vercel heuristic fallback',
+        description: 'BigEarthNet specialist availability guard',
         input_summary: 'Single optical observation',
-        output_summary: `Classified as ${analysis.label} (heuristic score; not calibrated confidence)`,
+        output_summary: 'Trained land-cover specialist unavailable in this serverless runtime; no heuristic label generated',
         duration_ms: Math.max(1, Date.now() - step2Start),
-        status: 'success',
-        confidence_source: 'classical_cv_heuristic',
-        parameters: { heuristic_score: analysis.heuristic_score },
+        status: 'unavailable',
+        confidence_source: 'none',
+        parameters: { specialist_available: false },
       })
       const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_land_cover')
       return res.status(200).json({ ...analysis, execution_trace: trace })
