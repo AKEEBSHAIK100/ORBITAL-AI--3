@@ -392,17 +392,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parsed.count_estimate = null
       parsed.count_uncertainty_factors = []
 
+      const vlmToolId = 'rs_vlm_fallback'
       traceSteps.push({
         step: 3,
-        tool: 'rs_vqa',
-        description: 'VLM inference with BigEarthNet domain adaptation',
+        tool: vlmToolId,
+        description: 'Configured general VLM inference used as explicit unadapted fallback',
         input_summary: 'Single optical observation',
-        output_summary: `Model returned ${parsed.confidence || 'high'} confidence (${parsed.confidence_percent}%)`,
+        output_summary: `Model returned a response; calibrated confidence is unavailable (${parsed.confidence_percent ?? 'null'})`,
         duration_ms: Math.max(15, Date.now() - step2Start),
         status: 'success',
-        parameters: { model: MODEL },
+        confidence_source: 'none',
+        parameters: { model: MODEL, remote_sensing_adapted: false, fallback: true },
       })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
+      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, vlmToolId)
       return res.status(200).json({ ...parsed, execution_trace: trace })
     } catch {
       const fallback = buildUnavailableAnalysis(taskType)
