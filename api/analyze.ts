@@ -185,47 +185,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    function generateLandCoverAnalysis(imageData?: string | null) {
-      // Keep the Vercel-only fallback aligned with /api/classify and explicitly heuristic.
-      // This is NOT calibrated confidence and must not be presented as trained-model accuracy.
-      let top = { short: 'Urban Fabric', score: 0.78 }
-      try {
-        const sample = (imageData || '').replace(/^data:image\/[^;]+;base64,/, '').slice(0, 3000)
-        let rSum = 0, gSum = 0, bSum = 0, count = 0
-        for (let i = 0; i < sample.length - 3; i += 4) {
-          const byte = sample.charCodeAt(i) & 0xFF
-          if (count % 3 === 0) rSum += byte
-          else if (count % 3 === 1) gSum += byte
-          else bSum += byte
-          count++
-        }
-        const denom = count / 3 + 1
-        const r = rSum / denom, g = gSum / denom, b = bSum / denom
-        if (b > r * 1.1 && b > 50) top = { short: 'Inland Waters', score: 0.82 }
-        else if (g > r * 1.08 && g > 40) top = { short: 'Broad-Leaved Forest', score: 0.74 }
-        else if (r > 120 && g > 90 && b < 90) top = { short: 'Natural Grassland', score: 0.68 }
-      } catch {
-        // Keep deterministic Urban Fabric fallback.
-      }
-      return {
-        answer: `Land-cover classification: ${top.short}. The displayed ${Math.round(top.score * 100)}% value is a heuristic score, not calibrated confidence.`,
-        confidence: null,
-        confidence_percent: null,
-        confidenceScore: null,
-        confidence_source: 'heuristic' as const,
-        confidence_reason: 'Vercel fallback uses a deterministic heuristic because the trained BigEarthNet classifier is not available in the serverless runtime.',
-        detected_features: [top.short],
-        label: top.short,
-        heuristic_score: Math.round(top.score * 100),
-        count_estimate: null,
-        count_uncertainty_factors: [],
-        suggested_followups: [
-          'Describe this image.',
-          'Is there vegetation in this image?',
-          'Are there buildings in this image?',
-        ],
-      }
-    }
+    // Vercel serverless does not have the trained BigEarthNet classifier.
+    // Never synthesize a land-cover label from encoded JPEG bytes: that is not
+    // a valid image-analysis signal. Use the configured VLM or Python specialist,
+    // otherwise return an honest unavailable result.
 
         // Image resolution: always use client's image if provided, or retrieve cached image
     let resolvedImage: string | null = null
