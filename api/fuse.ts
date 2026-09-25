@@ -8,6 +8,7 @@ import {
   classifyTask, validateInputs, buildExecutionTrace,
   type ExecutionTraceStep, type FusionFeatures,
 } from '../lib/agentController.js'
+import { runWorkerFusion } from './_hfWorker.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -85,6 +86,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: 'success',
       parameters: { compatibility: validation.compatibility },
     })
+
+    // Free Hugging Face ZeroGPU worker executes the explicitly-labelled optical-SAR baseline.
+    if (process.env.ENABLE_HF_RS_WORKER === 'true' && opticalImage && sarImage) {
+      try {
+        const worker = await runWorkerFusion(opticalImage, sarImage) as Record<string, any>
+        if (worker?.ok) {
+          traceSteps.push({
+            step: 3,
+            tool: 'optical_sar_classical',
+            description: 'Hugging Face worker classical optical-SAR joint telemetry',
+            input_summary: 'Optical + SAR image pair',
+            output_summary: `Optical mean ${worker.optical_mean_intensity}; SAR mean ${worker.sar_mean_intensity}`,
+            duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
+            status: 'success',
+            confidence_source: 'none',
+            parameters: { method: worker.method, geospatial_compatibility: worker.geospatial_compatibility },
+          })
+          const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'optical_sar_classical')
+          return res.status(200).json({
+            answer: 'The optical-SAR classical baseline executed successfully. It produced joint image-intensity telemetry, but it does not claim radiometric calibration, pixel co-registration, or neural fusion from imagery alone.',
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'none',
+            confidence_status: 'not_calibrated',
+            detected_features: [],
+            estimated_coverage_percent: null,
+            water_coverage_percent: null,
+            vegetation_percent: null,
+            data_limitation_note: worker.note,
+            region: null,
+            label: 'Optical-SAR Classical Baseline',
+            suggested_followups: ['Provide CRS and geotransform metadata for compatibility verification.', 'Use a radiometrically calibrated SAR product for physical backscatter interpretation.'],
+            fusion_features: worker,
+            execution_trace: trace,
+          })
+        }
+      } catch (workerError: any) {
+        console.warn('[Orbital-AI] HF ZeroGPU optical-SAR worker unavailable:', workerError?.message || workerError)
+      }
+    }
 
     // 3. Step 3: Classical-CV Feature Extraction
     const step3Start = Date.now()
