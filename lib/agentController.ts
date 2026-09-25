@@ -33,6 +33,17 @@ export interface ToolSpec {
 }
 
 export const TOOL_REGISTRY: Record<string, ToolSpec> = {
+  rs_vlm_fallback: {
+    id: 'rs_vlm_fallback',
+    name: 'Configured General Vision-Language Fallback',
+    description: 'General vision-language model used only when a task-specific remote-sensing specialist is unavailable. It is not treated as remote-sensing adapted.',
+    supported_tasks: ['vqa', 'land_cover', 'caption', 'grounding', 'vegetation_analysis', 'flood_assessment', 'unknown'],
+    modalities: ['optical', 'multispectral', 'sar'],
+    adapter: 'None — unadapted foundation VLM',
+    domain_adaptation: 'None. Explicit fallback only; no remote-sensing adaptation claim.',
+    model_id: 'configured-production-vlm',
+    availability: 'available',
+  },
   rs_land_cover: {
     id: 'rs_land_cover',
     name: 'BigEarthNet Land-Cover Classification Specialist',
