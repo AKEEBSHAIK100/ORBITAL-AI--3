@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { client, classifyError, cleanJson, imageContent, incrementCallCounter, MODEL, parseDataUrl, systemPrompt } from './_lib.js'
 import { MAX_TOKENS_COMPARE } from '../lib/constants.js'
 import { classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep } from '../lib/agentController.js'
+import { runWorkerChange } from './_hfWorker.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' }, maxDuration: 60 } }
 
@@ -74,6 +75,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       } catch {
         console.warn('[Orbital-AI] Python change backend unavailable; continuing without fabricated fallback.')
+      }
+    }
+
+    // Free Hugging Face ZeroGPU worker provides the classical change baseline when enabled.
+    if (process.env.ENABLE_HF_RS_WORKER === 'true') {
+      try {
+        const worker = await runWorkerChange(beforeImage, afterImage) as Record<string, any>
+        if (worker?.ok) {
+          traceSteps.push({
+            step: 3,
+            tool: 'change_detection_classical',
+            description: 'Hugging Face worker classical bi-temporal change baseline',
+            input_summary: 'Two temporal optical observations',
+            output_summary: `Changed fraction: ${worker.change_fraction_percent ?? 'n/a'}%`,
+            duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
+            status: 'success',
+            confidence_source: 'none',
+            parameters: { method: worker.method, geospatial_compatibility: worker.geospatial_compatibility },
+          })
+          const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'change_detection_classical')
+          return res.status(200).json({
+            answer: `Classical bi-temporal change baseline detected ${worker.change_fraction_percent ?? 'an unquantified amount'}% of pixels above the configured intensity-difference threshold.`,
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'none',
+            confidence_status: 'not_calibrated',
+            change_regions: [],
+            alignment_confidence: null,
+            label: 'Classical Change Baseline',
+            data_limitation_note: worker.note,
+            change_baseline: worker,
+            execution_trace: trace,
+          })
+        }
+      } catch (workerError: any) {
+        console.warn('[Orbital-AI] HF ZeroGPU change worker unavailable:', workerError?.message || workerError)
       }
     }
 
