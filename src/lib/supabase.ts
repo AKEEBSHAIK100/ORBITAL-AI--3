@@ -1,11 +1,10 @@
 type SupabaseConfig = { url: string; publishableKey: string }
 
 const DEFAULT_URL = 'https://ywieebckhnozovocbjhd.supabase.co'
-const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_i1-oKummSKGEz16-TzzNqg_KtmDDKc0'
 
 function getConfig(): SupabaseConfig | null {
   const url = String(import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL).replace(/\/$/, '')
-  const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY)
+  const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '')
   return url && publishableKey ? { url, publishableKey } : null
 }
 
@@ -13,13 +12,21 @@ export function isSupabaseConfigured(): boolean {
   return getConfig() !== null
 }
 
-async function request(path: string, init: RequestInit = {}) {
+async function dataPlaneRequest(body: Record<string, unknown>) {
   const config = getConfig()
-  if (!config) throw new Error('Supabase is not configured.')
-  const headers = new Headers(init.headers)
-  headers.set('apikey', config.publishableKey)
-  headers.set('Content-Type', 'application/json')
-  return fetch(`${config.url}/rest/v1/${path}`, { ...init, headers })
+  if (!config) throw new Error('Supabase publishable key is not configured for this deployment.')
+
+  const response = await fetch('/api/data-plane', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(String(payload?.error || `Supabase data-plane request failed: ${response.status}`))
+  }
+  return payload
 }
 
 export async function createAnalysisSession(input: {
@@ -28,32 +35,14 @@ export async function createAnalysisSession(input: {
   taskType: string
   userId?: string | null
 }) {
-  const response = await request('analysis_sessions', {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
+  return dataPlaneRequest({
+    action: 'create_session',
+    session: {
       query: input.query,
       modality: input.modality,
       task_type: input.taskType,
-      user_id: input.userId ?? null,
-      status: 'created',
-    }),
+    },
   })
-  if (!response.ok) throw new Error(`Supabase session creation failed: ${response.status}`)
-  const rows = await response.json()
-  return rows[0]
-}
-
-export async function updateAnalysisSession(sessionId: string, patch: {
-  status?: string
-  updated_at?: string
-}) {
-  const response = await request(`analysis_sessions?id=eq.${encodeURIComponent(sessionId)}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify(patch),
-  })
-  if (!response.ok) throw new Error(`Supabase session update failed: ${response.status}`)
 }
 
 export async function recordAnalysisRun(input: {
@@ -67,28 +56,18 @@ export async function recordAnalysisRun(input: {
   confidenceStatus?: string
   status?: string
 }) {
-  const response = await request('analysis_runs', {
-    method: 'POST',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
+  return dataPlaneRequest({
+    action: 'record_run',
+    run: {
       session_id: input.sessionId,
       task_type: input.taskType,
       model_name: input.modelName ?? null,
       model_adaptation: input.modelAdaptation ?? null,
       result: input.result ?? {},
-      evidence: [],
       execution_trace: input.executionTrace ?? [],
       confidence: input.confidence ?? null,
       confidence_status: input.confidenceStatus ?? 'not_calibrated',
       status: input.status ?? 'completed',
-      completed_at: new Date().toISOString(),
-    }),
+    },
   })
-  if (!response.ok) throw new Error(`Supabase run persistence failed: ${response.status}`)
-}
-
-export async function getAnalysisRuns(sessionId: string) {
-  const response = await request(`analysis_runs?session_id=eq.${encodeURIComponent(sessionId)}&order=created_at.desc`)
-  if (!response.ok) throw new Error(`Supabase run lookup failed: ${response.status}`)
-  return response.json()
 }
