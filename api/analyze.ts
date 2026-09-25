@@ -206,24 +206,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const effectiveQuestion = (question || promptText).trim()
 
-    // Vercel does not contain the trained BigEarthNet specialist weights.
-    // Never fabricate a land-cover label or score from JPEG bytes.
-    if (taskType === 'land_cover') {
-      incrementCallCounter()
-      const analysis = buildUnavailableAnalysis(taskType)
+    // The adapted BigEarthNet specialist runs through the Python backend when
+    // PYTHON_BACKEND_URL is configured above. If that backend is unavailable, allow
+    // the configured VLM provider to serve as an explicitly unadapted fallback rather
+    // than hard-stopping land-cover queries. The UI labels this path as VLM fallback.
+    if (taskType === 'land_cover' && !isPlaceholderKey && resolvedImage) {
       traceSteps.push({
         step: 3,
         tool: 'rs_land_cover',
-        description: 'BigEarthNet specialist availability guard',
+        description: 'BigEarthNet specialist requested; Python specialist unavailable, falling back to configured VLM',
         input_summary: 'Single optical observation',
-        output_summary: 'Trained land-cover specialist unavailable in this serverless runtime; no heuristic label generated',
+        output_summary: 'Adapted specialist unavailable in this runtime; configured VLM fallback permitted without specialist confidence claim',
         duration_ms: Math.max(1, Date.now() - step2Start),
         status: 'unavailable',
         confidence_source: 'none',
-        parameters: { specialist_available: false },
+        parameters: { specialist_available: false, vlm_fallback: true },
       })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_land_cover')
-      return res.status(200).json({ ...analysis, execution_trace: trace })
     }
 
     if (isPlaceholderKey || (!resolvedImage && !sessionId && !image)) {
