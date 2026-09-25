@@ -997,60 +997,20 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: dataUrl, top_k: 8, threshold: 0.2 }),
       })
-      if (res.ok) {
-        const data = await res.json()
-        setBenResults(data)
-      } else throw new Error('classify endpoint unavailable')
-    } catch {
-      // Heuristic demo fallback based on telemetry
-      const telem = imageTelemetryCache.get(dataUrl)
-      const terrain = telem?.terrain ?? 'urban'
-      const demos: Record<string, BENLabelScore[]> = {
-        urban: [
-          { name: 'Urban fabric', short: 'Urban Fabric', score: 0.84, active: true },
-          { name: 'Industrial or commercial units', short: 'Industrial/Commercial', score: 0.43, active: true },
-          { name: 'Arable land', short: 'Arable Land', score: 0.12, active: false },
-          { name: 'Broad-leaved forest', short: 'Broad-Leaved Forest', score: 0.08, active: false },
-          { name: 'Inland waters', short: 'Inland Waters', score: 0.06, active: false },
-        ],
-        water: [
-          { name: 'Inland waters', short: 'Inland Waters', score: 0.90, active: true },
-          { name: 'Coastal wetlands', short: 'Coastal Wetlands', score: 0.41, active: true },
-          { name: 'Inland wetlands', short: 'Inland Wetlands', score: 0.22, active: false },
-          { name: 'Urban fabric', short: 'Urban Fabric', score: 0.08, active: false },
-        ],
-        vegetation: [
-          { name: 'Broad-leaved forest', short: 'Broad-Leaved Forest', score: 0.78, active: true },
-          { name: 'Arable land', short: 'Arable Land', score: 0.55, active: true },
-          { name: 'Pastures', short: 'Pastures', score: 0.42, active: true },
-          { name: 'Mixed forest', short: 'Mixed Forest', score: 0.28, active: true },
-          { name: 'Urban fabric', short: 'Urban Fabric', score: 0.10, active: false },
-        ],
-        arid: [
-          { name: 'Natural grassland and sparsely vegetated areas', short: 'Natural Grassland', score: 0.72, active: true },
-          { name: 'Beaches, dunes, sands', short: 'Beaches & Dunes', score: 0.54, active: true },
-          { name: 'Transitional woodland/shrub', short: 'Transitional Woodland', score: 0.31, active: true },
-          { name: 'Moors, heathland', short: 'Moors & Heathland', score: 0.18, active: false },
-        ],
+      if (!res.ok) throw new Error('trained BigEarthNet specialist unavailable')
+      const data = await res.json()
+      if (!data?.available || !data?.top_label) {
+        setBenResults(null)
+        return
       }
-      const labels = demos[terrain] ?? demos.urban
-      const topLabel = labels[0]
-      setBenResults({
-        labels, active_labels: labels.filter(l => l.active),
-        top_label: topLabel.short,
-        confidence: topLabel.score * 100,
-        model_id: 'heuristic-fallback',
-        available: false,
-        device: 'cpu',
-        note: 'Heuristic estimation (backend classifier unavailable)',
-        citation: '',
-        mode: 'synthetic_fallback',
-      })
+      setBenResults(data)
+    } catch {
+      // Never fabricate a land-cover result when the trained specialist is unavailable.
+      setBenResults(null)
     } finally {
       setClassifyingBEN(false)
     }
   }, [])
-
   // ── Building detection ─────────────────────────────────────────────────────
   const runBuildingDetection = useCallback(async (fileOverride?: File) => {
     setIsDetectingBuildings(true)
