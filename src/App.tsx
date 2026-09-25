@@ -1513,7 +1513,7 @@ export default function App() {
         const data = await res.json()
         if (data.answer) {
           compAnswer = data.answer
-          confScore = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (data.confidenceScore ?? 96)
+          confScore = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidenceScore === 'number' ? data.confidenceScore : 0)
           confStatus = data.confidence_status || 'not_calibrated'
           if (data.detected_features?.length) features = data.detected_features
           if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
@@ -1527,7 +1527,7 @@ export default function App() {
         if (legacyRes.ok) {
           const data = await legacyRes.json()
           if (data.answer) {
-            compAnswer = data.answer; confScore = data.confidenceScore ?? 96
+            compAnswer = data.answer; confScore = typeof data.confidenceScore === 'number' ? data.confidenceScore : 0
             confStatus = data.confidence_status || 'not_calibrated'
             if (data.detected_features?.length) features = data.detected_features
             if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
@@ -1581,7 +1581,7 @@ export default function App() {
       if (res.ok && data.answer) {
         if (data.fusion_features) setFusionFeatures(data.fusion_features)
         if (data.execution_trace) { setLastFusionTrace(data.execution_trace); setActiveTrace(data.execution_trace) }
-        const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : 94)
+        const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : 0)
         setHistory(prev => [...prev, {
           question: fusionQuery, answer: data.answer, confidence_percent: confVal, confidenceScore: confVal,
           confidence: data.confidence_level ? data.confidence_level.toLowerCase() : (data.confidence || 'high'),
