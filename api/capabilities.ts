@@ -5,6 +5,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const pythonBackendConfigured = Boolean(process.env.PYTHON_BACKEND_URL?.trim())
   const supabaseConfigured = Boolean(process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim())
+  const hfWorkerConfigured = process.env.ENABLE_HF_RS_WORKER === 'true'
   const providerConfigured = Boolean(
     (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('your-key')) ||
     (process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('your-key'))
@@ -45,7 +46,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     runtime: {
       python_backend_configured: pythonBackendConfigured,
       supabase_data_plane_configured: supabaseConfigured,
+      free_remote_worker: hfWorkerConfigured ? 'Hugging Face ZeroGPU worker enabled' : 'not enabled',
       vision_provider_configured: providerConfigured,
+      free_hf_zero_gpu_worker_configured: hfWorkerConfigured,
       note: pythonBackendConfigured
         ? 'Python remote-sensing backend is configured for production routing.'
         : 'Python remote-sensing backend is not configured in this Vercel deployment; specialist execution is unavailable here.',
