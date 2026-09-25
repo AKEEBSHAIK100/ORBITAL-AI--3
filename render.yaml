@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: orbital-ai-rs-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: LAZY_MODEL_WARMUP
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: CORS_ORIGINS
+        value: "https://orbital-ai1.vercel.app"
