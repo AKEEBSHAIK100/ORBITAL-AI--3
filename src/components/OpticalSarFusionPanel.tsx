@@ -28,8 +28,8 @@ export default function OpticalSarFusionPanel({
 }: Props) {
   const [opticalImage, setOpticalImage] = useState<string | null>(null)
   const [sarImage, setSarImage] = useState<string | null>(null)
-  const [opticalLabel, setOpticalLabel] = useState<string>('Cartosat-2S (Optical RGB)')
-  const [sarLabel, setSarLabel] = useState<string>('RISAT-1A / Sentinel-1 (C-Band SAR)')
+  const [opticalLabel, setOpticalLabel] = useState<string>('Optical observation')
+  const [sarLabel, setSarLabel] = useState<string>('SAR observation')
   const [customQuery, setCustomQuery] = useState<string>('In simple language, what does each image show, and what additional information does the SAR image provide?')
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -142,9 +142,9 @@ export default function OpticalSarFusionPanel({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: CYN }}>
-                MODALITY 1: OPTICAL / MULTI-SPECTRAL
+                MODALITY 1: OPTICAL IMAGE
               </span>
-              <span className="text-[10px] font-mono text-white/50">Optical / multispectral</span>
+              <span className="text-[10px] font-mono text-white/50">Optical / visual</span>
             </div>
 
             {opticalImage ? (
@@ -165,10 +165,10 @@ export default function OpticalSarFusionPanel({
                   <circle cx="12" cy="13" r="4" />
                 </svg>
                 <span className="text-xs font-mono font-semibold" style={{ color: WHT }}>
-                  Upload Optical RGB / Multi-spectral
+                  Upload Optical Image
                 </span>
                 <span className="text-[10px] font-mono text-white/40 mt-0.5">
-                  GeoTIFF, TIFF, JPEG, PNG (Max 15MB)
+                  JPEG, PNG, WEBP (Max 15MB)
                 </span>
               </div>
             )}
@@ -184,7 +184,7 @@ export default function OpticalSarFusionPanel({
             <input
               ref={optInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={e => handleFileUpload(e, false)}
             />
@@ -202,7 +202,7 @@ export default function OpticalSarFusionPanel({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: MNT }}>
-                MODALITY 2: SYNTHETIC APERTURE RADAR (SAR)
+                MODALITY 2: SYNTHETIC APERTURE RADAR
               </span>
               <span className="text-[10px] font-mono text-white/50">SAR backscatter</span>
             </div>
@@ -227,10 +227,10 @@ export default function OpticalSarFusionPanel({
                   <line x1="12" y1="14" x2="12" y2="22" />
                 </svg>
                 <span className="text-xs font-mono font-semibold" style={{ color: WHT }}>
-                  Upload Co-Registered SAR Observation
+                  Upload SAR Observation
                 </span>
                 <span className="text-[10px] font-mono text-white/40 mt-0.5">
-                  Backscatter Intensity / GeoTIFF / TIFF
+                  JPEG, PNG, WEBP visual SAR export
                 </span>
               </div>
             )}
