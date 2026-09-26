@@ -312,13 +312,14 @@ def synthesize_response(
             g_targets = ground_ev.evidence.get("targets", [])
             g_regions = ground_ev.evidence.get("regions", [])
             if len(g_targets) > 1:
-                t_parts = [f"{t.get('label')}: {t.get('count', 0)} region(s)" for t in g_targets if t.get("status") == "success"]
+                t_parts = [f"{t.get('label')}: {t.get('count')} region(s)" for t in g_targets if t.get("status") == "success" and t.get("count") is not None]
                 parts.append(f"Spatial demarcation: {'; '.join(t_parts)}.")
             elif g_regions:
                 top_r = ground_ev.evidence.get("primary_region") or g_regions[0].get("region", {})
-                loc_s = f"X: {top_r.get('x_percent', 0)}%, Y: {top_r.get('y_percent', 0)}%"
-                g_target = ground_ev.evidence.get("target") or "target feature"
-                parts.append(f"Spatial demarcation: localized {g_target} (primary at [{loc_s}]).")
+                loc_s = f"X: {top_r.get('x_percent')}%, Y: {top_r.get('y_percent')}%"
+                g_target = ground_ev.evidence.get("target")
+                if g_target and top_r.get("x_percent") is not None and top_r.get("y_percent") is not None:
+                    parts.append(f"Spatial demarcation: localized {g_target} (primary at [{loc_s}]).")
 
         if fusion_ev:
             # Check optical-only vegetation proxy evidence
