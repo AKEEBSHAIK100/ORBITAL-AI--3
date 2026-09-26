@@ -119,5 +119,37 @@ class TestSynthesisIntegrity(unittest.TestCase):
         self.assertIsNone(conf)
 
 
+    def test_building_change_does_not_claim_new_additions_without_pairwise_evidence(self):
+        ev = SpecialistEvidenceObject(
+            task="change_detection",
+            result="",
+            evidence={"change_percentage": 12.0},
+            source="change_detection",
+            model="classical-cv-change",
+            confidence=None,
+            confidence_status="not_calibrated",
+        )
+        bldg = SpecialistEvidenceObject(
+            task="building_detection",
+            result="",
+            evidence={"building_count": 14},
+            source="building_detection",
+            model="building-model",
+            confidence=None,
+            confidence_status="not_calibrated",
+        )
+        ans, conf, status, _ = synthesize_response(
+            "Are there new buildings?",
+            self.plan("change_detection", ["change_detection", "building_detection"]),
+            [ev, bldg],
+            {"compatibility": "compatible"},
+            status="SUCCESS",
+        )
+        self.assertEqual(status, "not_calibrated")
+        self.assertIsNone(conf)
+        self.assertIn("does not by itself establish", ans.lower())
+        self.assertNotIn("new structural additions are identified", ans.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
