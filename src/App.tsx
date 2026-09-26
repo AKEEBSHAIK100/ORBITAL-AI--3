@@ -301,7 +301,7 @@ function ConfidenceBadge({
             </div>
             <div>
               {isCalibrated
-                ? 'Empirically calibrated confidence score verified against ground truth error bounds.'
+                ? 'Only displayed when a specialist explicitly reports calibrated confidence backed by empirical validation.'
                 : isUnavailable
                 ? 'Specialist model service is currently offline or unreachable.'
                 : 'Raw model prediction score/probability. Empirical error-rate calibration pending.'}
@@ -990,8 +990,8 @@ export default function App() {
             result = {
               answer: 'Building detection unavailable for this scene. The specialist YOLO segmentation service did not return footprints.',
               confidence: 'unavailable',
-              confidence_percent: 0,
-              confidenceScore: 0,
+              confidence_percent: null,
+              confidenceScore: null,
               confidence_status: 'unavailable',
               confidence_reason: 'Building detector service returned null or no valid footprints.',
               detected_features: ['Footprint Audit Unavailable'],
@@ -1003,8 +1003,8 @@ export default function App() {
           result = {
             answer: `Building footprint analysis failed: ${bErr?.message || 'Specialist model service unreachable.'}`,
             confidence: 'unavailable',
-            confidence_percent: 0,
-            confidenceScore: 0,
+            confidence_percent: null,
+            confidenceScore: null,
             confidence_status: 'unavailable',
             confidence_reason: bErr?.message || 'Building detection model service failed.',
             detected_features: ['Model Service Unavailable'],
@@ -1057,8 +1057,8 @@ export default function App() {
             result = {
                 answer: `Remote sensing analysis unavailable: ${errorMsg}`,
                 confidence: 'low',
-                confidence_percent: 0,
-                confidenceScore: 0,
+                confidence_percent: null,
+                confidenceScore: null,
                 confidence_status: 'unavailable',
                 confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
                 detected_features: ['Analysis Unavailable'],
@@ -1071,8 +1071,8 @@ export default function App() {
           result = {
             answer: `Analysis unavailable: could not contact specialist analysis service (${fetchErr?.message || 'Network error'}).`,
             confidence: 'low',
-            confidence_percent: 0,
-            confidenceScore: 0,
+            confidence_percent: null,
+            confidenceScore: null,
             confidence_status: 'unavailable',
             confidence_reason: fetchErr?.message || 'Network connection to analysis API failed.',
             detected_features: ['Service Unreachable'],
