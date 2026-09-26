@@ -89,13 +89,13 @@ class BigEarthNetTool(BaseTool):
 
         result = {
             "status": "success",
-            "top_label": res.get("top_label", "Urban fabric"),
-            "confidence": res.get("confidence", 85.0),
+            "top_label": res.get("top_label"),
+            "confidence": res.get("confidence"),
             "labels": res.get("labels", []),
             "active_labels": res.get("active_labels", []),
             "model_id": self.model_id,
             "duration_ms": round(duration_ms, 2),
-            "citation": res.get("citation", "BIFOLD BigEarthNet v2.0"),
+            "citation": res.get("citation"),
             "cache_hit": False,
         }
         result_cache.set(cache_key, result)
