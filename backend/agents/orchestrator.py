@@ -489,9 +489,9 @@ def run_orbital_analysis(
                 medium_confidence_count=res.get("medium_confidence_count", 0),
                 low_confidence_count=res.get("low_confidence_count", 0),
                 partial_count=res.get("partial_count", 0),
-                confidence=res.get("confidence", 0.85),
-                confidence_level=res.get("confidence_level", "High"),
-                validation_status=res.get("validation_status", "Tiled YOLO validation verified"),
+                confidence=res.get("confidence"),
+                confidence_level=res.get("confidence_level"),
+                validation_status=res.get("validation_status", "unverified"),
                 validation=res.get("validation", {}),
                 detections=b_items,
                 geojson=res.get("geojson")
