@@ -77,7 +77,7 @@ def filter_and_postprocess_detections(
                 is_partial = True
                 partial_count += 1
 
-        # Confidence categorization — calibrated to actual model output range (0.15–0.80):
+        # Confidence tier is a model-score bucket, not a validated accuracy estimate.
         # For aerial building models on CPU, 0.45+ is high, 0.28–0.45 is medium
         if conf >= 0.45:
             conf_tier = "high"
@@ -107,7 +107,7 @@ def filter_and_postprocess_detections(
     for idx, item in enumerate(filtered):
         item["id"] = f"B{idx + 1:03d}"
 
-    # Overall confidence score — recalibrated to model range
+    # Overall score summarizes model confidence only; it is not external validation.
     overall_score = float(np.mean(confidences)) if confidences else 0.0
     if overall_score >= 0.45:
         overall_level = "High"
@@ -124,7 +124,7 @@ def filter_and_postprocess_detections(
         "partial_count": partial_count,
         "confidence": round(overall_score, 2),
         "confidence_level": overall_level,
-        "validation_status": "Deep-learning segmentation verified (ground truth comparison optional)",
+        "validation_status": "Model confidence distribution (unverified against external ground truth)",
     }
 
     return filtered, stats
