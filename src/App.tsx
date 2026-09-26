@@ -1005,7 +1005,7 @@ function HeroSection({
 function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: string): Analysis {
   const confStatus = payload.confidence_status || (payload.available === false ? 'unavailable' : 'not_calibrated')
   const rawConf = typeof payload.confidence === 'number' ? payload.confidence : (typeof payload.confidence_score === 'number' ? payload.confidence_score : null)
-  const confPct = rawConf !== null ? Math.round(rawConf * 100) : 0
+  const confPct = rawConf !== null ? Math.round(rawConf * 100) : null
   const taskType = payload.task_type || 'vqa'
 
   let label = 'Analysis'
@@ -1033,14 +1033,14 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
 
   return {
     answer: payload.answer || 'Analysis complete.',
-    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
-    confidence_percent: confPct,
-    confidenceScore: confPct,
+    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct === null ? 'low' : confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
+    confidence_percent: confPct ?? 0,
+    confidenceScore: confPct ?? 0,
     confidence_status: confStatus,
     confidence_reason: payload.reasoning || (confStatus === 'not_calibrated' ? 'Model output score; empirical calibration pending.' : undefined),
     detected_features: detected_features.length > 0 ? detected_features : [label],
     label,
-    suggested_followups: payload.suggested_followups || ['Analyze surrounding terrain', 'Assess water-body proximity', 'Audit vegetation density'],
+    suggested_followups: payload.suggested_followups || ['What is the main feature in this image?', 'Where is the most important area to inspect?', 'Can you explain that in simpler terms?'],
     execution_trace: payload.execution_trace || null,
     region,
     mode: payload.mode || (payload.available === false ? 'synthetic_fallback' : undefined),
