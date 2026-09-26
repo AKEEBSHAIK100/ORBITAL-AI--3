@@ -29,6 +29,7 @@ from backend.agents.planner import create_query_plan
         ("Analyze the optical and SAR images together", 2, "optical_sar_analysis", "optical_sar_fusion"),
         ("Describe the scene and identify the main land cover", 1, "multi_task", "rs_caption_adapted"),
         ("What can you tell me about this image?", 1, "caption", "rs_caption_adapted"),
+        ("Hello, what can you do?", 1, "unsupported", None),
     ],
 )
 def test_judge_query_routing(query, images, expected_intent, expected_specialist):
