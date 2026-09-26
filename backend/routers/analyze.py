@@ -155,8 +155,39 @@ async def upload_image(file: UploadFile = File(...)):
     """Upload geospatial GeoTIFF, TIFF, PNG, or JPEG and receive inspected metadata and base64 preview."""
     contents = await file.read()
     img_bgr, meta = inspect_and_load_geospatial_image(contents)
-    # Encode thumbnail
-    _, buffer = cv2.imencode(".jpg", img_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+
+    # Preview rendering is separate from analysis ingestion. Multi-band rasters
+    # remain intact for downstream specialists; only the preview is reduced to
+    # an explicit display representation.
+    preview_bgr = img_bgr
+    if isinstance(img_bgr, np.ndarray) and img_bgr.ndim == 3 and img_bgr.shape[2] > 3:
+        band_names = [str(x).upper() for x in (meta.get("band_names") or [])]
+        if len(band_names) == img_bgr.shape[2] and all(b in band_names for b in ("B02", "B03", "B04")):
+            idx = {name: band_names.index(name) for name in band_names}
+            rgb = np.stack([
+                img_bgr[:, :, idx["B04"]],
+                img_bgr[:, :, idx["B03"]],
+                img_bgr[:, :, idx["B02"]],
+            ], axis=2).astype(np.float32)
+            for channel in range(3):
+                finite = rgb[:, :, channel][np.isfinite(rgb[:, :, channel])]
+                if finite.size:
+                    lo, hi = np.percentile(finite, [2.0, 98.0])
+                    rgb[:, :, channel] = np.clip(
+                        (rgb[:, :, channel] - lo) / max(hi - lo, 1e-6) * 255.0,
+                        0,
+                        255,
+                    )
+            preview_bgr = cv2.cvtColor(np.rint(rgb).astype(np.uint8), cv2.COLOR_RGB2BGR)
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail="Multi-band raster preview requires explicit band metadata; spectral channels were not collapsed implicitly.",
+            )
+
+    ok, buffer = cv2.imencode(".jpg", preview_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+    if not ok:
+        raise HTTPException(status_code=422, detail="Unable to encode raster preview.")
     b64_thumb = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
     return {
         "filename": file.filename,
