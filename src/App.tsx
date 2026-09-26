@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Globe from './components/Globe'
 import { SESSION_CALL_LIMIT } from './lib/constants'
-import { detectBuildingsFromImage } from './utils/buildingVisionDetector'
 import AgentTraceModal from './components/AgentTraceModal'
 import OpticalSarFusionPanel from './components/OpticalSarFusionPanel'
 import EvaluationCriteriaModal from './components/EvaluationCriteriaModal'
@@ -850,7 +849,6 @@ export default function App() {
     let stepIdx = 0
     const timer = setInterval(() => { stepIdx = (stepIdx+1) % steps.length; setStatus(steps[stepIdx]) }, 2800)
     const fileToSend = fileOverride ?? originalFile
-    const isDefault = !fileToSend && (!imagePreview || imagePreview.includes('photo-1472146936668'))
     try {
       let data: BuildingAnalysisResult | null = null
       const buildingEndpoints = API_BASE
@@ -873,26 +871,12 @@ export default function App() {
           } else if (res.status === 202) {
             const sig = await res.json().catch(() => null)
             if (sig?.custom_analysis_required) {
-              setStatus('Running client-side detection…')
-              data = await detectBuildingsFromImage(imagePreview!)
-              if (data) {
-                data.validation_status = 'Client-side edge estimation (YOLO server service busy)'
-                data.mode = 'synthetic_fallback'
-              }
-              break
+              throw new Error('Building detection specialist is busy. No client-side estimate is generated.')
             }
           }
         } catch { /* try next */ }
       }
 
-      if (!data && imagePreview) {
-        setStatus('Running client-side preview detection…')
-        data = await detectBuildingsFromImage(imagePreview)
-        if (data) {
-          data.validation_status = 'Client-side edge estimation (YOLO server service unreachable)'
-          data.mode = 'synthetic_fallback'
-        }
-      }
       if (!data) {
         throw new Error('Building detection unavailable: specialist YOLO model service is not reachable.')
       }
@@ -2075,7 +2059,7 @@ export default function App() {
                 </div>
                 {/* Before (clipped) */}
                 <div className="absolute inset-0 overflow-hidden" style={{ width: `${beforePct}%` }}>
-                  <img src={beforeImage ?? "https://images.unsplash.com/photo-1472146936668-d987bf0a6e38?w=800&h=500&fit=crop&auto=format"} alt="Before" className="w-full h-full object-cover" style={{ minWidth: `${100/beforePct*100}%`, opacity: 0.7 }} />
+                  <img src={beforeImage ?? ''} alt="Before" className="w-full h-full object-cover" style={{ minWidth: `${100/beforePct*100}%`, opacity: 0.7 }} />
                   <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-mono" style={{ background: `${C.surface}DD`, color: C.orange, border: `1px solid ${C.orange}40` }}>2024 · EARLIER</div>
                 </div>
                 {/* Slider line */}
