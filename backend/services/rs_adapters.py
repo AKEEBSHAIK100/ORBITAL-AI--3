@@ -126,29 +126,39 @@ class RSAdapterRuntime:
             return False
         return True
 
+    def _validate_adapter_config(self, adapter_dir: Path, expected_base: str) -> None:
+        import json
+        cfg_path = adapter_dir / "adapter_config.json"
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise RuntimeError(f"Invalid adapter_config.json: {exc}") from exc
+        if cfg.get("base_model_name_or_path") != expected_base:
+            raise RuntimeError(
+                f"Adapter base-model mismatch: expected {expected_base}, got {cfg.get('base_model_name_or_path')!r}."
+            )
+        targets = cfg.get("target_modules")
+        if not isinstance(targets, list) or not targets:
+            raise RuntimeError("Adapter config has no target_modules.")
+        if "dense" in targets:
+            raise RuntimeError("Adapter config targets unsupported BLIP module 'dense'.")
+        if not any(t in targets for t in ("qkv", "projection")):
+            raise RuntimeError("Adapter config does not target a verified BLIP vision attention module.")
+
     def _inspect_adapter_availability(self) -> None:
-        """Check filesystem for adapter artifacts without loading weights into memory."""
-        # Check Caption adapter
+        """Filesystem inspection is never treated as runtime availability."""
         if self._has_adapter_weights(CAPTION_ADAPTER_PATH):
             self.caption_state = SpecialistState.UNAVAILABLE
-            self.caption_unavailable_reason = "Caption adapter artifacts are present, but runtime execution has not been verified yet."
+            self.caption_unavailable_reason = "Caption adapter artifacts present; live PEFT load/inference verification pending."
         else:
             self.caption_state = SpecialistState.UNAVAILABLE
-            self.caption_unavailable_reason = (
-                f"Caption LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{CAPTION_ADAPTER_PATH}'. "
-                "Set RS_CAPTION_ADAPTER_PATH or mount pilot adapter weights."
-            )
-
-        # Check VQA adapter
+            self.caption_unavailable_reason = f"Caption adapter artifacts not found at '{CAPTION_ADAPTER_PATH}'."
         if self._has_adapter_weights(VQA_ADAPTER_PATH):
             self.vqa_state = SpecialistState.UNAVAILABLE
-            self.vqa_unavailable_reason = "VQA adapter artifacts are present, but runtime execution has not been verified yet."
+            self.vqa_unavailable_reason = "VQA adapter artifacts present; live PEFT load/inference verification pending."
         else:
             self.vqa_state = SpecialistState.UNAVAILABLE
-            self.vqa_unavailable_reason = (
-                f"VQA LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{VQA_ADAPTER_PATH}'. "
-                "Set RS_VQA_ADAPTER_PATH or mount pilot adapter weights."
-            )
+            self.vqa_unavailable_reason = f"VQA adapter artifacts not found at '{VQA_ADAPTER_PATH}'."
 
     @property
     def caption_provenance(self) -> Dict[str, Any]:
@@ -179,133 +189,158 @@ class RSAdapterRuntime:
             "note": "Pilot adaptation artifact only; no benchmark superiority claim (e.g. RSVQA).",
         }
 
-    def _convert_image_to_pil(self, image: Union[np.ndarray, Image.Image, bytes, str]) -> Image.Image:
-        """Converts diverse remote sensing image inputs into a standard RGB PIL Image."""
+    def _convert_image_to_pil(
+        self,
+        image: Union[np.ndarray, Image.Image, bytes, str],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Image.Image, Dict[str, Any]]:
+        meta = dict(metadata or {})
+
+        def stretch(ch: np.ndarray) -> np.ndarray:
+            arr = np.asarray(ch, dtype=np.float32)
+            finite = arr[np.isfinite(arr)]
+            if finite.size == 0:
+                raise ValueError("Sentinel-2 band contains no finite pixels.")
+            lo, hi = np.percentile(finite, [2.0, 98.0])
+            if hi <= lo:
+                return np.clip(arr, 0, 1)
+            return np.clip((arr - lo) / (hi - lo), 0, 1)
+
         if isinstance(image, Image.Image):
-            return image.convert("RGB") if image.mode != "RGB" else image
+            return image.convert("RGB"), {
+                "modality": meta.get("modality", "optical"),
+                "sensor": meta.get("sensor"),
+                "input_type": "rgb",
+                "bands_used": ["R", "G", "B"],
+                "preprocessing": "PIL RGB input converted to BLIP RGB."
+            }
 
         if isinstance(image, np.ndarray):
-            # Check if BGR from cv2 (most common in backend)
             if image.ndim == 3 and image.shape[2] == 3:
-                # Convert BGR to RGB
-                rgb = image[:, :, ::-1]
-                return Image.fromarray(rgb.astype(np.uint8))
-            elif image.ndim == 2:
-                # Grayscale / SAR intensity
-                return Image.fromarray(image.astype(np.uint8)).convert("RGB")
-            elif image.ndim == 3 and image.shape[2] > 3:
-                # Multispectral: take first 3 channels
-                return Image.fromarray(image[:, :, :3].astype(np.uint8)).convert("RGB")
+                order = str(meta.get("channel_order", "bgr")).lower()
+                rgb = image[:, :, ::-1] if order == "bgr" else image
+                return Image.fromarray(np.asarray(rgb, dtype=np.uint8)), {
+                    "modality": meta.get("modality", "optical"),
+                    "sensor": meta.get("sensor"),
+                    "input_type": "rgb",
+                    "bands_used": ["R", "G", "B"],
+                    "preprocessing": "3-channel image converted to BLIP RGB."
+                }
+            if image.ndim == 3 and image.shape[2] > 3:
+                names = [str(x).strip().upper() for x in meta.get("band_names", []) if x]
+                source_dataset = str(meta.get("source_dataset", "")).lower()
+                sensor = str(meta.get("sensor", "")).lower()
+                if image.shape[2] == 10 and not names and ("bigearthnet" in source_dataset or "reben" in source_dataset or "sentinel-2" in sensor):
+                    names = ["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12"]
+                if len(names) != image.shape[2]:
+                    raise ValueError("Multispectral BLIP input requires explicit band_names metadata; refusing silent band truncation.")
+                missing = [b for b in ("B02","B03","B04") if b not in names]
+                if missing:
+                    raise ValueError(f"Required Sentinel-2 bands missing: {missing}")
+                idx = {n: names.index(n) for n in names}
+                rgb = np.stack([
+                    stretch(image[:, :, idx["B04"]]),
+                    stretch(image[:, :, idx["B03"]]),
+                    stretch(image[:, :, idx["B02"]])
+                ], axis=2)
+                return Image.fromarray(np.rint(rgb * 255).astype(np.uint8), mode="RGB"), {
+                    "modality": "multispectral",
+                    "sensor": meta.get("sensor") or "Sentinel-2",
+                    "input_type": "multispectral",
+                    "bands_used": ["B04", "B03", "B02"],
+                    "preprocessing": "B04/B03/B02 natural-colour composite; per-channel 2%-98% percentile stretch.",
+                    "source_band_order": names,
+                }
+            if image.ndim == 2:
+                return Image.fromarray(np.asarray(image, dtype=np.uint8)).convert("RGB"), {
+                    "modality": meta.get("modality", "optical"),
+                    "sensor": meta.get("sensor"),
+                    "input_type": "single_channel",
+                    "bands_used": None,
+                    "preprocessing": "Single-channel image expanded to RGB; sensor identity not inferred."
+                }
 
         if isinstance(image, (bytes, bytearray)):
-            import io
-            return Image.open(io.BytesIO(image)).convert("RGB")
-
+            return Image.open(io.BytesIO(image)).convert("RGB"), {
+                "modality": meta.get("modality", "optical"),
+                "sensor": meta.get("sensor"),
+                "input_type": "rgb",
+                "bands_used": ["R", "G", "B"],
+                "preprocessing": "Encoded RGB image decoded to BLIP RGB."
+            }
         if isinstance(image, (str, Path)):
-            return Image.open(str(image)).convert("RGB")
-
+            return Image.open(str(image)).convert("RGB"), {
+                "modality": meta.get("modality", "optical"),
+                "sensor": meta.get("sensor"),
+                "input_type": "rgb",
+                "bands_used": ["R", "G", "B"],
+                "preprocessing": "Image file decoded to BLIP RGB."
+            }
         raise ValueError(f"Unsupported image input type for RS adapter: {type(image)}")
 
     # ─── Lazy Model Loading ───────────────────────────────────────────────────
 
     def _load_caption_model(self):
-        """Loads BLIP caption base model and PEFT LoRA adapter lazily."""
         if self._caption_model is not None and self._caption_processor is not None:
             return self._caption_model, self._caption_processor
-
-        if self.caption_state == SpecialistState.ERROR:
-            raise RuntimeError(self.caption_unavailable_reason or "Caption specialist unavailable.")
         if not self._has_adapter_weights(CAPTION_ADAPTER_PATH):
-            self.caption_state = SpecialistState.UNAVAILABLE
-            self.caption_unavailable_reason = f"Caption adapter artifacts not found at '{CAPTION_ADAPTER_PATH}'."
-            raise RuntimeError(self.caption_unavailable_reason)
-
+            raise RuntimeError(self.caption_unavailable_reason or "Caption adapter unavailable.")
         self.caption_state = SpecialistState.LOADING
         try:
             import torch
             from transformers import BlipProcessor, BlipForConditionalGeneration
-
+            from peft import PeftModel
+            self._validate_adapter_config(CAPTION_ADAPTER_PATH, self.caption_base_id)
             processor = BlipProcessor.from_pretrained(self.caption_base_id)
             model = BlipForConditionalGeneration.from_pretrained(self.caption_base_id)
-
-            # Strictly verify and apply LoRA adapter weights
-            if not self._has_adapter_weights(CAPTION_ADAPTER_PATH):
-                self.caption_state = SpecialistState.UNAVAILABLE
-                self.caption_unavailable_reason = (
-                    f"Caption LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{CAPTION_ADAPTER_PATH}'."
-                )
-                raise RuntimeError(self.caption_unavailable_reason)
-
-            try:
-                from peft import PeftModel
-                model = PeftModel.from_pretrained(model, str(CAPTION_ADAPTER_PATH))
-            except ImportError:
-                # If PEFT is not installed, fail cleanly to UNAVAILABLE
-                self.caption_state = SpecialistState.UNAVAILABLE
-                self.caption_unavailable_reason = "peft library is not installed to load LoRA adapter."
-                raise RuntimeError(self.caption_unavailable_reason)
-
-            model.to(self.device)
-            model.eval()
-
-            self._caption_model = model
-            self._caption_processor = processor
+            model = PeftModel.from_pretrained(model, str(CAPTION_ADAPTER_PATH))
+            model.to(self.device).eval()
+            smoke = Image.new("RGB", (32, 32), (0, 0, 0))
+            inputs = processor(smoke, return_tensors="pt").to(self.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, max_new_tokens=4)
+            if not processor.decode(out[0], skip_special_tokens=True).strip():
+                raise RuntimeError("BLIP caption smoke test returned empty text.")
+            self._caption_model, self._caption_processor = model, processor
             self.caption_state = SpecialistState.AVAILABLE
-            return self._caption_model, self._caption_processor
-
-        except Exception as e:
+            self.caption_unavailable_reason = None
+            return model, processor
+        except Exception as exc:
             self.caption_state = SpecialistState.UNAVAILABLE
-            self.caption_unavailable_reason = f"Caption runtime verification failed: {e}"
-            raise
+            self.caption_unavailable_reason = f"Caption runtime verification failed: {exc}"
+            self._caption_model = self._caption_processor = None
+            raise RuntimeError(self.caption_unavailable_reason) from exc
 
     def _load_vqa_model(self):
-        """Loads BLIP VQA base model and PEFT LoRA adapter lazily."""
         if self._vqa_model is not None and self._vqa_processor is not None:
             return self._vqa_model, self._vqa_processor
-
-        if self.vqa_state == SpecialistState.ERROR:
-            raise RuntimeError(self.vqa_unavailable_reason or "VQA specialist unavailable.")
         if not self._has_adapter_weights(VQA_ADAPTER_PATH):
-            self.vqa_state = SpecialistState.UNAVAILABLE
-            self.vqa_unavailable_reason = f"VQA adapter artifacts not found at '{VQA_ADAPTER_PATH}'."
-            raise RuntimeError(self.vqa_unavailable_reason)
-
+            raise RuntimeError(self.vqa_unavailable_reason or "VQA adapter unavailable.")
         self.vqa_state = SpecialistState.LOADING
         try:
             import torch
             from transformers import BlipProcessor, BlipForQuestionAnswering
-
+            from peft import PeftModel
+            self._validate_adapter_config(VQA_ADAPTER_PATH, self.vqa_base_id)
             processor = BlipProcessor.from_pretrained(self.vqa_base_id)
             model = BlipForQuestionAnswering.from_pretrained(self.vqa_base_id)
-
-            # Strictly verify and apply LoRA adapter weights
-            if not self._has_adapter_weights(VQA_ADAPTER_PATH):
-                self.vqa_state = SpecialistState.UNAVAILABLE
-                self.vqa_unavailable_reason = (
-                    f"VQA LoRA adapter files (adapter_config.json, adapter_model.safetensors) not found at '{VQA_ADAPTER_PATH}'."
-                )
-                raise RuntimeError(self.vqa_unavailable_reason)
-
-            try:
-                from peft import PeftModel
-                model = PeftModel.from_pretrained(model, str(VQA_ADAPTER_PATH))
-            except ImportError:
-                self.vqa_state = SpecialistState.UNAVAILABLE
-                self.vqa_unavailable_reason = "peft library is not installed to load LoRA adapter."
-                raise RuntimeError(self.vqa_unavailable_reason)
-
-            model.to(self.device)
-            model.eval()
-
-            self._vqa_model = model
-            self._vqa_processor = processor
+            model = PeftModel.from_pretrained(model, str(VQA_ADAPTER_PATH))
+            model.to(self.device).eval()
+            smoke = Image.new("RGB", (32, 32), (0, 0, 0))
+            inputs = processor(smoke, "What is visible?", return_tensors="pt").to(self.device)
+            with torch.no_grad():
+                out = model.generate(**inputs, max_new_tokens=4)
+            if not processor.decode(out[0], skip_special_tokens=True).strip():
+                raise RuntimeError("BLIP VQA smoke test returned empty text.")
+            self._vqa_model, self._vqa_processor = model, processor
             self.vqa_state = SpecialistState.AVAILABLE
-            return self._vqa_model, self._vqa_processor
-
-        except Exception as e:
+            self.vqa_unavailable_reason = None
+            return model, processor
+        except Exception as exc:
             self.vqa_state = SpecialistState.UNAVAILABLE
-            self.vqa_unavailable_reason = f"VQA runtime verification failed: {e}"
-            raise
+            self.vqa_unavailable_reason = f"VQA runtime verification failed: {exc}"
+            self._vqa_model = self._vqa_processor = None
+            raise RuntimeError(self.vqa_unavailable_reason) from exc
 
     # ─── Public Inference API ─────────────────────────────────────────────────
 
