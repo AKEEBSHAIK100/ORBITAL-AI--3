@@ -93,7 +93,7 @@ def synthesize_response(
     if conflict:
         answer = (
             "The available analyses disagree, so the result is uncertain. "
-            f"The building footprint detector extracted {bldg_ev.evidence.get('building_count', 0)} structures, "
+            f"The building footprint detector extracted {bldg_ev.evidence.get('building_count')} structures, "
             f"while visual question answering reported: '{vqa_ev.result}'."
         )
         return answer, None, "not_calibrated", warnings
@@ -238,7 +238,7 @@ def synthesize_response(
             answer = (
                 f"The bi-temporal comparison identified surface alterations across {chg_pct:.1f}% of the observation area. "
                 f"Structural footprint analysis detected {b_cnt} building footprints in the analyzed scene. "
-                "New structural additions are identified in altered spatial clusters. Confidence is not calibrated for this workflow."
+                "The available evidence does not by itself establish that these are newly added structures. Confidence is not calibrated for this workflow."
             )
             return answer, None, "not_calibrated", warnings
 
