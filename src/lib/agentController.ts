@@ -1,4 +1,4 @@
-// SatQuery AI — Client-Side Agentic Controller & Types
+// ORBITAL-AI — Query-driven remote-sensing controller & types
 // Shared with backend for consistent typing, routing, and execution trace visualization.
 
 export type TaskType =
@@ -40,7 +40,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs). Pilot artifact only.',
     model_id: 'rs-vqa-adapted-v1',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Pilot adapter artifact is documented, but live executable weights are not verified in this deployment.',
     required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 50,
@@ -56,7 +57,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 87 BigEarthNet image-text pairs (3 epochs). Pilot artifact only; no VRSBench benchmark claim.',
     model_id: 'rs-caption-adapted-v1',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Pilot adapter artifact is documented, but live executable weights are not verified in this deployment.',
     required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 60,
@@ -72,7 +74,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'BigEarthNet-derived VQA LoRA pilot adapter',
     domain_adaptation: 'Pilot domain adaptation on 551 BigEarthNet QA examples across 69 training patches (3 epochs).',
     model_id: 'rs-vqa-adapted-v1',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Pilot adapter artifact is documented, but live executable weights are not verified in this deployment.',
     required_dataset: 'bigearthnet_v2',
     permitted_parameters: {
       max_new_tokens: 50,
@@ -87,7 +90,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'PyTorch YOLO Segmentation Engine (Tiled Inference + NMS/IoU Deduplication)',
     domain_adaptation: 'Weight-trained on high-resolution aerial and satellite imagery for structural rooftop footprints with confidence calibration.',
     model_id: 'yolo-segmentation-building_model.pt',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Executable YOLO weights/service availability must be verified at runtime.',
     permitted_parameters: {
       tile_size_px: 512,
       overlap_px: 64,
@@ -102,9 +106,10 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     supported_tasks: ['change_detection'],
     modalities: ['optical', 'multispectral', 'sar'],
     adapter: 'RS-Change System Prompt (CDVQA benchmark conventions)',
-    domain_adaptation: 'Calibrated for multi-temporal change identification, confidence reporting, and spatial change region bounding.',
+    domain_adaptation: 'Designed around multi-temporal change identification; calibration is not claimed here.',
     model_id: 'claude-sonnet-5',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Live change-model execution is not independently verified in this deployment; external ZeroGPU fallback is separate.',
     permitted_parameters: {
       coregistration_tolerance_px: 2.0,
       change_attribution: 'bi-temporal',
@@ -115,15 +120,16 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
   rs_fusion_cv: {
     id: 'rs_fusion_cv',
     name: 'Optical–SAR Classical-CV Feature Extractor',
-    description: 'Computes multi-modal telemetry: optical NDVI proxy, water/built-up indices, SAR backscatter intensity, speckle index, SSIM structural similarity, and cross-correlation.',
+    description: 'Optional classical optical-SAR telemetry pipeline; physical interpretation requires appropriate sensor metadata and calibration.',
     supported_tasks: ['sar_optical_fusion'],
     modalities: ['optical', 'sar'],
     adapter: 'OpenCV / NumPy Classical Computer Vision Pipeline',
     domain_adaptation: 'Sensor-specific radar backscatter (dB), speckle noise modeling, and optical-SAR complementarity scoring.',
     model_id: 'classical-cv-fusion-engine-v2',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Sensor-specific classical fusion runtime must be verified before claiming calibrated telemetry.',
     permitted_parameters: {
-      optical_sensor: 'Cartosat-2S',
+      optical_sensor: 'unspecified unless metadata is supplied',
       sar_sensor: 'RISAT-1A',
       decomposition: 'SSIM+CrossCorr',
     },
@@ -137,7 +143,8 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     adapter: 'RS-Captioning System Prompt',
     domain_adaptation: 'Multi-attribute remote sensing description covering topography, land-use distribution, and sensor properties.',
     model_id: 'claude-sonnet-5',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Configured vision provider is optional; external ZeroGPU caption fallback is separate.',
     permitted_parameters: {
       caption_detail: 'multi-attribute',
       vocabulary: 'BigEarthNet-43',
@@ -146,13 +153,14 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
   rs_grounding: {
     id: 'rs_grounding',
     name: 'Text-Guided Spatial Grounding (Classical-CV Baseline)',
-    description: 'Identifies and localizes requested geographical objects or terrain patches using edge and spectral thresholding.',
+    description: 'Experimental classical-CV spatial baseline; not presented as a validated production grounding model.',
     supported_tasks: ['grounding'],
     modalities: ['optical', 'multispectral'],
     adapter: 'Classical-CV Spatial Bounding',
     domain_adaptation: 'Spatial coordinate bounding box prediction normalized to image frame dimensions (classical CV).',
     model_id: 'classical-cv-contour',
-    availability: 'available',
+    availability: 'unavailable',
+    unavailable_reason: 'Classical grounding baseline is not enabled as a production specialist.',
     permitted_parameters: {
       coordinate_system: 'normalized_percentage',
       bbox_format: '[x,y,w,h]',
