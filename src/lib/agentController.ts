@@ -142,9 +142,9 @@ export const TOOL_REGISTRY: Record<string, ToolSpec> = {
     modalities: ['optical', 'multispectral', 'sar'],
     adapter: 'RS-Captioning System Prompt',
     domain_adaptation: 'Multi-attribute remote sensing description covering topography, land-use distribution, and sensor properties.',
-    model_id: 'claude-sonnet-5',
+    model_id: 'external-zero-gpu-rs-vlm',
     availability: 'unavailable',
-    unavailable_reason: 'Configured vision provider is optional; external ZeroGPU caption fallback is separate.',
+    unavailable_reason: 'No independently verified local caption specialist is enabled; external ZeroGPU caption inference is separate.',
     permitted_parameters: {
       caption_detail: 'multi-attribute',
       vocabulary: 'BigEarthNet-43',
@@ -354,16 +354,16 @@ export function formatTaskLabel(task: TaskType): string {
     case 'building_detection':
       return 'YOLO Structural Footprint Audit'
     case 'change_detection':
-      return 'Bi-Temporal Change Analysis (CDVQA)'
+      return 'Bi-Temporal Change Analysis'
     case 'caption':
-      return 'VRSBench Scene Captioning'
+      return 'Remote-Sensing Scene Captioning'
     case 'grounding':
       return 'Text-Guided Spatial Grounding'
     case 'vegetation_analysis':
-      return 'Canopy & Agricultural NDVI Analysis'
+      return 'Vegetation Analysis'
     case 'flood_assessment':
-      return 'Hydrological & Inundation Mapping'
+      return 'Flood / Inundation Analysis'
     default:
-      return 'Remote-Sensing VQA (RSVQA)'
+      return 'Remote-Sensing VQA'
   }
 }
