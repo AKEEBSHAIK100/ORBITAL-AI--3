@@ -1,18 +1,11 @@
 /**
- * Shared image-compression utility for SATQUERY.
- *
- * Converts any browser-readable file (JPEG, PNG, WEBP, GIF, single-band GeoTIFF, TIFF)
- * into a `data:image/jpeg;base64,...` data URL that the server parseDataUrl() accepts.
- *
- * Used by both the main upload flow (App.tsx / compressImage) and the
- * OpticalSarFusionPanel so fusion uploads are always wire-safe JPEG.
+ * Converts a browser-decodable visual image into a transport-safe JPEG.
+ * This is a visual preview path only: JPEG conversion does not preserve
+ * multispectral bands, SAR calibration, CRS, or GeoTIFF metadata.
  */
 
 const MAX_DIMENSION = 1600
 const JPEG_QUALITY = 0.82
-
-const PLACEHOLDER_COLOR_BG = '#060D1A'
-const PLACEHOLDER_COLOR_FG = '#20D9FF'
 
 /**
  * Resize + re-encode a File to a JPEG data URL.
@@ -50,9 +43,9 @@ export async function compressToJpeg(file: File, label?: string): Promise<string
     ctx?.drawImage(source, 0, 0, canvas.width, canvas.height)
     source.close()
   } catch {
-    // Fallback: FileReader -> <img>
-    // Works for browser-renderable formats that createImageBitmap rejects
-    // (e.g. single-band GeoTIFF on Firefox/Safari).
+    // Fallback: FileReader -> <img> for browser-renderable formats.
+    // Do not manufacture a placeholder when a TIFF/GeoTIFF cannot be decoded:
+    // that would turn an upload failure into fabricated visual evidence.
     await new Promise<void>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (ev) => {
@@ -65,31 +58,14 @@ export async function compressToJpeg(file: File, label?: string): Promise<string
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
           resolve()
         }
-        img.onerror = () =>
-          reject(new Error('Browser could not decode the TIFF. Generating telemetry placeholder.'))
+        img.onerror = () => reject(new Error('This TIFF/GeoTIFF cannot be decoded by the browser. Use JPEG/PNG for visual analysis, or connect the Python remote-sensing backend for native raster processing.'))
         img.src = ev.target?.result as string
       }
-      reader.onerror = () => reject(new Error('Failed to read file buffer.'))
+      reader.onerror = () => reject(new Error('Failed to read image file.'))
       reader.readAsDataURL(file)
-    }).catch(() => {
-      // Last resort: placeholder canvas so the fusion pipeline still gets a valid JPEG.
-      canvas.width = 800
-      canvas.height = 600
-      ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.fillStyle = PLACEHOLDER_COLOR_BG
-        ctx.fillRect(0, 0, 800, 600)
-        ctx.fillStyle = PLACEHOLDER_COLOR_FG
-        ctx.font = '14px monospace'
-        const displayLabel = label ?? file.name
-        ctx.fillText(`GeoTIFF Matrix Loaded: ${displayLabel}`, 40, 290)
-        ctx.fillStyle = 'rgba(32,217,255,0.4)'
-        ctx.font = '11px monospace'
-        ctx.fillText('Multi-band SAR / Optical -- VLM reasoning active', 40, 315)
-      }
     })
   }
 
-  // Always export as JPEG so parseDataUrl() on the server accepts it.
+  // Transport as JPEG for visual inference. Band/metadata preservation is not claimed.
   return canvas.toDataURL('image/jpeg', JPEG_QUALITY)
 }
