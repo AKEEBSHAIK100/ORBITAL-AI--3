@@ -77,13 +77,17 @@ export async function runWorkerVqaOrCaption(image: string, query: string) {
 export async function runWorkerChange(beforeImage: string, afterImage: string) {
   const before = await uploadImage(beforeImage, 'orbital-before.jpg')
   const after = await uploadImage(afterImage, 'orbital-after.jpg')
-  return callGradio('answer', ['What changed between these two observations, and where did the change occur?', fileRef(before, 'orbital-before.jpg'), fileRef(after, 'orbital-after.jpg')])
+  const raw = await callGradio('answer', ['What changed between these two observations, and where did the change occur?', fileRef(before, 'orbital-before.jpg'), fileRef(after, 'orbital-after.jpg')])
+  const values = Array.isArray(raw) ? raw : [raw]
+  return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', method: 'external_zero_gpu_rs_vlm', note: 'External public ZeroGPU specialist; no calibrated quantitative change fraction is claimed.' }
 }
 
 export async function runWorkerFusion(opticalImage: string, sarImage: string) {
   const optical = await uploadImage(opticalImage, 'orbital-optical.jpg')
   const sar = await uploadImage(sarImage, 'orbital-sar.jpg')
-  return callGradio('answer', ['Use the optical and SAR images together to identify built-up and water-covered regions.', fileRef(optical, 'orbital-optical.jpg'), fileRef(sar, 'orbital-sar.jpg')])
+  const raw = await callGradio('answer', ['Use the optical and SAR images together to identify built-up and water-covered regions.', fileRef(optical, 'orbital-optical.jpg'), fileRef(sar, 'orbital-sar.jpg')])
+  const values = Array.isArray(raw) ? raw : [raw]
+  return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', method: 'external_zero_gpu_rs_vlm', note: 'External public ZeroGPU specialist; optical/SAR semantic result is not independently benchmarked by ORBITAL-AI.' }
 }
 
 export function isWorkerConfigured(): boolean {
