@@ -13,29 +13,19 @@ import { runWorkerFusion } from './_hfWorker.js'
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 const OPTICAL_SAR_SYSTEM_PROMPT = `${systemPrompt}
-You are operating in Optical–SAR Multi-Modal Fusion mode.
-You have been provided with two co-registered remote-sensing views of the same geographical area:
-1. OPTICAL VIEW (spectral and surface reflectance, sensitive to chlorophyll absorption and color albedo).
-2. SYNTHETIC APERTURE RADAR (SAR) VIEW (microwave backscatter intensity, sensitive to surface roughness, structural dielectric properties, moisture, and double-bounce reflection from built structures).
+You are operating in Optical–SAR joint-analysis mode.
+Two user-supplied images are provided. Do not assume they are perfectly co-registered unless metadata or a verified preprocessing step establishes that.
 
-Evaluate the scene combining both modalities:
-- Use SAR backscatter to confirm solid structures or penetrating under canopy/haze.
-- Use optical reflectance to assess vegetation vigor (NDVI) and water surface boundaries.
-- Cross-reference inconsistencies: identify where optical shows smooth surface but SAR reveals structural roughness, or where water bodies produce specular dark reflection in both.
+COMMUNICATION RULES:
+- Explain the result in plain language for a non-expert.
+- Separate observations supported by the optical image from observations supported by SAR.
+- Do not invent sensor bands, physical units, percentages, dates, or confidence scores.
+- Do not call RGB imagery multispectral unless the supplied data actually contains those bands.
+- Do not claim NDVI from RGB-only imagery.
+- Do not interpret raw image brightness as calibrated SAR backscatter in dB unless the input is a radiometrically calibrated SAR product.
+- If alignment cannot be verified, say so and treat cross-modal conclusions as provisional.
 
-Return valid JSON adhering to standard schema with:
-- answer: string (concise, joint cross-modal assessment)
-- confidence: 'high' | 'medium' | 'low'
-- confidence_percent: number (0-100)
-- confidence_reason: string (cross-sensor correlation and clarity factors)
-- detected_features: string[] (3-5 key features from both sensors)
-- estimated_coverage_percent: number
-- water_coverage_percent: number
-- vegetation_percent: number
-- data_limitation_note: string | null
-- region: { x_percent: number, y_percent: number, w_percent: number, h_percent: number } | null
-- label: string (summary label)
-- suggested_followups: string[]`
+Return valid JSON using the standard ORBITAL-AI schema.`
 
 /**
  * Fallback classical CV telemetry calculator if Python backend is offline.
@@ -255,9 +245,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     traceSteps.push({
       step: 4,
       tool: 'rs_vqa',
-      description: 'Multi-modal vision-language synthesis with BigEarthNet domain adaptation',
+      description: 'Plain-language optical-SAR synthesis with explicit sensor and calibration limits',
       input_summary: 'Joint optical-SAR imagery + telemetry summary',
-      output_summary: `Confidence: ${resultPayload.confidence ?? 'high'} (${resultPayload.confidence_percent ?? 94}%)`,
+      output_summary: `Confidence: ${resultPayload.confidence ?? 'not provided'} (${resultPayload.confidence_percent ?? 'not calibrated'})`,
       duration_ms: Math.max(12, Date.now() - step4Start),
       status: 'success',
       parameters: { model: MODEL },
