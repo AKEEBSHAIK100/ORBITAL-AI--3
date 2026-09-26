@@ -43,7 +43,7 @@ export interface TraceStep {
  */
 export async function upsertSession(sessionId: string): Promise<SessionRow | null> {
   const result = await dbQuery<SessionRow>(`
-    INSERT INTO sessions (id, expires_at)
+    INSERT INTO analysis_sessions (id, expires_at)
     VALUES ($1, NOW() + ($2 || ' minutes')::INTERVAL)
     ON CONFLICT (id) DO UPDATE
       SET updated_at = NOW(),
@@ -59,7 +59,7 @@ export async function upsertSession(sessionId: string): Promise<SessionRow | nul
  */
 export async function incrementSessionCalls(sessionId: string): Promise<number> {
   const result = await dbQuery<{ call_count: number }>(`
-    UPDATE sessions SET call_count = call_count + 1, updated_at = NOW()
+    UPDATE analysis_sessions SET call_count = call_count + 1, updated_at = NOW()
     WHERE id = $1
     RETURNING call_count
   `, [sessionId])
@@ -74,7 +74,7 @@ export async function appendSessionHistory(
   entry: HistoryEntry
 ): Promise<void> {
   await dbQuery(`
-    UPDATE sessions
+    UPDATE analysis_sessions
     SET history = history || $2::jsonb,
         updated_at = NOW()
     WHERE id = $1
@@ -86,7 +86,7 @@ export async function appendSessionHistory(
  */
 export async function getSessionHistory(sessionId: string): Promise<HistoryEntry[]> {
   const result = await dbQuery<{ history: HistoryEntry[] }>(`
-    SELECT history FROM sessions WHERE id = $1
+    SELECT history FROM analysis_sessions WHERE id = $1
   `, [sessionId])
   return result?.rows[0]?.history ?? []
 }
@@ -95,7 +95,7 @@ export async function getSessionHistory(sessionId: string): Promise<HistoryEntry
  * Deletes a session and all cascaded rows (runs, results, traces, assets, cache).
  */
 export async function deleteSession(sessionId: string): Promise<boolean> {
-  const result = await dbQuery(`DELETE FROM sessions WHERE id = $1`, [sessionId])
+  const result = await dbQuery(`DELETE FROM analysis_sessions WHERE id = $1`, [sessionId])
   // Also delete analysis_cache rows keyed to this session
   await dbQuery(`DELETE FROM analysis_cache WHERE session_id = $1`, [sessionId])
   return (result?.rowCount ?? 0) > 0
@@ -105,7 +105,7 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
  * Deletes sessions expired more than 5 minutes ago. Safe to call periodically.
  */
 export async function pruneExpiredSessions(): Promise<void> {
-  await dbQuery(`DELETE FROM sessions WHERE expires_at < NOW() - INTERVAL '5 minutes'`)
+  await dbQuery(`DELETE FROM analysis_sessions WHERE expires_at < NOW() - INTERVAL '5 minutes'`)
 }
 
 // ─── Analysis Runs ────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ export async function completeAnalysisRun(
 ): Promise<void> {
   await dbQuery(`
     UPDATE analysis_runs
-    SET status = $2, completed_at = NOW(), duration_ms = $3, error_tag = $4, is_cached = $5
+    SET status = CASE WHEN $2 = 'success' THEN 'completed' ELSE $2 END, completed_at = NOW(), duration_ms = $3, error_tag = $4, is_cached = $5
     WHERE id = $1
   `, [runId, status, Math.round(durationMs), errorTag ?? null, isCached])
 }
@@ -182,25 +182,6 @@ export async function persistAnalysisInput(
 
 // ─── Trace Steps ──────────────────────────────────────────────────────────────
 
-export async function persistTraceSteps(
-  runId: string,
-  steps: TraceStep[]
-): Promise<void> {
-  for (const step of steps) {
-    await dbQuery(`
-      INSERT INTO agent_trace_steps
-        (run_id, step_index, tool, description, input_summary, output_summary, duration_ms, status, parameters)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [
-      runId,
-      step.step,
-      step.tool,
-      step.description ?? null,
-      step.input_summary ?? null,
-      step.output_summary ?? null,
-      step.duration_ms ?? null,
-      step.status ?? 'success',
-      step.parameters ? JSON.stringify(step.parameters) : null,
-    ])
-  }
+export async function persistTraceSteps(runId: string, steps: TraceStep[]): Promise<void> {
+  await dbQuery(`UPDATE analysis_runs SET execution_trace=$2 WHERE id=$1`, [runId, JSON.stringify(steps)])
 }
