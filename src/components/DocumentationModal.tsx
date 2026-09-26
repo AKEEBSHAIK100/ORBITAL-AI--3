@@ -36,10 +36,10 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#20D9FF]" />
             <div>
               <h2 id="doc-modal-title" className="text-base font-bold text-slate-100 font-mono tracking-wide">
-                SATQUERY AI · TECHNICAL DOCUMENTATION & PROTOCOL
+                ORBITAL-AI · TECHNICAL DOCUMENTATION & PROTOCOL
               </h2>
               <p className="text-[11px] font-mono text-slate-400">
-                Agentic Remote-Sensing VLM System Specifications & Benchmark Reference
+                Agentic Remote-Sensing System Specification · SIH 2026 Demo
               </p>
             </div>
           </div>
@@ -126,10 +126,10 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
             <div className="space-y-6">
               <div>
                 <h3 className="text-xl font-bold text-slate-100 mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  ISRO / SAC Specialist Task Workflows
+                  SIH 2026 Remote-Sensing Task Workflows
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Comprehensive coverage across all 5 benchmark problem scopes
+                  Workflow coverage mapped to the project problem requirements; benchmark metrics are reported only when independently verified.
                 </p>
               </div>
 
@@ -140,35 +140,35 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
                     badge: 'CAPTION',
                     color: '#20D9FF',
                     desc: 'Generates multi-attribute natural language descriptions of the scene, identifying continuous urban fabric, road transport corridors, agricultural plots, and natural vegetation.',
-                    metric: 'Evaluated against VRSBench test subset using CIDEr, BLEU-4, and multi-label F1-Score.',
+                    metric: 'Evaluation plan: CIDEr, BLEU-4 and multi-label F1 can be reported only from a reproducible VRSBench test run; no unverified score is shown here.',
                   },
                   {
                     title: '2. RSVQA Text-Guided Region Grounding',
                     badge: 'GROUNDING',
                     color: '#35E0B8',
                     desc: 'Localizes requested entities (such as "highlight the water body") into normalized bounding coordinates [x_percent, y_percent, w_percent, h_percent] rendered dynamically onto the image canvas.',
-                    metric: 'Evaluated against RSVQA-HR test split measuring mean Intersection-over-Union (mIoU).',
+                    metric: 'Evaluation plan: mIoU on an explicitly identified RSVQA-HR split; production results are labelled as uncalibrated unless ground-truth evaluation has been completed.',
                   },
                   {
                     title: '3. CDVQA Bi-Temporal Change Detection',
                     badge: 'CHANGE-VQA',
                     color: '#FF9F43',
                     desc: 'Co-registers pairs of satellite images acquired at different passes, detects structural additions or environmental deltas, and answers comparative questions regarding urban expansion and deforestation.',
-                    metric: 'Evaluated against CDVQA benchmark measuring change classification accuracy and edge agreement.',
+                    metric: 'Evaluation plan: change classification accuracy and spatial agreement on a reproducible CDVQA split; no fabricated metric is presented.',
                   },
                   {
                     title: '4. Optical–SAR Cross-Modal Joint Analysis',
                     badge: 'CROSS-MODAL',
                     color: '#20D9FF',
                     desc: 'Combines optical reflectance (chlorophyll absorption, spectral indices) with microwave SAR backscatter (dielectric properties, double-bounce scattering) for cloud penetration and all-weather structural audit.',
-                    metric: 'Evaluated via Structural Similarity Index (SSIM), Cross-Correlation, and speckle index bounds.',
+                    metric: 'Evaluation plan: modality-specific structural/correlation diagnostics after input co-registration; these are not presented as benchmark scores.',
                   },
                   {
                     title: '5. Deep Learning Instance Building Segmentation',
                     badge: 'YOLO-SEG',
                     color: '#35E0B8',
                     desc: 'Splits ultra-high-resolution scenes into overlapping 512px tiles, performs polygon instance segmentation, and filters overlaps via IoU Non-Maximum Suppression (NMS) with unique IDs (B001, B002).',
-                    metric: 'Precision, Recall, and mAP@0.5 against architectural rooftop footprints.',
+                    metric: 'Evaluation plan: Precision, Recall and mAP@0.5 on a documented building-footprint ground-truth set.',
                   },
                 ].map(t => (
                   <div key={t.badge} className="p-4 rounded-xl border border-slate-800 bg-slate-900/50 space-y-2">
