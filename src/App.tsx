@@ -1211,16 +1211,40 @@ export default function App() {
         })
         if (legacyRes.ok) {
           const data = await legacyRes.json()
-          if (data.answer) {
+          const legacyUnavailable =
+            data?.confidence_status === 'unavailable' ||
+            /no executable|unavailable|could not be executed/i.test(String(data?.answer || ''))
+          if (data.answer && !legacyUnavailable) {
             compAnswer = data.answer; confScore = typeof data.confidenceScore === 'number' ? data.confidenceScore : 0
             confStatus = data.confidence_status || 'not_calibrated'
             if (data.detected_features?.length) features = data.detected_features
             if (data.execution_trace) { traceData = data.execution_trace; setActiveTrace(data.execution_trace) }
             mode = data.mode || 'model'
+          } else {
+            const remote = await runBrowserRemoteAnalysis(
+              queryPrompt,
+              beforeImage || '',
+              afterImage || undefined,
+              message => setStatus(message),
+            )
+            compAnswer = remote.answer
+            confScore = 0
+            confStatus = 'not_calibrated'
+            features = []
+            mode = 'external_hf_zero_gpu'
           }
         } else {
-          mode = 'unavailable'
-          confStatus = 'unavailable'
+          const remote = await runBrowserRemoteAnalysis(
+            queryPrompt,
+            beforeImage || '',
+            afterImage || undefined,
+            message => setStatus(message),
+          )
+          compAnswer = remote.answer
+          confScore = 0
+          confStatus = 'not_calibrated'
+          features = []
+          mode = 'external_hf_zero_gpu'
         }
       }
     } catch {
@@ -1298,7 +1322,37 @@ export default function App() {
           }])
           setAnalysis(legacyData as Analysis); setStatus('Fusion complete')
           addToast('Optical–SAR fusion complete', 'success')
-        } else throw new Error(legacyData.error || 'Fusion failed')
+        } else {
+          const remote = await runBrowserRemoteAnalysis(
+            fusionQuery,
+            opticalDataUrl,
+            sarDataUrl,
+            message => setStatus(message),
+          )
+          const remoteData = {
+            answer: remote.answer,
+            confidence: null,
+            confidence_status: 'not_calibrated',
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_reason: 'External public Hugging Face ZeroGPU specialist; no calibrated ORBITAL-AI confidence is claimed.',
+            detected_features: [],
+            label: 'External Optical–SAR VLM',
+            mode: 'external_hf_zero_gpu',
+            is_synthetic: false,
+            execution_trace: legacyData.execution_trace ?? null,
+            fusion_features: null,
+          }
+          setHistory(prev => [...prev, {
+            question: fusionQuery, answer: remoteData.answer, confidence_percent: 0, confidenceScore: 0,
+            confidence: 'low', confidence_reason: remoteData.confidence_reason, confidence_status: 'not_calibrated',
+            detected_features: [], label: remoteData.label,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            execution_trace: null, fusion_features: null, mode: remoteData.mode,
+          }])
+          setAnalysis(remoteData as Analysis); setStatus('Fusion complete')
+          addToast('Optical–SAR remote analysis complete', 'success')
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fusion error'
