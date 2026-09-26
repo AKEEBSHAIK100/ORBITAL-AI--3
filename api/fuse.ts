@@ -27,13 +27,6 @@ COMMUNICATION RULES:
 
 Return valid JSON using the standard ORBITAL-AI schema.`
 
-/**
- * Fallback classical CV telemetry calculator if Python backend is offline.
- */
-function computeSimulatedFusionFeatures(_opticalBase64?: string, _sarBase64?: string): FusionFeatures {
-  throw new Error('Synthetic fusion telemetry is disabled for SIH release integrity. Use the real Python fusion specialist.')
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' })
 
