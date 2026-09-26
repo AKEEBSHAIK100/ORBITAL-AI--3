@@ -1241,7 +1241,7 @@ export default function App() {
       if (res.ok && data.answer) {
         if (data.fusion_features) setFusionFeatures(data.fusion_features)
         if (data.execution_trace) { setLastFusionTrace(data.execution_trace); setActiveTrace(data.execution_trace) }
-        const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : 0)
+        const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : null)
         setHistory(prev => [...prev, {
           question: fusionQuery, answer: data.answer, confidence_percent: confVal, confidenceScore: confVal,
           confidence: data.confidence_level ? data.confidence_level.toLowerCase() : (data.confidence_status === 'unavailable' || data.confidence == null ? 'unavailable' : data.confidence),
@@ -1379,8 +1379,8 @@ export default function App() {
       lines.push(`- **High Confidence:** ${buildingAnalysis.high_confidence_count}`)
       lines.push(`- **Medium Confidence:** ${buildingAnalysis.medium_confidence_count}`)
       lines.push(`- **Partial Edge:** ${buildingAnalysis.partial_count}`)
-      lines.push(`- **Confidence Level:** ${buildingAnalysis.confidence_level} (${Math.round(buildingAnalysis.confidence * 100)}%)`)
-      lines.push(`- **Validation:** ${buildingAnalysis.validation_status}`)
+      lines.push(`- **Confidence Level:** ${buildingAnalysis.confidence_level ?? '—'}${buildingAnalysis.confidence != null ? ` (${Math.round(buildingAnalysis.confidence * 100)}% model score)` : ''}`)
+      lines.push(`- **Validation:** ${buildingAnalysis.validation_status ?? '—'}`)
     }
     if (trace) {
       lines.push('', '## 5. Observable Execution Trace')
