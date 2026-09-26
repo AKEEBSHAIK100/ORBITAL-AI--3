@@ -140,10 +140,14 @@ def synthesize_response(
         hi = bldg_ev.evidence.get("high_confidence_count") if bldg_ev else None
         med = bldg_ev.evidence.get("medium_confidence_count") if bldg_ev else None
         conf = bldg_ev.confidence if bldg_ev else None
+        tier_text = (
+            f"({hi} high certainty, {med} medium certainty)."
+            if hi is not None and med is not None
+            else "The specialist did not return confidence-tier counts."
+        )
         answer = (
-            f"The building detection specialist extracted {cnt} structural rooftop footprints "
-            + (f"({hi} high certainty, {med} medium certainty). " if hi is not None and med is not None else "The specialist did not return confidence-tier counts. ")
-            f"Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
+            f"The building detection specialist extracted {cnt} structural rooftop footprints. "
+            f"{tier_text} Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
         )
         return answer, conf, "calibrated", warnings
 
@@ -210,7 +214,7 @@ def synthesize_response(
             direction = "increase" if veg_delta > 0 else "decrease" if veg_delta < 0 else "no directional change"
             answer = (
                 f"The image-derived vegetation proxy shows a {direction} between the two supplied images. "
-                f"The change detector identified increased vegetated-area evidence across {chg_pct:.1f}% "
+                f"The change detector identified {abs(veg_delta):.1f}% relative change in the image-derived vegetation proxy across {chg_pct:.1f}% "
                 "of the comparison region. Confidence is not calibrated for this workflow."
             )
             return answer, None, "not_calibrated", warnings
