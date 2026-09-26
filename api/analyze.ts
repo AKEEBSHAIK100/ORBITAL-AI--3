@@ -158,10 +158,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parameters: { compatibility: validation.compatibility },
     })
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
-
-
 
     // Vercel serverless does not have the trained BigEarthNet classifier.
     // Never synthesize a land-cover label from encoded JPEG bytes: that is not
