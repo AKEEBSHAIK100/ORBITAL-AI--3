@@ -485,9 +485,9 @@ def run_orbital_analysis(
                 raw_detections_count=res.get("raw_detections_count", 0),
                 merged_detections_count=res.get("merged_detections_count", 0),
                 building_count=res.get("building_count", 0),
-                high_confidence_count=res.get("high_confidence_count", 0),
-                medium_confidence_count=res.get("medium_confidence_count", 0),
-                low_confidence_count=res.get("low_confidence_count", 0),
+                high_confidence_count=res.get("high_confidence_count"),
+                medium_confidence_count=res.get("medium_confidence_count"),
+                low_confidence_count=res.get("low_confidence_count"),
                 partial_count=res.get("partial_count", 0),
                 confidence=res.get("confidence"),
                 confidence_level=res.get("confidence_level"),
@@ -498,14 +498,14 @@ def run_orbital_analysis(
             )
             visual_evidence["building_analysis"] = building_response.model_dump() if hasattr(building_response, "model_dump") else building_response.dict()
             visual_evidence["geojson"] = res.get("geojson")
-            result_summary = f"Detected {res.get('building_count', 0)} structures ({res.get('high_confidence_count', 0)} high confidence)"
+            result_summary = (f"Detected {res.get('building_count')} structures" if res.get("building_count") is not None else "Building specialist returned no count")
 
         elif specialist_id in ["visual_grounding", "grounding"]:
             g_items = [
                 GroundingItem(
                     target=r["target"],
                     region=GroundingRegion(**r["region"]),
-                    confidence=r.get("confidence", 0.0),
+                    confidence=r.get("confidence"),
                     label=r["label"]
                 )
                 for r in res.get("regions", [])
@@ -514,7 +514,7 @@ def run_orbital_analysis(
             visual_evidence["grounding_regions"] = [
                 g.model_dump() if hasattr(g, "model_dump") else g.dict() for g in g_items
             ]
-            result_summary = f"Localized {len(g_items)} regions for '{res.get('target', 'target')}'"
+            result_summary = f"Localized {len(g_items)} regions for '{res.get('target', 'target')}'" if res.get("target") else f"Localized {len(g_items)} regions"
 
         elif specialist_id in ["optical_sar_fusion", "optical_sar"]:
             fusion_response = res.get("metrics")
@@ -649,8 +649,8 @@ def run_orbital_analysis(
         execution_trace=trace,
         success=True,
         task_type=plan.intent,
-        confidence_level="High" if final_conf and final_conf >= 0.8 else "UNAVAILABLE",
-        confidence_source="calibrated" if final_conf is not None else "model_output_not_calibrated",
+        confidence_level="AVAILABLE_SCORE" if final_conf is not None else "UNAVAILABLE",
+        confidence_source="specialist_reported_score" if final_conf is not None else "not_calibrated",
         tools_used=tools_used,
         input_modality=(modalities or ["optical"])[0],
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ"),
