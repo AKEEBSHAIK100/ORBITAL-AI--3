@@ -1,5 +1,5 @@
 """
-SatQuery AI — Lightweight Runtime Capability & Provenance Inspector.
+ORBITAL-AI — Lightweight Runtime Capability & Provenance Inspector.
 
 Inspects actual local filesystem and model registry availability without
 triggering heavy PyTorch model weights loading or unannounced network downloads.
@@ -32,8 +32,8 @@ def inspect_capabilities() -> Dict[str, Any]:
     )
 
     # 2. BigEarthNet ResNet-50
-    # Classifier code exists; BIFOLD model ID is configured
-    ben_available = True
+    # A configured model ID is not proof of executable local readiness.
+    ben_available = False
 
     # 3. Caption LoRA pilot adapter
     caption_available = (
@@ -47,9 +47,8 @@ def inspect_capabilities() -> Dict[str, Any]:
         and (VQA_ADAPTER_PATH / "adapter_model.safetensors").exists()
     )
 
-    # 5. Classical Change Detection & Optical-SAR (pure NumPy/OpenCV engines)
-    change_available = True
-    fusion_available = True
+    # 5. Classical Change Detection & Optical-SAR are executable baselines.
+    # They are not presented as trained-model availability.
 
     # 6. Generalist Qwen2-VL-2B (Unadapted fallback VLM)
     qwen_weights_installed = (
@@ -92,10 +91,10 @@ def inspect_capabilities() -> Dict[str, Any]:
             "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
             "type": "trained_deep_classifier",
             "status": "available" if ben_available else "unavailable",
-            "display_status": "Available",
+            "display_status": "Available" if ben_available else "Unavailable",
             "provenance": "Official BIFOLD BigEarthNet v2.0 Corine 19-class taxonomy (IGARSS 2025)",
             "benchmark_claim": None,
-            "weights_present": True,
+            "weights_present": ben_available,
         },
         {
             "id": "caption",
@@ -127,8 +126,8 @@ def inspect_capabilities() -> Dict[str, Any]:
             "model_id": "classical-cv-change-detector-v2",
             "type": "classical_cv",
             "status": "available",
-            "display_status": "Available",
-            "provenance": "Deterministic pixel differencing, morphological cleanup, and Excess Green Index",
+            "display_status": "Available (baseline)",
+            "provenance": "Deterministic pixel differencing, morphological cleanup, and visible-band vegetation proxy",
             "benchmark_claim": None,
             "weights_present": True,
         },
@@ -138,8 +137,8 @@ def inspect_capabilities() -> Dict[str, Any]:
             "model_id": "classical-cv-fusion-engine-v2",
             "type": "classical_cv",
             "status": "available",
-            "display_status": "Available",
-            "provenance": "Gaussian SSIM, NCC, and raw SAR signal level telemetry (uncalibrated to sigma-nought)",
+            "display_status": "Available (baseline)",
+            "provenance": "Classical RGB proxies, raw SAR intensity telemetry, SSIM/NCC; no sensor-specific calibration",
             "benchmark_claim": None,
             "weights_present": True,
         },
@@ -188,7 +187,7 @@ def inspect_capabilities() -> Dict[str, Any]:
 
     return {
         "status": "success",
-        "service": "SatQuery AI Capability & Provenance Inspector",
+        "service": "ORBITAL-AI Capability & Provenance Inspector",
         "version": "3.0.0",
         "capabilities": items,
         "summary": {
