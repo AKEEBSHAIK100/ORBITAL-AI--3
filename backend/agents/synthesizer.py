@@ -139,6 +139,8 @@ def synthesize_response(
     # Intent: building_detection ("How many buildings?")
     if intent == "building_detection":
         cnt = bldg_ev.evidence.get("building_count") if bldg_ev else None
+        if cnt is None:
+            return "SPECIALIST UNAVAILABLE: Building detection returned no verified building count.", None, "unavailable", warnings
         hi = bldg_ev.evidence.get("high_confidence_count") if bldg_ev else None
         med = bldg_ev.evidence.get("medium_confidence_count") if bldg_ev else None
         conf = bldg_ev.confidence if bldg_ev else None
@@ -351,6 +353,8 @@ def synthesize_response(
             else:
                 parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected; cluster count was not returned.")
 
+        if not parts:
+            return "SPECIALIST UNAVAILABLE: No usable specialist evidence was returned for this multi-task request.", None, "unavailable", warnings
         parts.append("Confidence is not calibrated across this multi-specialist workflow.")
         answer = " ".join(parts)
         return answer, None, "not_calibrated", warnings
