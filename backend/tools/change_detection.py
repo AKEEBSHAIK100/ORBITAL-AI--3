@@ -113,7 +113,7 @@ class ChangeDetectionTool(BaseTool):
             except (ValueError, TypeError):
                 pass
 
-        if crs1 or gt1 or (gsd1 and gsd2):
+        if (crs1 and crs2) or (gt1 and gt2) or (gsd1 is not None and gsd2 is not None):
             geospatial_compatibility = "verified"
             geospatial_note = f"Geospatial co-registration verified from metadata (CRS: {crs1 or 'consistent'})."
         else:
