@@ -218,31 +218,29 @@ class BENClassifier:
         top_k: int = 5,
         threshold: float = 0.25,
     ) -> Dict:
-        """
-        Run BigEarthNet v2.0 19-class multi-label inference on an image.
-
-        Args:
-            image_bytes: Raw image bytes (JPEG / PNG / TIFF)
-            top_k:       Maximum number of labels to return
-            threshold:   Sigmoid probability threshold for a label to be "active"
-
-        Returns:
-            {
-                "labels":     [{name, short, score, active}],
-                "top_label":  str,
-                "confidence": float,
-                "model_id":   str,
-                "available":  bool,
-                "device":     str,
-                "note":       str,
-            }
-        """
+        """Run BigEarthNet v2.0 inference only when the real model is available."""
         if not self._available and self._model is None and not self._load_error:
             self.ensure_model_loaded()
+
         if self._available and self._model is not None:
             return self._run_model_inference(image_bytes, top_k, threshold)
-        else:
-            return self._heuristic_fallback(image_bytes, top_k)
+
+        return {
+            "labels": [],
+            "active_labels": [],
+            "top_label": None,
+            "confidence": None,
+            "model_id": self._model_id,
+            "available": False,
+            "device": self._device,
+            "note": (
+                "BigEarthNet v2.0 classifier unavailable; no heuristic or synthetic "
+                "land-cover result is returned."
+            ),
+            "citation": None,
+            "status": "unavailable",
+            "error": self._load_error or "Model weights are not loaded.",
+        }
 
     def _run_model_inference(
         self, image_bytes: bytes, top_k: int, threshold: float
@@ -252,49 +250,66 @@ class BENClassifier:
         import torchvision.transforms.functional as TF
         from PIL import Image
 
-        # ── Decode image ─────────────────────────────────────────────────────
         try:
             pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         except Exception as e:
             logger.warning(f"[BEN] Image decode failed: {e}")
-            return self._heuristic_fallback(image_bytes, top_k)
+            return {
+                "labels": [],
+                "active_labels": [],
+                "top_label": None,
+                "confidence": None,
+                "model_id": self._model_id,
+                "available": False,
+                "device": self._device,
+                "note": "Image decoding failed; no classification result returned.",
+                "citation": None,
+                "status": "error",
+                "error": str(e),
+            }
 
-        # ── Preprocess: resize → 3-band tensor → replicate to 10 S2 bands ──
-        # The model expects 10 Sentinel-2 bands (B02..B12 at 120×120).
-        # We approximate using the RGB image replicated/mapped to S2 bands.
         pil_img = pil_img.resize((BEN_IMG_SIZE, BEN_IMG_SIZE))
-        rgb = np.array(pil_img, dtype=np.float32)  # H×W×3, range 0-255
+        rgb = np.array(pil_img, dtype=np.float32)
+        rgb_scaled = rgb / 255.0 * 3000.0
 
-        # Map RGB (0-255) to approximate Sentinel-2 reflectance scale (0-10000)
-        rgb_scaled = rgb / 255.0 * 3000.0  # crude approximation
-
-        # Build 10-channel tensor by replicating/mapping RGB → 10 S2 bands
-        # Band order: B02(blue), B03(green), B04(red), B05-B12 approximated
         channels = np.stack([
-            rgb_scaled[:, :, 2],  # B02 — blue
-            rgb_scaled[:, :, 1],  # B03 — green
-            rgb_scaled[:, :, 0],  # B04 — red
-            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 2,   # B05 (red-edge proxy)
-            rgb_scaled[:, :, 1],  # B06 (red-edge proxy)
-            rgb_scaled[:, :, 1] * 1.1,  # B07
-            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 1.8,  # B08
-            rgb_scaled[:, :, 1] * 0.9,  # B8A
-            rgb_scaled[:, :, 0] * 0.7,  # B11 (SWIR proxy)
-            rgb_scaled[:, :, 0] * 0.5,  # B12 (SWIR proxy)
-        ], axis=0)  # 10×H×W
+            rgb_scaled[:, :, 2],
+            rgb_scaled[:, :, 1],
+            rgb_scaled[:, :, 0],
+            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 2,
+            rgb_scaled[:, :, 1],
+            rgb_scaled[:, :, 1] * 1.1,
+            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 1.8,
+            rgb_scaled[:, :, 1] * 0.9,
+            rgb_scaled[:, :, 0] * 0.7,
+            rgb_scaled[:, :, 0] * 0.5,
+        ], axis=0)
 
-        # Normalize per BEN v2.0 dataset statistics
         for i in range(10):
             channels[i] = (channels[i] - BEN_S2_MEAN[i]) / (BEN_S2_STD[i] + 1e-8)
 
-        tensor = torch.from_numpy(channels).float().unsqueeze(0).to(self._device)  # 1×10×120×120
+        tensor = torch.from_numpy(channels).float().unsqueeze(0).to(self._device)
 
-        # ── Inference ────────────────────────────────────────────────────────
-        with torch.no_grad():
-            logits = self._model(tensor)
-            scores = torch.sigmoid(logits).squeeze().cpu().numpy()
+        try:
+            with torch.no_grad():
+                logits = self._model(tensor)
+                scores = torch.sigmoid(logits).squeeze().cpu().numpy()
+        except Exception as e:
+            logger.warning(f"[BEN] Inference failed: {e}")
+            return {
+                "labels": [],
+                "active_labels": [],
+                "top_label": None,
+                "confidence": None,
+                "model_id": self._model_id,
+                "available": False,
+                "device": self._device,
+                "note": "BigEarthNet inference failed; no classification result returned.",
+                "citation": None,
+                "status": "error",
+                "error": str(e),
+            }
 
-        # ── Format results ────────────────────────────────────────────────────
         label_scores = [
             {
                 "name": BIGEARTHNET_19_CLASSES[i],
@@ -305,7 +320,6 @@ class BENClassifier:
             for i in range(19)
         ]
         label_scores.sort(key=lambda x: x["score"], reverse=True)
-
         top = label_scores[0]
         active_labels = [l for l in label_scores if l["active"]]
 
@@ -319,64 +333,7 @@ class BENClassifier:
             "device": self._device,
             "note": f"BigEarthNet v2.0 · ResNet-50 · {len(active_labels)} active classes (≥{threshold:.0%})",
             "citation": "Clasen et al., IGARSS 2025 · arXiv:2407.03653",
-        }
-
-    def _heuristic_fallback(self, image_bytes: bytes, top_k: int) -> Dict:
-        """
-        Lightweight heuristic classification when model is unavailable.
-        Uses basic pixel statistics to estimate land-cover class.
-        """
-        try:
-            from PIL import Image
-
-            img = Image.open(io.BytesIO(image_bytes)).convert("RGB").resize((64, 64))
-            arr = np.array(img, dtype=np.float32) / 255.0
-            r, g, b = arr[:, :, 0].mean(), arr[:, :, 1].mean(), arr[:, :, 2].mean()
-
-            scores = np.zeros(19)
-            # Heuristic mappings
-            if b > r * 1.15 and b > 0.18:          # water dominant
-                scores[17] = 0.82  # Inland waters
-                scores[16] = 0.35  # Coastal wetlands
-            elif g > r * 1.10 and g > 0.22:         # vegetation dominant
-                scores[8] = 0.75   # Broad-leaved forest
-                scores[2] = 0.55   # Arable land
-                scores[4] = 0.45   # Pastures
-            elif r > 0.38 and g > 0.30 and b < 0.28:  # arid/soil
-                scores[11] = 0.65  # Natural grassland
-                scores[13] = 0.50  # Transitional woodland
-                scores[14] = 0.40  # Beaches/dunes
-            else:                                    # urban/mixed
-                scores[0] = 0.72   # Urban fabric
-                scores[1] = 0.45   # Industrial/commercial
-                scores[2] = 0.30   # Arable land
-
-        except Exception:
-            scores = np.zeros(19)
-            scores[0] = 0.60  # default: urban fabric
-
-        label_scores = [
-            {
-                "name": BIGEARTHNET_19_CLASSES[i],
-                "short": BIGEARTHNET_19_SHORT[i],
-                "score": float(scores[i]),
-                "active": bool(scores[i] >= 0.3),
-            }
-            for i in range(19)
-        ]
-        label_scores.sort(key=lambda x: x["score"], reverse=True)
-        top = label_scores[0]
-
-        return {
-            "labels": label_scores[:top_k],
-            "active_labels": [l for l in label_scores if l["active"]][:top_k],
-            "top_label": top["short"],
-            "confidence": round(float(top["score"]) * 100, 1),
-            "model_id": "heuristic-fallback",
-            "available": False,
-            "device": "cpu",
-            "note": f"Heuristic fallback (configilm unavailable: {self._load_error[:80]})",
-            "citation": "",
+            "status": "success",
         }
 
     @property
