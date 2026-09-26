@@ -164,8 +164,8 @@ class ModelRegistry:
             top_label = pred.get("top_label", "Unknown")
             return {
                 "answer": f"Primary land cover identified as: {top_label}.",
-                "confidence": round(pred.get("confidence", 85.0) / 100.0, 2),
-                "confidence_level": "High",
+                "confidence": (round(pred.get("confidence") / 100.0, 2) if pred.get("confidence") is not None else None),
+                "confidence_level": "UNAVAILABLE" if pred.get("confidence") is None else "MODEL_SCORE",
                 "evidence": {"top_label": top_label, "active_labels": pred.get("active_labels", [])}
             }
 
