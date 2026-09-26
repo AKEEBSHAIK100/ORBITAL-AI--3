@@ -88,15 +88,17 @@ class BigEarthNetTool(BaseTool):
         duration_ms = (time.time() - t0) * 1000
 
         result = {
-            "status": "success",
+            "status": res.get("status", "success"),
             "top_label": res.get("top_label"),
             "confidence": res.get("confidence"),
             "labels": res.get("labels", []),
             "active_labels": res.get("active_labels", []),
-            "model_id": self.model_id,
+            "model_id": res.get("model_id", self.model_id),
             "duration_ms": round(duration_ms, 2),
             "citation": res.get("citation"),
             "cache_hit": False,
+            "error": res.get("error"),
+            "note": res.get("note"),
         }
         result_cache.set(cache_key, result)
         return result
