@@ -2,6 +2,8 @@ const SPACE = 'cattolatte/satquery'
 const ENDPOINT = '/answer'
 const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.0/dist/index.min.js'
 
+type GradioStatus = { status?: string; load_status?: string; message?: string }
+
 type GradioClient = {
   predict: (endpoint: string, data: unknown[]) => Promise<{ data?: unknown[] }>
 }
@@ -10,21 +12,31 @@ type GradioModule = {
   Client: {
     connect: (
       source: string,
-      options?: { status_callback?: (status: { status?: string; load_status?: string; message?: string }) => void },
+      options?: { status_callback?: (status: GradioStatus) => void },
     ) => Promise<GradioClient>
   }
   handle_file: (file: Blob) => unknown
 }
 
+let modulePromise: Promise<GradioModule> | null = null
 let clientPromise: Promise<GradioClient> | null = null
+
+async function loadGradio(): Promise<GradioModule> {
+  if (!modulePromise) {
+    modulePromise = (async () => {
+      // Keep the main Vite bundle lean; load the pinned client only when analysis is requested.
+      // @ts-expect-error The module is intentionally loaded from a pinned CDN URL.
+      return (await import(/* @vite-ignore */ CLIENT_URL)) as GradioModule
+    })()
+  }
+  return modulePromise
+}
 
 async function getClient(onStatus?: (message: string) => void): Promise<GradioClient> {
   if (!clientPromise) {
     clientPromise = (async () => {
-      // The Gradio client is loaded at runtime so the main Vite bundle stays lean.
-      // @ts-expect-error The module is intentionally loaded from a pinned CDN URL.
-      const mod = (await import(/* @vite-ignore */ CLIENT_URL)) as GradioModule
-      return mod.Client.connect(SPACE, {
+      const { Client } = await loadGradio()
+      return Client.connect(SPACE, {
         status_callback: (status) => {
           const phase = status?.load_status || status?.status
           if (phase === 'pending' || phase === 'generating' || phase === 'running') {
@@ -54,9 +66,9 @@ function asText(value: unknown): string {
 }
 
 /**
- * Executes the same public remote-sensing Space already used by the server fallback,
- * but from the browser. This prevents a Vercel serverless timeout while the ZeroGPU
- * model is waking and generating. No client-side heuristic is used.
+ * Executes the same public remote-sensing Space used by the server fallback,
+ * but from the browser. This avoids a Vercel serverless timeout while the
+ * ZeroGPU model is waking and generating. No client-side heuristic is used.
  */
 export async function runBrowserRemoteAnalysis(
   question: string,
@@ -67,8 +79,8 @@ export async function runBrowserRemoteAnalysis(
   if (!imageA) throw new Error('A primary image is required.')
   onStatus?.('Connecting to remote-sensing specialist…')
 
-  const [blobA, blobB] = await Promise.all([
-    dataUrlToBlob(imageA),
+  const [{ blob: blobA, handle_file }, blobB] = await Promise.all([
+    dataUrlToBlob(imageA).then(async blob => ({ blob, handle_file: (await loadGradio()).handle_file })),
     imageB ? dataUrlToBlob(imageB) : Promise.resolve(null),
   ])
 
@@ -77,8 +89,8 @@ export async function runBrowserRemoteAnalysis(
 
   const result = await client.predict(ENDPOINT, [
     question,
-    (await import(/* @vite-ignore */ CLIENT_URL) as GradioModule).handle_file(blobA),
-    blobB ? (await import(/* @vite-ignore */ CLIENT_URL) as GradioModule).handle_file(blobB) : null,
+    handle_file(blobA),
+    blobB ? handle_file(blobB) : null,
   ])
 
   const data = Array.isArray(result?.data) ? result.data : []
