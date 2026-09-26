@@ -924,7 +924,7 @@ function HeroSection({
             </h1>
 
             <p className="text-lg leading-relaxed mb-10 max-w-lg" style={{ color: C.muted, lineHeight: 1.8 }}>
-              ORBITAL-AI automatically infers required remote-sensing specialists from natural-language queries across single-image observation, bi-temporal change analysis, and optical-SAR fusion — with an observable execution trace behind every finding.
+              ORBITAL-AI turns natural-language questions into validated remote-sensing workflows across single-image analysis, bi-temporal change understanding, and optical-SAR reasoning. Every run exposes what was executed, what evidence was available, and where uncertainty remains.
             </p>
 
             {/* CTA buttons */}
@@ -939,7 +939,7 @@ function HeroSection({
               {[
                 { val: '3', label: 'Analysis Input Modes', col: C.cyan },
                 { val: 'MULTI', label: 'Specialist Ensemble', col: C.mint },
-                { val: '100%', label: 'Deterministic Routing', col: C.orange },
+                { val: 'RULE', label: 'Query-Driven Routing', col: C.orange },
                 { val: 'TRACE', label: 'Observable Verification', col: C.white },
               ].map(s => (
                 <div key={s.label}>
@@ -982,7 +982,7 @@ function HeroSection({
             <div className="absolute bottom-6 left-0 glass card-border rounded-xl px-4 py-3 text-xs font-mono">
               <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: C.muted }}>PIPELINE STATUS</div>
               <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full glow-pulse" style={{ background: C.mint }} /><span style={{ color: C.mint, fontWeight: 600 }}>System Online</span></div>
-              <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>Awaiting remote sensing imagery & query</div>
+              <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>Awaiting imagery and a natural-language query</div>
             </div>
           </div>
         </div>
