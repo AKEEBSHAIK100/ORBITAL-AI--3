@@ -66,7 +66,7 @@ class CaptionTool(BaseTool):
             }
 
         # 1. Primary execution path: BLIP + LoRA pilot adapter
-        adapter_res = self.runtime.caption(img_bgr)
+        adapter_res = self.runtime.caption(img_bgr, metadata=inputs.get("metadata"))
         status = adapter_res.get("status", "error")
         caption = adapter_res.get("caption")
         inference_time_ms = adapter_res.get("inference_time_ms", (time.time() - t0) * 1000)
@@ -75,6 +75,7 @@ class CaptionTool(BaseTool):
         evidence: Dict[str, Any] = {
             "device": adapter_res.get("device", self.runtime.device),
             "raw_output": adapter_res.get("answer"),
+            "sensor_metadata": adapter_res.get("sensor_metadata"),
         }
 
         # 2. Retain BigEarthNet land-cover information ONLY as optional supporting evidence
@@ -127,7 +128,7 @@ class CaptionTool(BaseTool):
         return {
             "status": status,
             "caption": caption,
-            "answer": caption or adapter_res.get("answer", "Descriptive scene caption generated."),
+            "answer": caption or adapter_res.get("answer"),
             "model_id": self.model_id,
             "adapter": self.adapter,
             "evidence": evidence,
