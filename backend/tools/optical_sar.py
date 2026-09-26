@@ -30,7 +30,19 @@ class OpticalSARTool(BaseTool):
             return {"error": "Missing optical image for optical-SAR fusion", "status": "error"}
 
         if sar_bgr is None or not isinstance(sar_bgr, np.ndarray):
-            # Joint optical-SAR analysis requires both observations. Never silently\n        # downgrade a fusion request to optical-only analysis.\n        if sar_bgr is None or not isinstance(sar_bgr, np.ndarray):\n            return {\n                "status": "specialist_unavailable",\n                "answer": "Optical-SAR fusion requires both an optical image and a SAR image. No optical-only fallback is returned for a joint-analysis request.",\n                "metrics": None,\n                "is_synthetic_sar": False,\n                "is_coregistered": False,\n                "confidence": None,\n                "confidence_status": "unavailable",\n                "warnings": ["SAR input is missing; joint optical-SAR analysis was not executed."],\n                "duration_ms": (time.time() - t0) * 1000,\n            }\n\n        # Co-registration verification
+            return {
+                "status": "specialist_unavailable",
+                "answer": "Optical-SAR fusion requires both an optical image and a SAR image. No optical-only fallback is returned for a joint-analysis request.",
+                "metrics": None,
+                "is_synthetic_sar": False,
+                "is_coregistered": False,
+                "confidence": None,
+                "confidence_status": "unavailable",
+                "warnings": ["SAR input is missing; joint optical-SAR analysis was not executed."],
+                "duration_ms": (time.time() - t0) * 1000,
+            }
+
+        # Co-registration verification
         meta_opt = inputs.get("metadata") or {}
         meta_sar = inputs.get("secondary_metadata") or {}
 
