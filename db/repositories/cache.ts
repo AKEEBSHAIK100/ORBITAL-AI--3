@@ -102,9 +102,9 @@ export async function putCached(
 ): Promise<void> {
   await dbQuery(`
     INSERT INTO analysis_cache
-      (cache_key, session_id, task_type, result_json, model_id, agent_version, cache_schema_ver, expires_at)
+      (cache_key, session_id, task_type, result_json, model_id, agent_version, expires_at)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, NOW() + ($8 || ' minutes')::INTERVAL)
+      ($1, $2, $3, $4, $5, $6, NOW() + ($7 || ' minutes')::INTERVAL)
     ON CONFLICT (cache_key) DO UPDATE
       SET result_json = EXCLUDED.result_json,
           expires_at = EXCLUDED.expires_at,
@@ -116,7 +116,6 @@ export async function putCached(
     JSON.stringify(payload.result),
     payload.model_id ?? null,
     payload.agent_version ?? null,
-    CACHE_SCHEMA_VERSION,
     CACHE_TTL_MINUTES,
   ])
 }
