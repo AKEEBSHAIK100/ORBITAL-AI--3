@@ -85,9 +85,9 @@ def synthesize_response(
 
     # Conflict check: VQA says "no buildings" or "no" while building detector found significant buildings
     if bldg_ev and vqa_ev:
-        bldg_cnt = bldg_ev.evidence.get("building_count", 0)
+        bldg_cnt = bldg_ev.evidence.get("building_count") if bldg_ev else None
         vqa_ans = str(vqa_ev.result).lower()
-        if bldg_cnt > 5 and ("no building" in vqa_ans or vqa_ans.strip() in ["no", "no."]):
+        if bldg_cnt is not None and bldg_cnt > 5 and ("no building" in vqa_ans or vqa_ans.strip() in ["no", "no."]):
             conflict = True
 
     if conflict:
@@ -158,20 +158,24 @@ def synthesize_response(
         regions = ground_ev.evidence.get("regions", []) if ground_ev else []
         targets = ground_ev.evidence.get("targets", []) if ground_ev else []
         top_reg = ground_ev.evidence.get("primary_region") if ground_ev else (regions[0]["region"] if regions else None)
-        bldg_part = f" Concurrently, {bldg_ev.evidence.get('building_count', 0)} building footprints were demarcated." if bldg_ev else ""
+        bldg_part = f" Concurrently, {bldg_ev.evidence.get('building_count')} building footprints were demarcated." if bldg_ev and bldg_ev.evidence.get("building_count") is not None else ""
 
         if len(targets) > 1:
             target_parts: List[str] = []
             for t in targets:
-                t_label = t.get("label", "target")
+                t_label = t.get("label")
+                if not t_label:
+                    continue
                 t_status = t.get("status")
                 t_cnt = t.get("count", len(t.get("regions", [])))
                 if t_status == "unsupported":
                     target_parts.append(f"'{t_label}' is unsupported by classical spectral grounding")
                 elif t_cnt > 0:
                     top_t_reg = t["regions"][0]["region"]
-                    loc_s = f"X: {top_t_reg.get('x_percent', 0)}%, Y: {top_t_reg.get('y_percent', 0)}%"
-                    target_parts.append(f"{t_label} ({t_cnt} region(s), primary at [{loc_s}])")
+                    loc_x = top_t_reg.get("x_percent")
+                    loc_y = top_t_reg.get("y_percent")
+                    loc_s = f"X: {loc_x}%, Y: {loc_y}%" if loc_x is not None and loc_y is not None else None
+                    target_parts.append(f"{t_label} ({t_cnt} region(s)" + (f", primary at [{loc_s}]" if loc_s else "") + ")")
                 else:
                     target_parts.append(f"no regions localized for {t_label}")
             answer = (
@@ -182,7 +186,11 @@ def synthesize_response(
             target_name = ground_ev.evidence.get("target") if ground_ev else None
             if not target_name:
                 return "SPECIALIST UNAVAILABLE: Grounding returned a region without a verified target label.", None, "unavailable", warnings
-            loc_str = f"X: {top_reg.get('x_percent', 0)}%, Y: {top_reg.get('y_percent', 0)}%, Width: {top_reg.get('w_percent', 0)}%, Height: {top_reg.get('h_percent', 0)}%"
+            loc_x, loc_y = top_reg.get("x_percent"), top_reg.get("y_percent")
+            loc_w, loc_h = top_reg.get("w_percent"), top_reg.get("h_percent")
+            if loc_x is None or loc_y is None or loc_w is None or loc_h is None:
+                return "SPECIALIST UNAVAILABLE: Grounding returned an incomplete region geometry.", None, "unavailable", warnings
+            loc_str = f"X: {loc_x}%, Y: {loc_y}%, Width: {loc_w}%, Height: {loc_h}%"
             answer = (
                 f"The visual grounding specialist localized {target_name} at coordinates [{loc_str}].{bldg_part} "
                 "Confidence is not calibrated for this workflow."
