@@ -100,5 +100,7 @@ class BigEarthNetTool(BaseTool):
             "error": res.get("error"),
             "note": res.get("note"),
         }
-        result_cache.set(cache_key, result)
+        # Cache only successful real inference; availability failures must not be pinned in cache.
+        if result.get("status") == "success" and result.get("top_label") is not None:
+            result_cache.set(cache_key, result)
         return result
