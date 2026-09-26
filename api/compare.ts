@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { client, classifyError, cleanJson, imageContent, incrementCallCounter, MODEL, parseDataUrl, systemPrompt } from './_lib.js'
-import { MAX_TOKENS_COMPARE } from '../lib/constants.js'
+import { buildExecutionTrace, type ExecutionTraceStep } from '../lib/agentController.js'
 import { classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep } from '../lib/agentController.js'
 import { runWorkerChange } from './_hfWorker.js'
 
@@ -115,90 +114,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Optional unadapted VLM path, only when explicitly configured.
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key') || apiKey === 'sk-placeholder-key'
-    let before: string
-    let after: string
-    try {
-      before = parseDataUrl(beforeImage)
-      after = parseDataUrl(afterImage)
-    } catch {
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.status(200).json({
-        answer: 'The supplied temporal images could not be decoded. No change result was estimated.',
-        confidence: null, confidence_percent: null, confidenceScore: null, confidence_source: 'none',
-        change_regions: [], alignment_confidence: null, label: 'Change analysis unavailable',
-        execution_trace: trace,
-      })
-    }
-
-    if (isPlaceholderKey) {
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.status(200).json({
-        answer: 'Bi-temporal change analysis is unavailable in this deployment because no executable change specialist or configured vision provider is reachable.',
-        confidence: null, confidence_percent: null, confidenceScore: null, confidence_source: 'none',
-        change_regions: [], alignment_confidence: null, label: 'Change analysis unavailable',
-        data_limitation_note: 'Connect the real Python remote-sensing backend to execute the change workflow.',
-        execution_trace: trace,
-      })
-    }
-
-    incrementCallCounter()
-    const step3Start = Date.now()
-    try {
-      const response = await client.chat.completions.create({
-        model: MODEL, temperature: 0.2, max_tokens: MAX_TOKENS_COMPARE,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: `${systemPrompt}\nFor two images, return alignment_confidence ('high'|'medium'|'low'), change_regions, and confidence only when actually supported by the provider.` },
-          { role: 'user', content: [
-            { type: 'text', text: `Compare ${beforeLabel || 'the earlier image'} with ${afterLabel || 'the later image'}. Question: ${promptText}. Return JSON only.` },
-            { type: 'text', text: 'EARLIER IMAGE' }, imageContent(before),
-            { type: 'text', text: 'LATER IMAGE' }, imageContent(after),
-          ] },
-        ],
-      })
-      const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      if (typeof parsed.confidence_percent !== 'number') {
-        parsed.confidence_percent = null
-        parsed.confidenceScore = null
-        parsed.confidence_source = 'none'
-      } else {
-        parsed.confidence_percent = Math.max(0, Math.min(100, Math.round(parsed.confidence_percent)))
-        parsed.confidenceScore = parsed.confidence_percent
-      }
-      traceSteps.push({
-        step: 3, tool: 'rs_change_detector',
-        description: 'Vision-provider bi-temporal inference (explicitly unadapted fallback)',
-        input_summary: 'Optical temporal pair',
-        output_summary: 'Provider-generated change response',
-        duration_ms: Math.max(1, Date.now() - step3Start), status: 'success',
-        confidence_source: parsed.confidence_source || 'none',
-        parameters: { model: MODEL, remote_sensing_adapted: false },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.status(200).json({ ...parsed, execution_trace: trace })
-    } catch (apiError) {
-      const { userMessage, logTag } = classifyError(apiError)
-      console.warn(`[Orbital-AI] Change provider unavailable (${logTag}: ${userMessage}). No fabricated comparison returned.`)
-      traceSteps.push({
-        step: 3, tool: 'rs_change_detector',
-        description: 'Change specialist/provider availability guard',
-        input_summary: 'Two temporal observations',
-        output_summary: 'Execution unavailable; no fabricated change regions or confidence returned',
-        duration_ms: Math.max(1, Date.now() - step3Start), status: 'unavailable',
-        confidence_source: 'none', parameters: { provider_available: false },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.status(200).json({
-        answer: 'Bi-temporal change analysis is currently unavailable. No change result was estimated.',
-        confidence: null, confidence_percent: null, confidenceScore: null, confidence_source: 'none',
-        change_regions: [], alignment_confidence: null, label: 'Change analysis unavailable',
-        data_limitation_note: 'A real change specialist or configured vision provider is required.',
-        execution_trace: trace,
-      })
-    }
+    const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
+    return res.status(200).json({
+      answer: 'Bi-temporal change analysis is currently unavailable because no executable free remote-sensing specialist returned a result. No change result was estimated.',
+      confidence: null,
+      confidence_percent: null,
+      confidenceScore: null,
+      confidence_source: 'none',
+      confidence_status: 'unavailable',
+      change_regions: [],
+      alignment_confidence: null,
+      label: 'Change analysis unavailable',
+      data_limitation_note: 'Use the Python remote-sensing backend or the free public ZeroGPU specialist to execute the change workflow.',
+      execution_trace: trace,
+    })
   } catch (error) {
     const trace = buildExecutionTrace('change_detection', traceSteps, Date.now() - startTime, validateInputs('change_detection', 2), 'rs_change_detector')
     return res.status(200).json({
