@@ -85,8 +85,8 @@ class BuildingAnalysisResponse(BaseModel):
     medium_confidence_count: int
     low_confidence_count: int
     partial_count: int
-    confidence: float
-    confidence_level: str
+    confidence: Optional[float] = None
+    confidence_level: Optional[str] = None
     validation_status: str
     validation: Dict[str, Any]
     detections: List[BuildingDetectionItem]
