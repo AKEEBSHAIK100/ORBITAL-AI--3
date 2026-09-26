@@ -1,62 +1,74 @@
-const SPACE = 'cattolatte/satquery'
-const ENDPOINT = '/answer'
-const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.0/dist/index.min.js'
+const SPACE_URL = 'https://cattolatte-satquery.hf.space'
+const ANSWER_ENDPOINT = '/gradio_api/call/answer'
 
-type GradioStatus = { status?: string; load_status?: string; message?: string }
-
-type GradioClient = {
-  predict: (endpoint: string, data: unknown[]) => Promise<{ data?: unknown[] }>
+type FileRef = {
+  path: string
+  orig_name: string
+  meta: { _type: 'gradio.FileData' }
 }
 
-type GradioModule = {
-  Client: {
-    connect: (
-      source: string,
-      options?: { status_callback?: (status: GradioStatus) => void },
-    ) => Promise<GradioClient>
-  }
-  handle_file: (file: Blob) => unknown
-}
-
-let modulePromise: Promise<GradioModule> | null = null
-let clientPromise: Promise<GradioClient> | null = null
-
-async function loadGradio(): Promise<GradioModule> {
-  if (!modulePromise) {
-    modulePromise = (async () => {
-      // Keep the main Vite bundle lean; load the pinned client only when analysis is requested.
-      // @ts-expect-error The module is intentionally loaded from a pinned CDN URL.
-      return (await import(/* @vite-ignore */ CLIENT_URL)) as GradioModule
-    })()
-  }
-  return modulePromise
-}
-
-async function getClient(onStatus?: (message: string) => void): Promise<GradioClient> {
-  if (!clientPromise) {
-    clientPromise = (async () => {
-      const { Client } = await loadGradio()
-      return Client.connect(SPACE, {
-        status_callback: (status) => {
-          const phase = status?.load_status || status?.status
-          if (phase === 'pending' || phase === 'generating' || phase === 'running') {
-            onStatus?.('Waking remote vision model…')
-          } else if (phase === 'complete') {
-            onStatus?.('Remote vision model is ready.')
-          } else if (status?.message) {
-            onStatus?.(status.message)
-          }
-        },
-      })
-    })()
-  }
-  return clientPromise
+function fileRef(path: string, filename: string): FileRef {
+  return { path, orig_name: filename, meta: { _type: 'gradio.FileData' } }
 }
 
 async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const response = await fetch(dataUrl)
   if (!response.ok) throw new Error('Could not prepare the uploaded image for remote analysis.')
   return response.blob()
+}
+
+async function uploadImage(blob: Blob, filename: string): Promise<string> {
+  const form = new FormData()
+  form.append('files', blob, filename)
+  const response = await fetch(`${SPACE_URL}/gradio_api/upload`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!response.ok) throw new Error(`Remote specialist upload failed (HTTP ${response.status}).`)
+  const payload = await response.json()
+  const path = Array.isArray(payload) ? payload[0] : payload?.path
+  if (!path) throw new Error('Remote specialist returned no uploaded-file reference.')
+  return String(path)
+}
+
+async function startJob(data: unknown[]): Promise<string> {
+  const response = await fetch(`${SPACE_URL}${ANSWER_ENDPOINT}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  })
+  if (!response.ok) throw new Error(`Remote specialist queue request failed (HTTP ${response.status}).`)
+  const payload = await response.json()
+  if (!payload?.event_id) throw new Error('Remote specialist returned no job id.')
+  return String(payload.event_id)
+}
+
+async function readJob(eventId: string, onStatus?: (message: string) => void): Promise<unknown[]> {
+  const response = await fetch(`${SPACE_URL}${ANSWER_ENDPOINT}/${encodeURIComponent(eventId)}`)
+  if (!response.ok) throw new Error(`Remote specialist result request failed (HTTP ${response.status}).`)
+
+  const text = await response.text()
+  const blocks = text.split(/\n\n+/)
+
+  for (const block of blocks) {
+    const event = block.match(/^event:\s*(\S+)/m)?.[1]
+    const raw = block.match(/^data:\s*(.*)$/m)?.[1]
+    if (!raw) continue
+
+    if (event === 'heartbeat' || event === 'generating') {
+      onStatus?.('Remote GPU specialist is processing the image…')
+      continue
+    }
+    if (event === 'error') {
+      throw new Error(raw)
+    }
+    if (event === 'complete') {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : [parsed]
+    }
+  }
+
+  throw new Error('Remote specialist ended without a completed result.')
 }
 
 function asText(value: unknown): string {
@@ -66,9 +78,9 @@ function asText(value: unknown): string {
 }
 
 /**
- * Executes the same public remote-sensing Space used by the server fallback,
- * but from the browser. This avoids a Vercel serverless timeout while the
- * ZeroGPU model is waking and generating. No client-side heuristic is used.
+ * Executes the public SatQuery ZeroGPU specialist directly from the browser.
+ * This avoids Vercel's serverless request timeout while the GPU Space wakes.
+ * No client-side heuristic or fabricated measurement is used.
  */
 export async function runBrowserRemoteAnalysis(
   question: string,
@@ -77,24 +89,30 @@ export async function runBrowserRemoteAnalysis(
   onStatus?: (message: string) => void,
 ): Promise<{ answer: string; evidence: string; trace: string }> {
   if (!imageA) throw new Error('A primary image is required.')
-  onStatus?.('Connecting to remote-sensing specialist…')
 
-  const [{ blob: blobA, handle_file }, blobB] = await Promise.all([
-    dataUrlToBlob(imageA).then(async blob => ({ blob, handle_file: (await loadGradio()).handle_file })),
+  onStatus?.('Connecting to remote-sensing GPU specialist…')
+
+  const [blobA, blobB] = await Promise.all([
+    dataUrlToBlob(imageA),
     imageB ? dataUrlToBlob(imageB) : Promise.resolve(null),
   ])
 
-  const client = await getClient(onStatus)
-  onStatus?.(imageB ? 'Running two-image remote-sensing analysis…' : 'Running remote-sensing VQA…')
-
-  const result = await client.predict(ENDPOINT, [
-    question,
-    handle_file(blobA),
-    blobB ? handle_file(blobB) : null,
+  const [pathA, pathB] = await Promise.all([
+    uploadImage(blobA, 'orbital-image-a.jpg'),
+    blobB ? uploadImage(blobB, 'orbital-image-b.jpg') : Promise.resolve(null),
   ])
 
-  const data = Array.isArray(result?.data) ? result.data : []
+  onStatus?.('Remote specialist is waking or entering the GPU queue…')
+
+  const eventId = await startJob([
+    question,
+    fileRef(pathA, 'orbital-image-a.jpg'),
+    pathB ? fileRef(pathB, 'orbital-image-b.jpg') : null,
+  ])
+
+  const data = await readJob(eventId, onStatus)
   const answer = asText(data[0])
+
   if (!answer || /^error\s*:/i.test(answer)) {
     throw new Error(answer || 'The remote-sensing specialist returned no answer.')
   }
