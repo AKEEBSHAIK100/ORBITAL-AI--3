@@ -24,26 +24,6 @@ function isCountingQuestion(text: string): boolean {
   return COUNT_KEYWORDS.some(kw => lower.includes(kw))
 }
 
-// ─── Terrain heuristic (used for demo/fallback) ───────────────────────────────
-function detectImageTerrain(imageData?: string | null): 'vegetation' | 'water' | 'urban' | 'arid' {
-  if (!imageData) return 'urban'
-  try {
-    const raw = imageData.split(',')[1] || imageData
-    const sampleLen = Math.min(raw.length, 3500)
-    let charCodeSum = 0
-    for (let i = 0; i < sampleLen; i += 7) {
-      charCodeSum += raw.charCodeAt(i)
-    }
-    const bucket = charCodeSum % 4
-    if (bucket === 0) return 'vegetation'
-    if (bucket === 1) return 'water'
-    if (bucket === 2) return 'arid'
-    return 'urban'
-  } catch {
-    return 'vegetation'
-  }
-}
-
 // ─── Median helper ────────────────────────────────────────────────────────────
 function median(values: number[]): number {
   if (values.length === 0) return 0
@@ -334,7 +314,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (parsedResults.length === 0) {
-          // All calls failed — fall back to demo
+          // All provider calls failed — return an honest unavailable response
           return res.status(200).json(buildUnavailableAnalysis(taskType))
         }
 
@@ -360,9 +340,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
-        const mergedBest = bestEstimates.length > 0 ? median(bestEstimates) : (typeof base.building_count === 'number' ? base.building_count as number : 0)
-        const mergedLow = lowEstimates.length > 0 ? Math.min(...lowEstimates) : Math.round(mergedBest * 0.88)
-        const mergedHigh = highEstimates.length > 0 ? Math.max(...highEstimates) : Math.round(mergedBest * 1.12)
+        const mergedBest = bestEstimates.length > 0 ? median(bestEstimates) : (typeof base.building_count === 'number' ? base.building_count as number : null)
+        const mergedLow = lowEstimates.length > 0 ? Math.min(...lowEstimates) : null
+        const mergedHigh = highEstimates.length > 0 ? Math.max(...highEstimates) : null
         const mergedUncertainty = dedupeStrings(allUncertainty)
 
         const merged: Record<string, unknown> = {
