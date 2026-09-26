@@ -182,53 +182,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parameters: { compatibility: validation.compatibility },
     })
 
-    // Free Hugging Face ZeroGPU worker is the preferred no-cost remote specialist path
-    // when explicitly enabled. It executes the adapted BLIP VQA/caption worker without a paid API.
-    if (process.env.ENABLE_HF_RS_WORKER === 'true' && resolvedImage) {
-      try {
-        const workerResult = await runWorkerVqaOrCaption(resolvedImage, effectiveQuestion)
-        if (workerResult && typeof workerResult === 'object' && (workerResult as any).ok) {
-          const worker = workerResult as Record<string, any>
-          const workerTask = String(worker.task || taskType)
-          traceSteps.push({
-            step: 3,
-            tool: workerTask === 'caption' ? 'rs_caption_adapted' : 'rs_vqa_adapted',
-            description: 'Hugging Face ZeroGPU remote-sensing adapted specialist execution',
-            input_summary: 'Single optical observation',
-            output_summary: 'BigEarthNet-derived LoRA specialist returned a generated result',
-            duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
-            status: 'success',
-            confidence_source: 'none',
-            parameters: {
-              model: worker.model,
-              adapter: worker.adapter,
-              remote_sensing_adapted: true,
-              confidence_status: 'not_calibrated',
-            },
-          })
-          const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, workerTask === 'caption' ? 'rs_caption_adapted' : 'rs_vqa_adapted')
-          return res.status(200).json({
-            answer: String(worker.answer || ''),
-            confidence: null,
-            confidence_percent: null,
-            confidenceScore: null,
-            confidence_source: 'none',
-            confidence_status: 'not_calibrated',
-            confidence_reason: 'Specialist executed successfully, but no calibrated confidence metric is available.',
-            detected_features: [],
-            suggested_followups: [],
-            label: workerTask === 'caption' ? 'Remote-Sensing Adapted Caption' : 'Remote-Sensing Adapted VQA',
-            mode: 'hf_zero_gpu_specialist',
-            is_synthetic: false,
-            data_limitation_note: 'Inference used the adapted BLIP specialist. Quantitative confidence was not calibrated.',
-            execution_trace: trace,
-          })
-        }
-      } catch (workerError: any) {
-        console.warn('[Orbital-AI] HF ZeroGPU worker unavailable:', workerError?.message || workerError)
-      }
-    }
-
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
     const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
 
@@ -254,6 +207,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const effectiveQuestion = (question || promptText).trim()
+
+    // Free Hugging Face ZeroGPU is the no-cost external RS specialist fallback.
+    if (resolvedImage && process.env.ENABLE_HF_RS_WORKER !== 'false') {
+      try {
+        const workerResult = await runWorkerVqaOrCaption(resolvedImage, effectiveQuestion)
+        if (workerResult && typeof workerResult === 'object' && (workerResult as any).ok) {
+          const worker = workerResult as Record<string, any>
+          traceSteps.push({
+            step: 3,
+            tool: worker.task === 'caption' ? 'external_rs_caption' : 'external_rs_vqa',
+            description: 'External public Hugging Face ZeroGPU remote-sensing specialist',
+            input_summary: 'Single optical observation',
+            output_summary: 'External specialist returned a result; provenance kept explicit',
+            duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
+            status: 'success',
+            confidence_source: 'none',
+            parameters: { model: worker.model, adapter: worker.adapter, external_dependency: true, confidence_status: 'not_calibrated' },
+          })
+          const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, worker.task === 'caption' ? 'external_rs_caption' : 'external_rs_vqa')
+          return res.status(200).json({
+            answer: String(worker.answer || ''),
+            confidence: null,
+            confidence_percent: null,
+            confidenceScore: null,
+            confidence_source: 'none',
+            confidence_status: 'not_calibrated',
+            confidence_reason: 'External specialist executed, but no calibrated confidence metric is available.',
+            detected_features: [],
+            suggested_followups: [],
+            label: worker.task === 'caption' ? 'External Remote-Sensing Caption' : 'External Remote-Sensing VQA',
+            mode: 'external_hf_zero_gpu',
+            is_synthetic: false,
+            provenance: worker.provenance,
+            data_limitation_note: 'This is an external public ZeroGPU specialist fallback, not an ORBITAL-AI benchmark result.',
+            execution_trace: trace,
+          })
+        }
+      } catch (workerError: any) {
+        console.warn('[Orbital-AI] External HF ZeroGPU worker unavailable:', workerError?.message || workerError)
+      }
+    }
 
     // The adapted BigEarthNet specialist runs through the Python backend when
     // PYTHON_BACKEND_URL is configured above. If that backend is unavailable, allow
