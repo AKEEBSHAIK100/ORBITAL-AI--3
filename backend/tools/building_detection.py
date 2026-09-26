@@ -144,10 +144,9 @@ class BuildingDetectionTool(BaseTool):
         med_c = pp_stats.get("medium_confidence_count", sum(1 for d in final_detections if d.get("confidence_tier") == "medium"))
         low_c = pp_stats.get("low_confidence_count", sum(1 for d in final_detections if d.get("confidence_tier") == "low"))
         partial_c = pp_stats.get("partial_count", sum(1 for d in final_detections if d.get("is_partial", False)))
-        avg_conf = pp_stats.get("confidence", (
-            sum(d["confidence"] for d in final_detections) / len(final_detections)
-            if final_detections else 0.0
-        ))
+        avg_conf = pp_stats.get("confidence")
+        if avg_conf is None and final_detections:
+            avg_conf = sum(d["confidence"] for d in final_detections) / len(final_detections)
         conf_level = pp_stats.get("confidence_level")
 
         # 8. Generate GeoJSON features
