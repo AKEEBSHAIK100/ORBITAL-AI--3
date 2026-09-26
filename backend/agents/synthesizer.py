@@ -234,6 +234,8 @@ def synthesize_response(
             )
             return answer, None, "not_calibrated", warnings
 
+        if chg_pct is None:
+            return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
         answer = (
             f"Bi-temporal change detection localized alterations across {chg_pct:.1f}% of the observation surface. "
             "Confidence is not calibrated for this workflow."
@@ -351,6 +353,8 @@ def synthesize_response(
             b_cnt = bldg_ev.evidence.get("building_count")
             hi = bldg_ev.evidence.get("high_confidence_count")
             vqa_part = f"VQA assessment: {vqa_ev.result}." if vqa_ev and vqa_ev.result else ""
+            if b_cnt is None:
+                return "SPECIALIST UNAVAILABLE: Building specialist returned no building count.", None, "unavailable", warnings
             if b_cnt > 0:
                 answer = (
                     f"Yes, structural footprints are present. The building footprint detector identified {b_cnt} structures "
