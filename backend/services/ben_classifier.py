@@ -245,15 +245,22 @@ class BENClassifier:
     def _run_model_inference(
         self, image_bytes: bytes, top_k: int, threshold: float
     ) -> Dict:
-        """Real BigEarthNet v2.0 model inference path."""
+        """Run real BigEarthNet v2.0 inference only on compatible 10-band Sentinel-2 input."""
         import torch
-        import torchvision.transforms.functional as TF
-        from PIL import Image
 
         try:
-            pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            # BigEarthNet v2.0 ResNet-50 expects the original Sentinel-2
+            # 10-band feature stack. An RGB JPEG/PNG cannot be converted into
+            # truthful multispectral bands by duplicating or synthesizing channels.
+            arr = np.load(io.BytesIO(image_bytes), allow_pickle=False)
+            if arr.ndim != 3 or arr.shape[2] != 10:
+                raise ValueError(
+                    "BigEarthNet v2.0 inference requires a 10-band Sentinel-2 array; "
+                    "RGB/JPEG/PNG input is not a valid substitute for missing spectral bands."
+                )
+            bands = arr.astype(np.float32)
         except Exception as e:
-            logger.warning(f"[BEN] Image decode failed: {e}")
+            logger.warning(f"[BEN] Input decoding/compatibility failed: {e}")
             return {
                 "labels": [],
                 "active_labels": [],
@@ -262,29 +269,22 @@ class BENClassifier:
                 "model_id": self._model_id,
                 "available": False,
                 "device": self._device,
-                "note": "Image decoding failed; no classification result returned.",
+                "note": "BigEarthNet inference requires a compatible 10-band Sentinel-2 input; no synthetic spectral channels were created.",
                 "citation": None,
-                "status": "error",
+                "status": "unavailable",
                 "error": str(e),
             }
 
-        pil_img = pil_img.resize((BEN_IMG_SIZE, BEN_IMG_SIZE))
-        rgb = np.array(pil_img, dtype=np.float32)
-        rgb_scaled = rgb / 255.0 * 3000.0
+        if bands.shape[0] != BEN_IMG_SIZE or bands.shape[1] != BEN_IMG_SIZE:
+            import cv2
+            bands = np.stack(
+                [cv2.resize(bands[:, :, i], (BEN_IMG_SIZE, BEN_IMG_SIZE), interpolation=cv2.INTER_AREA)
+                 for i in range(10)],
+                axis=2,
+            )
 
-        channels = np.stack([
-            rgb_scaled[:, :, 2],
-            rgb_scaled[:, :, 1],
-            rgb_scaled[:, :, 0],
-            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 2,
-            rgb_scaled[:, :, 1],
-            rgb_scaled[:, :, 1] * 1.1,
-            (rgb_scaled[:, :, 0] + rgb_scaled[:, :, 1]) / 1.8,
-            rgb_scaled[:, :, 1] * 0.9,
-            rgb_scaled[:, :, 0] * 0.7,
-            rgb_scaled[:, :, 0] * 0.5,
-        ], axis=0)
-
+        # Sentinel-2 bands are ordered B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12.
+        channels = np.transpose(bands, (2, 0, 1))
         for i in range(10):
             channels[i] = (channels[i] - BEN_S2_MEAN[i]) / (BEN_S2_STD[i] + 1e-8)
 
