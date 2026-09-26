@@ -169,7 +169,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     // No paid VLM fallback. The classical fusion specialist is the final free path.
-    const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
     traceSteps.push({
       step: 4,
       tool: 'fusion_result_guard',
