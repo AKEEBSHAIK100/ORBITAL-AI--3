@@ -1,7 +1,7 @@
 """
-SatQuery AI — Specialist Model Registry.
+ORBITAL-AI — Specialist Model Registry.
 Declares all 8 domain specialist engines, their tasks, versions, modalities,
-checkpoint locations, availability criteria, and controlled unavailable fallbacks.
+checkpoint locations, runtime availability criteria, and controlled unavailable states.
 """
 
 from __future__ import annotations
@@ -169,6 +169,13 @@ class ModelRegistry:
                 "evidence": {"top_label": top_label, "active_labels": pred.get("active_labels", [])}
             }
 
+        ben_runtime_available = False
+        try:
+            from backend.services.ben_classifier import BENClassifier
+            ben_runtime_available = bool(BENClassifier.get_instance()._available)
+        except Exception:
+            ben_runtime_available = False
+
         self._specialists["land_cover"] = SpecialistEntry(
             id="land_cover",
             name="BigEarthNet v2.0 Corine Land-Cover Classifier",
@@ -177,8 +184,9 @@ class ModelRegistry:
             version="0.2.0",
             modality=["multispectral", "optical"],
             supported_input_types=["image/tiff", "image/png", "image/jpeg"],
-            checkpoint_location="huggingface:BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
-            is_available=True,
+            checkpoint_location="huggingface:BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0" if ben_runtime_available else None,
+            is_available=ben_runtime_available,
+            unavailable_reason=None if ben_runtime_available else "BigEarthNet runtime classifier is not loaded/verified in this process.",
             inference_fn=run_land_cover
         )
 
@@ -191,8 +199,8 @@ class ModelRegistry:
                 return {"answer": f"Change detection failed: {res.get('error')}", "confidence": None, "confidence_level": "UNAVAILABLE"}
             return {
                 "answer": f"Surface alterations detected across {res['change_percentage']}% of the observation scene.",
-                "confidence": 0.85,
-                "confidence_level": "High",
+                "confidence": None,
+                "confidence_level": "UNAVAILABLE",
                 "evidence": res
             }
 
@@ -200,8 +208,8 @@ class ModelRegistry:
             id="change_detection",
             name="Bi-Temporal Change Detection Engine",
             task="change_detection",
-            model_id="rs-change-detector-v2",
-            version="2.0.0",
+            model_id="classical-cv-change-detector-v2",
+            version="2.0.0-baseline",
             modality=["optical", "multispectral", "sar", "bi-temporal"],
             supported_input_types=["pair:image/tiff", "pair:image/png"],
             checkpoint_location=None,
@@ -225,10 +233,10 @@ class ModelRegistry:
 
         self._specialists["change_vqa"] = SpecialistEntry(
             id="change_vqa",
-            name="Bi-Temporal Change VQA Specialist",
+            name="Classical Bi-Temporal Change VQA Baseline",
             task="change_vqa",
-            model_id="rs-change-vqa-v2",
-            version="2.0.0",
+            model_id="classical-cv-change-vqa-baseline-v2",
+            version="2.0.0-baseline",
             modality=["bi-temporal"],
             supported_input_types=["pair:image/tiff", "pair:image/png"],
             checkpoint_location=None,
@@ -250,10 +258,10 @@ class ModelRegistry:
 
         self._specialists["optical_sar_fusion"] = SpecialistEntry(
             id="optical_sar_fusion",
-            name="Optical-SAR Cross-Modal Fusion Engine",
+            name="Classical Optical-SAR Cross-Modal Baseline",
             task="optical_sar_fusion",
             model_id="classical-cv-fusion-engine-v2",
-            version="2.0.0",
+            version="2.0.0-baseline",
             modality=["optical", "sar"],
             supported_input_types=["image/tiff", "pair:optical+sar"],
             checkpoint_location=None,
@@ -346,8 +354,8 @@ class ModelRegistry:
                 ans = f"No target '{res.get('target')}' localized."
             return {
                 "answer": ans,
-                "confidence": 0.80 if top_reg else 0.40,
-                "confidence_level": "High" if top_reg else "Medium",
+                "confidence": None,
+                "confidence_level": "UNAVAILABLE",
                 "evidence": {"regions": res.get("regions", []), "target": res.get("target"), "targets": res.get("targets", [])},
                 "grounding": res.get("regions", []),
                 "targets": res.get("targets", [])
@@ -357,8 +365,8 @@ class ModelRegistry:
             id="visual_grounding",
             name="Text-Guided Spatial Grounding Specialist",
             task="grounding",
-            model_id="rs-grounding-specialist-v2",
-            version="2.0.0",
+            model_id="classical-cv-grounding-baseline-v2",
+            version="2.0.0-baseline",
             modality=["optical", "multispectral"],
             supported_input_types=["image/tiff", "image/png", "image/jpeg"],
             checkpoint_location=None,
