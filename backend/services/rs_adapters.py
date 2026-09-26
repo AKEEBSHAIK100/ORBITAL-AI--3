@@ -12,9 +12,10 @@ from __future__ import annotations
 import os
 import sys
 import time
+import io
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Tuple
 import numpy as np
 from PIL import Image
 
@@ -344,7 +345,7 @@ class RSAdapterRuntime:
 
     # ─── Public Inference API ─────────────────────────────────────────────────
 
-    def caption(self, image: Union[np.ndarray, Image.Image, bytes, str]) -> Dict[str, Any]:
+    def caption(self, image: Union[np.ndarray, Image.Image, bytes, str], metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Executes BLIP + BigEarthNet-derived LoRA captioning.
         Returns structured output with status, caption, model_id, provenance, and null confidence.
@@ -369,7 +370,7 @@ class RSAdapterRuntime:
             }
 
         try:
-            pil_img = self._convert_image_to_pil(image)
+            pil_img, sensor_metadata = self._convert_image_to_pil(image, metadata)
             model, processor = self._load_caption_model()
 
             import torch
@@ -391,6 +392,7 @@ class RSAdapterRuntime:
                 "confidence": None,  # VLM outputs are uncalibrated
                 "confidence_status": "not_calibrated",
                 "provenance": self.caption_provenance,
+                "sensor_metadata": sensor_metadata,
                 "warnings": [],
             }
 
@@ -411,7 +413,7 @@ class RSAdapterRuntime:
                 "warnings": [str(e)],
             }
 
-    def vqa(self, image: Union[np.ndarray, Image.Image, bytes, str], question: str) -> Dict[str, Any]:
+    def vqa(self, image: Union[np.ndarray, Image.Image, bytes, str], question: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Executes BLIP-VQA + BigEarthNet-derived LoRA visual question answering.
         Returns structured output with status, answer, model_id, provenance, and null confidence.
@@ -436,8 +438,7 @@ class RSAdapterRuntime:
             }
 
         try:
-            pil_img = self._convert_image_to_pil(image)
-            model, processor = self._load_vqa_model()
+            pil_img, sensor_metadata = self._convert_image_to_pil(image, metadata)
 
             import torch
             inputs = processor(pil_img, question, return_tensors="pt").to(self.device)
@@ -458,6 +459,7 @@ class RSAdapterRuntime:
                 "confidence": None,  # VLM outputs are uncalibrated
                 "confidence_status": "not_calibrated",
                 "provenance": self.vqa_provenance,
+                "sensor_metadata": sensor_metadata,
                 "warnings": [],
             }
 
