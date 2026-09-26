@@ -1496,7 +1496,7 @@ export default function App() {
     let confStatus: string = 'unavailable'
     let features: string[] = ['Change Detection Unavailable']
     let traceData: ExecutionTrace | null = null
-    let mode: string = 'synthetic_fallback'
+    let mode: string = 'unavailable'
     try {
       const res = await fetch(`${API_BASE}/api/analyze/change`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1534,23 +1534,23 @@ export default function App() {
             mode = data.mode || 'model'
           }
         } else {
-          mode = 'synthetic_fallback'
+          mode = 'unavailable'
           confStatus = 'unavailable'
         }
       }
     } catch {
-      mode = 'synthetic_fallback'
+      mode = 'unavailable'
       confStatus = 'unavailable'
     }
 
     setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, confidence_status: confStatus, features, execution_trace: traceData, mode })
     setHistory(prev => [...prev, {
       question: queryPrompt, answer: compAnswer, confidence_percent: confScore, confidenceScore: confScore,
-      confidence: confScore >= 85 ? 'high' : 'medium', confidence_status: confStatus, detected_features: features,
+      confidence: confStatus === 'unavailable' ? 'low' : (confScore >= 85 ? 'high' : 'medium'), confidence_status: confStatus, detected_features: features,
       label: 'Bi-Temporal Change Detection', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      region: { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 55 }, execution_trace: traceData, fusion_features: null,
-      is_synthetic: mode === 'synthetic_fallback',
-      mode,
+      region: null, execution_trace: traceData, fusion_features: null,
+      is_synthetic: false,
+      mode: mode === 'synthetic_fallback' ? 'unavailable' : mode,
     }])
     setStatus('Change detection complete')
     addToast('Change detection complete: results below', 'success')
@@ -1602,14 +1602,14 @@ export default function App() {
         if (legacyRes.ok && legacyData.answer) {
           if (legacyData.fusion_features) setFusionFeatures(legacyData.fusion_features)
           if (legacyData.execution_trace) { setLastFusionTrace(legacyData.execution_trace); setActiveTrace(legacyData.execution_trace) }
-          const confVal = typeof legacyData.confidence_percent === 'number' ? legacyData.confidence_percent : 94
+          const confVal = typeof legacyData.confidence_percent === 'number' ? legacyData.confidence_percent : 0
           setHistory(prev => [...prev, {
             question: fusionQuery, answer: legacyData.answer, confidence_percent: confVal, confidenceScore: confVal,
-            confidence: legacyData.confidence || 'high', confidence_reason: legacyData.confidence_reason,
+            confidence: legacyData.confidence || 'low', confidence_reason: legacyData.confidence_reason, confidence_status: legacyData.confidence_status || 'not_calibrated',
             detected_features: legacyData.detected_features || [], label: legacyData.label || 'Optical–SAR Fusion',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             execution_trace: legacyData.execution_trace ?? null, fusion_features: legacyData.fusion_features ?? null,
-            mode: legacyData.mode || 'synthetic_fallback',
+            mode: legacyData.mode || 'model',
           }])
           setAnalysis(legacyData as Analysis); setStatus('Fusion complete')
           addToast('Optical–SAR fusion complete', 'success')
