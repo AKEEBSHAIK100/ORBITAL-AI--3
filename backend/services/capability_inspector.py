@@ -36,15 +36,21 @@ def inspect_capabilities() -> Dict[str, Any]:
     ben_available = False
 
     # 3. Caption LoRA pilot adapter
-    caption_available = (
+    caption_available = False
+    caption_artifacts_present = (
         CAPTION_ADAPTER_PATH.exists()
-        and (CAPTION_ADAPTER_PATH / "adapter_model.safetensors").exists()
+        and (CAPTION_ADAPTER_PATH / "adapter_config.json").is_file()
+        and (CAPTION_ADAPTER_PATH / "adapter_model.safetensors").is_file()
+        and (CAPTION_ADAPTER_PATH / "adapter_model.safetensors").stat().st_size > 0
     )
 
     # 4. VQA LoRA pilot adapter
-    vqa_available = (
+    vqa_available = False
+    vqa_artifacts_present = (
         VQA_ADAPTER_PATH.exists()
-        and (VQA_ADAPTER_PATH / "adapter_model.safetensors").exists()
+        and (VQA_ADAPTER_PATH / "adapter_config.json").is_file()
+        and (VQA_ADAPTER_PATH / "adapter_model.safetensors").is_file()
+        and (VQA_ADAPTER_PATH / "adapter_model.safetensors").stat().st_size > 0
     )
 
     # 5. Classical Change Detection & Optical-SAR are executable baselines.
@@ -102,11 +108,12 @@ def inspect_capabilities() -> Dict[str, Any]:
             "model_id": "rs-caption-adapted-v1",
             "base_model": "Salesforce/blip-image-captioning-base",
             "type": "pilot_domain_adaptation",
-            "status": "available" if caption_available else "unavailable",
-            "display_status": "Available" if caption_available else "Unavailable",
+            "status": "unavailable",
+            "display_status": "Artifacts present; runtime verification required" if caption_artifacts_present else "Unavailable",
             "provenance": "Pilot LoRA adapter on 87 BigEarthNet patch-text pairs (3 epochs)",
             "benchmark_claim": None,
-            "weights_present": caption_available,
+            "weights_present": caption_artifacts_present,
+            "runtime_verified": False,
         },
         {
             "id": "vqa",
@@ -114,11 +121,12 @@ def inspect_capabilities() -> Dict[str, Any]:
             "model_id": "rs-vqa-adapted-v1",
             "base_model": "Salesforce/blip-vqa-base",
             "type": "pilot_domain_adaptation",
-            "status": "available" if vqa_available else "unavailable",
-            "display_status": "Available" if vqa_available else "Unavailable",
+            "status": "unavailable",
+            "display_status": "Artifacts present; runtime verification required" if vqa_artifacts_present else "Unavailable",
             "provenance": "Pilot LoRA adapter on 551 BigEarthNet QA pairs (3 epochs)",
             "benchmark_claim": None,
-            "weights_present": vqa_available,
+            "weights_present": vqa_artifacts_present,
+            "runtime_verified": False,
         },
         {
             "id": "change_detection",
