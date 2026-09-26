@@ -261,112 +261,40 @@ app.get('/api/agent/tools', (_req, res) => {
 
 app.get('/api/model-status', async (_req, res) => {
   try {
-    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/api/model-status`, {
-      signal: AbortSignal.timeout(4000),
-    })
-    if (pyRes.ok) {
-      const data = await pyRes.json()
-      return res.json(data)
-    }
-  } catch { /* fallback */ }
-
-  const specialists = Object.values(TOOL_REGISTRY).map(t => ({
-    id: t.id,
-    name: t.name,
-    task: t.supported_tasks[0] || 'general',
-    version: '1.0.0-adapted',
-    modality: t.modalities,
-    supported_input_types: ['geotiff', 'png', 'jpg'],
-    checkpoint_location: t.id.includes('adapted') ? `models/adapters/${t.id}` : null,
-    is_available: true,
-    unavailable_reason: null,
-  }))
-
+    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/api/model-status`, { signal: AbortSignal.timeout(5000) })
+    if (pyRes.ok) return res.json(await pyRes.json())
+  } catch {}
   return res.json({
-    specialists,
-    datasets: [
-      { id: 'bigearthnet_v2', name: 'BigEarthNet v2.0', status: 'AVAILABLE', sample_count: 87, local_path: 'data/BigEarthNet-v2.0' },
-      { id: 'vrsbench', name: 'VRSBench Remote-Sensing Benchmark', status: 'AVAILABLE', sample_count: 551, local_path: 'data/vrsbench' }
-    ],
-    evaluations: []
+    specialists: Object.values(TOOL_REGISTRY).map(t => ({
+      id: t.id, name: t.name, task: t.supported_tasks[0] || 'general',
+      modality: t.modalities, is_available: t.availability === 'available',
+      unavailable_reason: t.unavailable_reason ?? null,
+    })),
+    datasets: [], evaluations: [],
   })
 })
 
-// ─── BigEarthNet v2.0 Classification ──────────────────────────────────────────
-// Proxies to the Python backend BEN classifier when available.
-// Falls back to heuristic scoring so the UI always gets a response.
-const BEN_CLASSES_SHORT = [
-  'Urban Fabric','Industrial/Commercial','Arable Land','Permanent Crops','Pastures',
-  'Complex Cultivation','Agri + Natural Veg','Agro-Forestry','Broad-Leaved Forest',
-  'Coniferous Forest','Mixed Forest','Natural Grassland','Moors & Heathland',
-  'Transitional Woodland','Beaches & Dunes','Inland Wetlands','Coastal Wetlands',
-  'Inland Waters','Marine Waters',
-]
-const BEN_CLASSES_FULL = [
-  'Urban fabric','Industrial or commercial units','Arable land','Permanent crops','Pastures',
-  'Complex cultivation patterns','Land principally occupied by agriculture, with significant areas of natural vegetation',
-  'Agro-forestry areas','Broad-leaved forest','Coniferous forest','Mixed forest',
-  'Natural grassland and sparsely vegetated areas','Moors, heathland and sclerophyllous vegetation',
-  'Transitional woodland/shrub','Beaches, dunes, sands','Inland wetlands','Coastal wetlands',
-  'Inland waters','Marine waters',
-]
-
-function heuristicBENScores(image?: string): number[] {
-  const scores = new Array(19).fill(0)
-  if (!image) { scores[0] = 0.65; return scores }
-  try {
-    const raw = (image.split(',')[1] || image).slice(0, 4000)
-    let rSum = 0, gSum = 0, bSum = 0, n = 0
-    for (let i = 0; i < raw.length; i += 3) {
-      const b = raw.charCodeAt(i) & 0xFF
-      if (n % 3 === 0) rSum += b; else if (n % 3 === 1) gSum += b; else bSum += b; n++
-    }
-    const r = rSum / (n / 3 + 1), g = gSum / (n / 3 + 1), b = bSum / (n / 3 + 1)
-    if (b > r * 1.1 && b > 50) { scores[17] = 0.82; scores[15] = 0.30; scores[16] = 0.22 }
-    else if (g > r * 1.08 && g > 40) { scores[8] = 0.74; scores[2] = 0.52; scores[4] = 0.40; scores[10] = 0.28 }
-    else if (r > 120 && g > 90 && b < 90) { scores[11] = 0.68; scores[13] = 0.48; scores[14] = 0.35 }
-    else { scores[0] = 0.78; scores[1] = 0.42; scores[2] = 0.18 }
-  } catch { scores[0] = 0.65 }
-  return scores
-}
-
-app.post(['/classify', '/api/classify'], async (req, res) => {
-  const { image, top_k = 5, threshold = 0.25 } = req.body ?? {}
-  const topK = Math.min(Math.max(Number(top_k) || 5, 1), 19)
-  const thresh = Math.min(Math.max(Number(threshold) || 0.25, 0), 1)
-
-  // Try Python backend first
-  try {
-    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/classify`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, top_k: topK, threshold: thresh }),
-      signal: AbortSignal.timeout(10000),
-    })
-    if (pyRes.ok) {
-      const data = await pyRes.json()
-      return res.json(data)
-    }
-  } catch { /* fallback */ }
-
-  // Heuristic fallback
-  const rawScores = heuristicBENScores(image)
-  const labels = BEN_CLASSES_FULL.map((name, i) => ({
-    name, short: BEN_CLASSES_SHORT[i], score: rawScores[i], active: rawScores[i] >= thresh,
-  })).sort((a, b) => b.score - a.score)
-  const top = labels[0]
-  res.json({
-    labels: labels.slice(0, topK),
-    active_labels: labels.filter(l => l.active).slice(0, topK),
-    top_label: top?.short ?? 'Unknown',
-    confidence: Math.round((top?.score ?? 0) * 100 * 10) / 10,
-    model_id: 'heuristic-node-fallback',
-    available: false,
-    device: 'cpu',
-    note: 'Heuristic estimation (Python backend with configilm not responding).',
-    citation: '',
-  })
-})
-
+// ─── BigEarthNet classification ──────────────────────────────────────────────
+ // Classification is served by the verified Python specialist only. This Node
+ // server deliberately does not estimate labels from encoded image bytes.
+ app.post(['/classify', '/api/classify'], async (req, res) => {
+   const { image, top_k = 5, threshold = 0.25 } = req.body ?? {}
+   if (!image) return res.status(400).json({ error: 'An image is required.' })
+   try {
+     const pyRes = await fetch(`${PYTHON_BACKEND_URL}/classify`, {
+       method: 'POST', headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ image, top_k, threshold }),
+       signal: AbortSignal.timeout(15_000),
+     })
+     if (pyRes.ok) return res.json(await pyRes.json())
+   } catch {}
+   return res.status(503).json({
+     available: false, labels: [], active_labels: [], top_label: null,
+     confidence: null, model_id: null,
+     error: 'BigEarthNet classifier is unavailable in this deployment.',
+     note: 'No heuristic classification is generated.',
+   })
+ })
 
 app.post('/api/analyze', async (req, res) => {
   const startTime = Date.now()
