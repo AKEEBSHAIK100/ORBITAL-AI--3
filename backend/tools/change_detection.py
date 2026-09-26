@@ -113,12 +113,18 @@ class ChangeDetectionTool(BaseTool):
             except (ValueError, TypeError):
                 pass
 
-        if (crs1 and crs2) or (gt1 and gt2) or (gsd1 is not None and gsd2 is not None):
+        metadata_alignment_verified = bool(
+            crs1 and crs2 and gt1 and gt2
+            and isinstance(gt1, (list, tuple)) and isinstance(gt2, (list, tuple))
+            and len(gt1) >= 6 and len(gt2) >= 6
+            and all(abs(float(gt1[i]) - float(gt2[i])) <= 1e-9 for i in range(6))
+        )
+        if metadata_alignment_verified:
             geospatial_compatibility = "verified"
-            geospatial_note = f"Geospatial co-registration verified from metadata (CRS: {crs1 or 'consistent'})."
+            geospatial_note = "Geospatial co-registration is supported by matching CRS and affine geotransform metadata."
         else:
             geospatial_compatibility = "unverified"
-            geospatial_note = "Geospatial co-registration could not be verified from the supplied metadata."
+            geospatial_note = "Geospatial co-registration could not be fully verified from the supplied metadata; change results are image-grid comparisons only."
 
 
         # Convert to grayscale
@@ -162,8 +168,8 @@ class ChangeDetectionTool(BaseTool):
         elif change_ratio < 0.12:
             direction = "increased" if exg2 > exg1 else "decreased"
             answer = (
-                f"Pixel-differencing baseline identified surface alterations across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
-                f"Vegetation proxy changed {direction} by {abs(veg_delta_pct)}%. This is an image-derived excess-green proxy, not a calibrated vegetation index. Structural alterations were demarcated in highlighted sectors."
+                f"Pixel-differencing baseline identified image-grid alterations across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
+                f"Vegetation proxy changed {direction} by {abs(veg_delta_pct)}%. This is an image-derived excess-green proxy, not a calibrated vegetation index. The highlighted sectors indicate radiometric differences, not independently verified structural change."
             )
         else:
             answer = (
