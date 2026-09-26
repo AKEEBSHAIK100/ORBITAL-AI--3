@@ -2,7 +2,7 @@
 // Mirrors src/lib/constants.ts but uses process.env (no import.meta.env).
 // Used by server.ts and api/*.ts — never import the src version from server code.
 
-/** The vision model used for all AI calls. Change once here to affect all server handlers. */
+/** Runtime model label used by API routing and telemetry. Free specialists are selected by the agent registry. */
 export const MODEL = 'remote-sensing-specialists'
 
 /** Max output tokens for single-image analysis. */
