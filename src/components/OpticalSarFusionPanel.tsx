@@ -10,9 +10,6 @@ const GRY = '#9AA9B8'
 const PNL = '#060D1A'
 const CB = 'rgba(32,217,255,0.18)'
 
-// Built-in calibrated optical-SAR demo benchmarks
-const DEMO_OPTICAL_URL = 'https://images.unsplash.com/photo-1524813686514-a57563d77d61?w=900&auto=format&fit=crop&q=80'
-const DEMO_SAR_URL = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=900&auto=format&fit=crop&q=80'
 
 interface Props {
   onRunFusion: (opticalDataUrl: string, sarDataUrl: string, query?: string) => Promise<void>
@@ -62,13 +59,6 @@ export default function OpticalSarFusionPanel({
     e.target.value = ''
   }
 
-  const handleLoadSamplePair = async () => {
-    setOpticalImage(DEMO_OPTICAL_URL)
-    setOpticalLabel('Cartosat-2S Multi-Spectral (0.65m)')
-    setSarImage(DEMO_SAR_URL)
-    setSarLabel('RISAT-1A Hybrid-Polarimetric SAR (1.0m)')
-  }
-
   const handleExecute = () => {
     if (!opticalImage || !sarImage) return
     onRunFusion(opticalImage, sarImage, customQuery)
@@ -99,7 +89,7 @@ export default function OpticalSarFusionPanel({
                 className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
                 style={{ background: `${MNT}22`, color: MNT, border: `1px solid ${MNT}55` }}
               >
-                ISRO / SAC BENCHMARK
+                CO-REGISTERED INPUTS
               </span>
             </div>
             <p className="text-xs font-mono" style={{ color: GRY }}>
@@ -109,20 +99,20 @@ export default function OpticalSarFusionPanel({
         </div>
 
         <button
-          onClick={handleLoadSamplePair}
-          className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+          onClick={() => {} }
+          className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-default flex items-center gap-1.5 self-start sm:self-auto opacity-70" disabled
           style={{
             background: 'rgba(32,217,255,0.08)',
             color: CYN,
             border: `1px solid ${CYN}44`,
           }}
-          title="Load pre-calibrated Cartosat-2S and RISAT-1A test pair"
+          title="Use real co-registered optical and SAR inputs"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="2" />
             <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
           </svg>
-          <span>LOAD BENCHMARK PAIR</span>
+          <span>REAL INPUTS ONLY</span>
         </button>
       </div>
 
@@ -154,7 +144,7 @@ export default function OpticalSarFusionPanel({
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: CYN }}>
                 MODALITY 1: OPTICAL / MULTI-SPECTRAL
               </span>
-              <span className="text-[10px] font-mono text-white/50">Cartosat / Sentinel-2</span>
+              <span className="text-[10px] font-mono text-white/50">Optical / multispectral</span>
             </div>
 
             {opticalImage ? (
@@ -214,7 +204,7 @@ export default function OpticalSarFusionPanel({
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: MNT }}>
                 MODALITY 2: SYNTHETIC APERTURE RADAR (SAR)
               </span>
-              <span className="text-[10px] font-mono text-white/50">RISAT-1A / Sentinel-1</span>
+              <span className="text-[10px] font-mono text-white/50">SAR backscatter</span>
             </div>
 
             {sarImage ? (
