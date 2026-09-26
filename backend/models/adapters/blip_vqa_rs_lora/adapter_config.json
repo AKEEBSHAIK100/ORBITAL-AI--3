@@ -11,8 +11,10 @@
   "r": 8,
   "target_modules": [
     "qkv",
-    "dense"
+    "projection"
   ],
-  "task_type": "FEATURE_EXTRACTION",
-  "domain_adaptation": "BigEarthNet-S2 VQA pilot (551 train QA / 69 patches, 144 val QA / 18 patches, 3 epochs, pilot only; no benchmark superiority claim)"
+  "task_type": null,
+  "domain_adaptation": "BigEarthNet-S2 VQA pilot (551 train QA / 69 patches, 144 val QA / 18 patches, 3 epochs, pilot only; no benchmark superiority claim)",
+  "band_strategy": "B04/B03/B02 natural-colour Sentinel-2 representation for BLIP",
+  "preprocessing": "Per-channel 2%-98% percentile stretch to RGB; no synthetic band substitution."
 }
