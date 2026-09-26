@@ -148,7 +148,7 @@ class BuildingDetectionTool(BaseTool):
             sum(d["confidence"] for d in final_detections) / len(final_detections)
             if final_detections else 0.0
         ))
-        conf_level = pp_stats.get("confidence_level", "High" if avg_conf >= 0.45 else "Medium" if avg_conf >= 0.28 else "Low")
+        conf_level = pp_stats.get("confidence_level")
 
         # 8. Generate GeoJSON features
         features = []
@@ -196,7 +196,7 @@ class BuildingDetectionTool(BaseTool):
             "partial_detections": partial_c,
             "confidence": round(avg_conf, 3),
             "confidence_level": conf_level,
-            "validation_status": accuracy_eval.get("status", "Model inference (unverified against external benchmark)"),
+            "validation_status": accuracy_eval.get("status"),
             "validation": accuracy_eval,
             "detections": final_detections,
             "geojson": geojson_data,
