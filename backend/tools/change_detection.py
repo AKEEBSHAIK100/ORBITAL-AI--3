@@ -162,7 +162,7 @@ class ChangeDetectionTool(BaseTool):
         exg2 = (2.0 * t2_img[:, :, 1] - t2_img[:, :, 2] - t2_img[:, :, 0]).mean()
         veg_delta_pct = round(((exg2 - exg1) / (abs(exg1) + 1e-5)) * 100, 1)
 
-        # Built-up alteration interpretation (Pixel-diff heuristic baseline)
+        # Built-up alteration interpretation (pixel-difference baseline)
         if change_ratio < 0.02:
             answer = f"Pixel-differencing baseline found limited radiometric change ({change_ratio*100:.1f}% of pixels exceeded the configured threshold). This does not by itself verify built-up footprint stability."
         elif change_ratio < 0.12:
