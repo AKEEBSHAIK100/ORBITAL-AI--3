@@ -57,8 +57,8 @@ export type Region = { x_percent: number; y_percent: number; w_percent: number; 
 type Analysis = {
   answer: string
   confidence: 'high' | 'medium' | 'low' | 'unavailable'
-  confidence_percent: number
-  confidenceScore: number
+  confidence_percent: number | null
+  confidenceScore: number | null
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
@@ -115,8 +115,8 @@ export interface BuildingDetection {
 
 export interface BuildingAnalysisResult {
   building_count: number; high_confidence_count: number; medium_confidence_count: number
-  low_confidence_count: number; partial_count: number; confidence: number
-  confidence_level: 'High' | 'Medium' | 'Low'; validation_status: string
+  low_confidence_count: number; partial_count: number; confidence?: number | null
+  confidence_level?: 'High' | 'Medium' | 'Low' | null; validation_status?: string | null
   detections: BuildingDetection[]; image_dimensions?: { width: number; height: number }
   mode?: string
   error?: string
@@ -126,7 +126,7 @@ export interface BuildingAnalysisResult {
 interface BENLabelScore { name: string; short: string; score: number; active: boolean }
 interface BENResult {
   labels: BENLabelScore[]; active_labels: BENLabelScore[]; top_label: string
-  confidence: number; model_id: string; available: boolean; device: string; note: string; citation: string
+  confidence: number | null; model_id: string | null; available: boolean; device: string; note: string; citation?: string | null
   mode?: string
 }
 
@@ -977,10 +977,11 @@ export default function App() {
           const bRes = await runBuildingDetection()
           if (bRes) {
             result = {
-              answer: `Instance segmentation across high-resolution tiles identified ${bRes.building_count} unique building footprints (${bRes.confidence_level} confidence, ${Math.round(bRes.confidence*100)}%). Breakdown: ${bRes.high_confidence_count} high confidence, ${bRes.medium_confidence_count} medium, ${bRes.partial_count} partial perimeter. ${bRes.validation_status}.`,
-              confidence: bRes.confidence_level === 'High' ? 'high' : bRes.confidence_level === 'Medium' ? 'medium' : 'low',
-              confidence_percent: Math.round(bRes.confidence*100), confidenceScore: Math.round(bRes.confidence*100),
-              confidence_reason: `Evaluated via YOLO segmentation with tile mapping and polygon IoU deduplication.`,
+              answer: `Instance segmentation returned ${bRes.building_count} building footprints.${bRes.confidence_level ? ` Confidence tier: ${bRes.confidence_level}.` : ''}${bRes.confidence != null ? ` Model score: ${Math.round(bRes.confidence * 100)}% (not independently calibrated).` : ''}${bRes.high_confidence_count != null ? ` Breakdown: ${bRes.high_confidence_count} high, ${bRes.medium_confidence_count} medium, ${bRes.partial_count} partial perimeter.` : ''}${bRes.validation_status ? ` ${bRes.validation_status}.` : ''}`,
+              confidence: bRes.confidence_level ? bRes.confidence_level.toLowerCase() as Analysis['confidence'] : 'unavailable',
+              confidence_percent: bRes.confidence != null ? Math.round(bRes.confidence * 100) : null, confidenceScore: bRes.confidence != null ? Math.round(bRes.confidence * 100) : null,
+              confidence_status: bRes.confidence != null ? 'not_calibrated' : 'unavailable',
+              confidence_reason: bRes.confidence != null ? 'Detector-reported model score; independent calibration is not established.' : 'Detector did not provide a confidence score.',
               detected_features: [`${bRes.building_count} Detected Footprints`, `${bRes.high_confidence_count} High Confidence`, `${bRes.medium_confidence_count} Medium`, `${bRes.partial_count} Partial Edge`],
               label: 'Building Footprint Audit', revealed_layer: 'urban',
               suggested_followups: ['Total roof area for solar?','Buildings closest to flood zone?','Density distribution?'],
