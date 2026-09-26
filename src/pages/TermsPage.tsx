@@ -33,7 +33,7 @@ export default function TermsPage() {
             Terms & Conditions
           </h1>
           <p className="text-xs font-mono text-slate-400">
-            Last Updated: September 17, 2026
+            Last Updated: September 26, 2026
           </p>
         </div>
 
