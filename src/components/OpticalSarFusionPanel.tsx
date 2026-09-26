@@ -246,7 +246,7 @@ export default function OpticalSarFusionPanel({
             <input
               ref={sarInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={e => handleFileUpload(e, true)}
             />
@@ -298,30 +298,32 @@ export default function OpticalSarFusionPanel({
         </button>
       </div>
 
-      {/* Real-time Multi-Modal Telemetry Gauges */}
+      {/* Specialist result status */}
       {fusionFeatures && (
         <div
-          className="p-4 rounded-xl border space-y-3"
+          className="p-4 rounded-xl border space-y-2"
           style={{ background: 'rgba(7,16,34,0.7)', borderColor: 'rgba(53,224,184,0.3)' }}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: MNT }}>
-              EXTRACTED CROSS-MODAL TELEMETRY MATRIX
+              SPECIALIST RESULT
             </span>
             {lastFusionTrace && (
               <button
                 onClick={() => onOpenTrace(lastFusionTrace)}
-                className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer"
                 style={{ background: `${CYN}22`, color: CYN, border: `1px solid ${CYN}88` }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <span>INSPECT AGENT TRACE</span>
+                INSPECT AGENT TRACE
               </button>
             )}
           </div>
+          <p className="text-xs font-mono text-white/60">
+            Results come from the configured remote-sensing specialist. This interface does not infer NDVI, calibrated SAR dB, or other physical measurements from JPEG pixels.
+          </p>
+        </div>
+      )}
+    </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             {/* Optical NDVI */}
