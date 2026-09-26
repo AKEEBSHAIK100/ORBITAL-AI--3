@@ -56,7 +56,7 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
         <div className="flex border-b border-slate-800 bg-[#081322] px-6 gap-2 pt-2 overflow-x-auto">
           {[
             { id: 'architecture' as const, label: '1. Agent Architecture' },
-            { id: 'tasks' as const, label: '2. ISRO/SAC Task Workflows' },
+            { id: 'tasks' as const, label: '2. SIH Remote-Sensing Task Workflows' },
             { id: 'taxonomy' as const, label: '3. BigEarthNet v2.0 Taxonomy' },
             { id: 'api' as const, label: '4. REST API Reference' },
             { id: 'citations' as const, label: '5. Academic References' },
@@ -83,10 +83,10 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
             <div className="space-y-6">
               <div>
                 <h3 className="text-xl font-bold text-slate-100 mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Deterministic Agentic Orchestration Framework
+                  Query-Driven Remote-Sensing Orchestration
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Unlike opaque monolithic chatbots, SatQuery AI implements an observable pipeline separating query intent
+                  Unlike opaque monolithic chatbots, ORBITAL-AI implements an observable pipeline separating query intent
                   classification, multi-sensor input validation, specialist tool execution, and transparent trace generation.
                 </p>
               </div>
@@ -304,7 +304,7 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
                   Academic Literature & Citations
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Key foundational papers and dataset benchmarks incorporated into SatQuery AI
+                  Key foundational papers and dataset benchmarks incorporated into ORBITAL-AI
                 </p>
               </div>
 
@@ -347,7 +347,7 @@ export default function DocumentationModal({ isOpen, onClose }: DocumentationMod
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-[#050D18] flex items-center justify-between text-xs font-mono text-slate-400">
-          <span>ISRO/SAC Remote-Sensing VLM Challenge · SatQuery AI</span>
+          <span>ISRO/SAC Remote-Sensing VLM Challenge · ORBITAL-AI</span>
           <button
             type="button"
             onClick={onClose}
