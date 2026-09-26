@@ -1,5 +1,5 @@
 {
-  "name": "figma-make-app",
+  "name": "orbital-ai",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -45,5 +45,6 @@
   },
   "engines": {
     "node": "24.x"
-  }
+  },
+  "description": "Evidence-grounded remote-sensing query assistant"
 }
