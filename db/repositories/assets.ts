@@ -66,7 +66,7 @@ export async function registerAsset(
   // Check if already registered for this session
   if (sessionId) {
     const existing = await dbQuery<{ id: string }>(`
-      SELECT id FROM assets
+      SELECT id FROM analysis_assets
       WHERE sha256 = $1 AND session_id = $2 AND expires_at > NOW()
       LIMIT 1
     `, [sha256, sessionId])
@@ -79,8 +79,8 @@ export async function registerAsset(
   const storageKey = `session/${sessionId ?? 'anon'}/${sha256.slice(0, 16)}`
 
   const result = await dbQuery(`
-    INSERT INTO assets
-      (id, session_id, storage_key, sha256, mime_type, size_bytes, modality, sensor_hint, expires_at)
+    INSERT INTO analysis_assets
+      (id, session_id, storage_path, sha256, mime_type, size_bytes, modality, sensor_hint, expires_at)
     VALUES
       ($1, $2, $3, $4, $5, $6, $7, $8, NOW() + ($9 || ' minutes')::INTERVAL)
     ON CONFLICT DO NOTHING
@@ -95,7 +95,7 @@ export async function registerAsset(
  */
 export async function findAssetBySha256(sha256: string, sessionId?: string): Promise<AssetRecord | null> {
   const result = await dbQuery<AssetRecord>(`
-    SELECT * FROM assets
+    SELECT id,session_id,storage_path AS storage_key,sha256,mime_type,size_bytes,modality,sensor_hint,expires_at FROM analysis_assets
     WHERE sha256 = $1
       ${sessionId ? 'AND session_id = $2' : ''}
       AND expires_at > NOW()
@@ -109,5 +109,5 @@ export async function findAssetBySha256(sha256: string, sessionId?: string): Pro
  * Purges assets with expired TTL. Safe to call periodically.
  */
 export async function pruneExpiredAssets(): Promise<void> {
-  await dbQuery(`DELETE FROM assets WHERE expires_at < NOW() - INTERVAL '5 minutes'`)
+  await dbQuery(`DELETE FROM analysis_assets WHERE expires_at < NOW() - INTERVAL '5 minutes'`)
 }
