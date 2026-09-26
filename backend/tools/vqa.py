@@ -86,7 +86,7 @@ class VQATool(BaseTool):
             }
 
         # 1. Primary execution path: BLIP-VQA + LoRA pilot adapter
-        adapter_res = self.runtime.vqa(img_bgr, query)
+        adapter_res = self.runtime.vqa(img_bgr, query, metadata=inputs.get("metadata"))
         status = adapter_res.get("status", "error")
         answer = adapter_res.get("answer", "")
         inference_time_ms = adapter_res.get("inference_time_ms", (time.time() - t0) * 1000)
@@ -94,6 +94,7 @@ class VQATool(BaseTool):
         evidence: Dict[str, Any] = {
             "device": adapter_res.get("device", self.runtime.device),
             "raw_output": answer,
+            "sensor_metadata": adapter_res.get("sensor_metadata"),
         }
 
         # 2. For questions that require specialist spatial reasoning unavailable to BLIP-VQA,
