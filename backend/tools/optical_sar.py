@@ -80,13 +80,13 @@ class OpticalSARTool(BaseTool):
         interpretation_parts = [
             f"Classical cross-modal telemetry baseline: optical visible-band proxies indicate {built_up_frac*100:.1f}% built-up fabric "
             f"and {water_frac*100:.1f}% water bodies.",
-            f"SAR mean signal level derived from raw amplitude is {mean_db:.1f} dB (speckle index {speckle:.2f}; raw amplitude uncalibrated to sigma-nought backscatter)."
+            (f"SAR mean signal level derived from raw amplitude is {mean_db:.1f} dB (speckle index {speckle:.2f}; raw amplitude uncalibrated to sigma-nought backscatter)." if mean_db is not None and speckle is not None else "SAR signal-level telemetry is unavailable from the specialist output.")
         ]
 
         if is_coregistered and cm_metrics.get("structural_similarity") is not None:
             ssim = cm_metrics["structural_similarity"]
-            cross_corr = cm_metrics.get("cross_correlation", 0.0)
-            interpretation_parts.append(f"Cross-modal structural alignment: SSIM = {ssim:.2f}, Cross-Correlation = {cross_corr:.2f}.")
+            cross_corr = cm_metrics.get("cross_correlation")
+            interpretation_parts.append(f"Cross-modal structural alignment: SSIM = {ssim:.2f}" + (f", Cross-Correlation = {cross_corr:.2f}." if cross_corr is not None else "."))
         else:
             interpretation_parts.append("Cross-modal pixel alignment is unavailable because spatial co-registration is unverified; silent pixel alignment is disabled.")
 
