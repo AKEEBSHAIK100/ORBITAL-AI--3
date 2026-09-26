@@ -3,7 +3,7 @@
 // Used by server.ts and api/*.ts — never import the src version from server code.
 
 /** The vision model used for all AI calls. Change once here to affect all server handlers. */
-export const MODEL = process.env.OPENAI_VISION_MODEL ?? 'gpt-5.6-luna'
+export const MODEL = 'remote-sensing-specialists'
 
 /** Max output tokens for single-image analysis. */
 export const MAX_TOKENS_ANALYZE = 700
