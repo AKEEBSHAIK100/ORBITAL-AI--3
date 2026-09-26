@@ -333,7 +333,7 @@ function BENPanel({ results, loading }: { results: BENResult | null, loading: bo
           <div>
             <div className="text-xs font-semibold font-mono tracking-wide" style={{ color: C.white }}>BigEarthNet v2.0 Classification</div>
             <div className="text-[10px] font-mono" style={{ color: C.muted }}>
-              {loading ? 'Running inference…' : results?.available ? `ResNet-50 · ${results.device?.toUpperCase()} · 19 Classes` : 'Heuristic estimation active'}
+              {loading ? 'Running inference…' : results?.available ? `ResNet-50 · ${results.device?.toUpperCase()} · 19 Classes` : 'Specialist unavailable'}
             </div>
           </div>
         </div>
@@ -341,7 +341,7 @@ function BENPanel({ results, loading }: { results: BENResult | null, loading: bo
           <div className="text-right">
             <div className="text-xs font-mono font-bold" style={{ color: C.mint }}>{results.top_label}</div>
             <div className="text-[10px] font-mono" style={{ color: C.muted }}>
-              {results.available ? `${results.confidence?.toFixed(1)}% model score` : `${results.confidence?.toFixed(1)}% heuristic score`}
+              {results.available ? `${results.confidence?.toFixed(1)}% model score` : 'No result returned'}
             </div>
           </div>
         )}
@@ -2054,7 +2054,7 @@ export default function App() {
                 onMouseDown={() => setDragging(true)} onMouseUp={() => setDragging(false)} onMouseLeave={() => setDragging(false)}>
                 {/* After */}
                 <div className="absolute inset-0">
-                  <img src={afterImage ?? "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&h=500&fit=crop&auto=format"} alt="After" className="w-full h-full object-cover" style={{ opacity: 0.7 }} />
+                  <img src={afterImage ?? ''} alt="After" className="w-full h-full object-cover" style={{ opacity: 0.7 }} />
                   <div className="absolute top-2 right-2 px-2 py-1 rounded-lg text-[10px] font-mono" style={{ background: `${C.surface}DD`, color: C.mint, border: `1px solid ${C.mint}40` }}>2026 · LATER</div>
                 </div>
                 {/* Before (clipped) */}
