@@ -29,7 +29,9 @@ UNSUPPORTED_KEYWORDS = [
     "who is", "recipe", "write a poem", "history of", "tell me a joke",
     "stock price", "stock market", "cryptocurrency", "bitcoin", "lottery",
     "who won", "celebrity", "sports score", "quantum physics", "write code",
-    "translate to", "sing a song", "solve equation"
+    "translate to", "sing a song", "solve equation", "medical diagnosis",
+    "identify this person", "facial recognition", "license plate", "exact address",
+    "personal identity", "bank balance", "financial advice"
 ]
 
 DISPOSITION_KNOWN_SPECIALIST = "Known specialist available"
@@ -42,7 +44,11 @@ KNOWN_RS_VQA_KEYWORDS = [
     "farmland", "woodland", "orchard", "pasture",
     "building", "buildings", "house", "houses", "structure", "structures", "rooftop", "rooftops",
     "urban", "residential", "industrial", "commercial", "settlement",
-    "road", "roads", "highway", "runway", "runways", "airport", "railway", "railroad", "bridge"
+    "road", "roads", "street", "streets", "highway", "runway", "runways",
+    "airport", "railway", "railroad", "rail", "bridge", "intersection", "overpass",
+    "parking", "parking lot", "harbor", "port", "dam", "reservoir", "coastline",
+    "shoreline", "island", "wetland", "industrial", "residential", "commercial",
+    "suburban", "rural", "urban", "built-up", "bare land", "sand", "beach"
 ]
 
 OPEN_VISUAL_OBJECT_KEYWORDS = [
@@ -53,8 +59,10 @@ OPEN_VISUAL_OBJECT_KEYWORDS = [
     "ship", "ships", "boat", "boats", "vessel", "vessels",
     "crane", "cranes", "helicopter", "helicopters",
     "tank", "tanks", "storage tank", "oil tank",
-    "stadium", "tennis court", "baseball", "golf course",
-    "playground", "fence", "power line", "wind turbine",
+    "stadium", "tennis court", "baseball", "golf course", "sports field",
+    "playground", "fence", "power line", "wind turbine", "solar farm", "solar panel",
+    "airstrip", "helipad", "warehouse", "factory", "greenhouse", "dam", "levee",
+    "pier", "dock", "shipyard", "construction site", "parking lot",
     "unusual structure", "unusual structures", "infrastructure"
 ]
 
@@ -162,6 +170,26 @@ def create_query_plan(
             planner_disposition=DISPOSITION_NO_CAPABILITY,
             task_category="UNSUPPORTED",
         )
+
+    # Natural-language scene/observation requests stay inside RS scope when an image is supplied.
+    has_scene_observation_request = any(k in q for k in [
+        "what can you tell me", "what do you see", "what is visible",
+        "what features are visible", "what features can you identify",
+        "what is shown", "what does this image show", "analyze this image",
+        "analyse this image", "inspect this image", "interpret this image",
+        "give me an overview", "give an overview", "summarize this image",
+        "summarise this image", "what is in this image", "what's in this image",
+        "what kind of area is this", "what type of area is this",
+        "is this urban", "is this rural", "is this agricultural",
+        "is this residential", "is this industrial"
+    ])
+    has_visual_question_form = any(k in q for k in [
+        "is there", "are there", "does this image", "does the image",
+        "can you identify", "can you see", "identify the", "identify any",
+        "tell me about", "what is", "what are", "which areas", "which features",
+        "where can i find", "where can i see", "how much of the image",
+        "how much area", "how dense", "how developed"
+    ])
 
     # ── 2. Multi-Task Queries ────────────────────────────────────────────────
     # Check for compound requests combining distinct specialist tasks
@@ -624,6 +652,24 @@ def create_query_plan(
             task_category="KNOWN_TASK",
         )
 
+    # ── 8b. Natural-language scene observation ───────────────────────────────
+    if has_scene_observation_request:
+        return QueryPlan(
+            intent="vqa" if has_visual_question_form else "caption",
+            required_images=1,
+            required_modalities=["optical"],
+            required_tasks=["vqa"] if has_visual_question_form else ["caption"],
+            specialists=["rs_vqa_adapted"] if has_visual_question_form else ["rs_caption_adapted"],
+            execution_order=["rs_vqa_adapted"] if has_visual_question_form else ["rs_caption_adapted"],
+            evidence_requirements=[
+                "Natural-language visual question answering grounded in the supplied image"
+                if has_visual_question_form else
+                "Remote-sensing scene description grounded in the supplied image"
+            ],
+            planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
+            task_category="NATURAL_LANGUAGE_RS_OBSERVATION",
+        )
+
     # ── 9. Open Visual Object Requests (Route to AdaptLLM if available, else Generalist) ──
     # Specific open-vocabulary objects not covered by domain-adapted specialists
     if has_open_visual_request:
@@ -664,7 +710,9 @@ def create_query_plan(
         has_vegetation_request or
         has_water_request or
         has_building_request or
-        any(k in q for k in KNOWN_RS_VQA_KEYWORDS)
+        any(k in q for k in KNOWN_RS_VQA_KEYWORDS) or
+        any(k in q for k in OPEN_VISUAL_OBJECT_KEYWORDS) or
+        has_visual_question_form
     )
     if is_known_rs_vqa:
         return QueryPlan(
