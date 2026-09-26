@@ -75,6 +75,28 @@ class TestSynthesisIntegrity(unittest.TestCase):
         self.assertEqual(status, "unavailable")
         self.assertNotIn("building", ans.lower())
 
+
+    def test_grounding_incomplete_geometry_is_unavailable(self):
+        ev = SpecialistEvidenceObject(
+            task="grounding",
+            result="",
+            evidence={"target": "water body", "regions": [{"region": {"x_percent": 10.0, "y_percent": None, "w_percent": 20.0, "h_percent": 20.0}}]},
+            source="grounding",
+            model="grounding",
+            confidence=None,
+            confidence_status="not_calibrated",
+        )
+        ans, conf, status, _ = synthesize_response(
+            "Where is the water?",
+            self.plan("grounding", ["grounding"]),
+            [ev],
+            {"compatibility": "compatible"},
+            status="SUCCESS",
+        )
+        self.assertEqual(status, "unavailable")
+        self.assertIsNone(conf)
+        self.assertIn("incomplete region geometry", ans.lower())
+
     def test_building_confidence_is_not_invented(self):
         ev = SpecialistEvidenceObject(
             task="building_detection",
