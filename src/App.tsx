@@ -693,7 +693,7 @@ function HeroSection({
             <div className="flex flex-wrap gap-8 pt-6 mb-10" style={{ borderTop: `1px solid ${C.border}` }}>
               {[
                 { val: '3', label: 'Analysis Input Modes', col: C.cyan },
-                { val: 'MULTI', label: 'Specialist Ensemble', col: C.mint },
+                { val: 'MODULAR', label: 'Specialist Routing', col: C.mint },
                 { val: 'RULE', label: 'Query-Driven Routing', col: C.orange },
                 { val: 'TRACE', label: 'Observable Verification', col: C.white },
               ].map(s => (
@@ -736,7 +736,7 @@ function HeroSection({
             {/* Clean Live Status indicator */}
             <div className="absolute bottom-6 left-0 glass card-border rounded-xl px-4 py-3 text-xs font-mono">
               <div className="text-[9px] uppercase tracking-widest mb-1" style={{ color: C.muted }}>PIPELINE STATUS</div>
-              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full glow-pulse" style={{ background: C.mint }} /><span style={{ color: C.mint, fontWeight: 600 }}>System Online</span></div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full glow-pulse" style={{ background: C.mint }} /><span style={{ color: C.mint, fontWeight: 600 }}>Interface Ready</span></div>
               <div className="text-[10px] mt-0.5" style={{ color: C.muted }}>Awaiting imagery and a natural-language query</div>
             </div>
           </div>
@@ -1356,7 +1356,7 @@ export default function App() {
   // ── Export report ─────────────────────────────────────────────────────────
   const downloadReport = () => {
     const data = {
-      generator: 'SatQuery AI: Agentic Remote-Sensing VLM', version: '3.0.0',
+      generator: 'ORBITAL-AI: Agentic Remote-Sensing Analysis', version: '3.1.0',
       exported_at: new Date().toISOString(), session_id: sessionId, active_mode: appMode,
       telemetry: imageTelemetry, bigearth_classification: benResults,
       latest_analysis: analysis, building_audit: buildingAnalysis,
@@ -1366,7 +1366,7 @@ export default function App() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `satquery_report_${Date.now()}.json`
+    a.href = url; a.download = `orbital_ai_report_${Date.now()}.json`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
     addToast('Report exported as JSON', 'success')
   }
@@ -1402,7 +1402,7 @@ export default function App() {
     const geojson = {
       type: 'FeatureCollection',
       metadata: {
-        generator: 'SatQuery AI: Building Footprint Extractor',
+        generator: 'ORBITAL-AI: Building Footprint Extractor',
         version: '3.0.0',
         exported_at: new Date().toISOString(),
         total_buildings: buildingAnalysis.building_count,
@@ -1430,7 +1430,7 @@ export default function App() {
       '---',
       '## 1. Session Overview',
       `- **Active Mode:** \`${appMode}\``,
-      `- **Session ID:** \`${sessionId ?? 'demo'}\``,
+      `- **Session ID:** \`${sessionId ?? 'not created'}\``,
       `- **Terrain Classification:** ${imageTelemetry.landClass} (${imageTelemetry.landClassPct})`,
       '',
       '## 2. BigEarthNet v2.0 Land-Cover Classification',
