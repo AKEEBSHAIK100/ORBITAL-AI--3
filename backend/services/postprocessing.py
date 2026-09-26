@@ -108,8 +108,10 @@ def filter_and_postprocess_detections(
         item["id"] = f"B{idx + 1:03d}"
 
     # Overall score summarizes model confidence only; it is not external validation.
-    overall_score = float(np.mean(confidences)) if confidences else 0.0
-    if overall_score >= 0.45:
+    overall_score = float(np.mean(confidences)) if confidences else None
+    if overall_score is None:
+        overall_level = None
+    elif overall_score >= 0.45:
         overall_level = "High"
     elif overall_score >= 0.28:
         overall_level = "Medium"
@@ -122,7 +124,7 @@ def filter_and_postprocess_detections(
         "medium_confidence_count": med_conf_count,
         "low_confidence_count": low_conf_count,
         "partial_count": partial_count,
-        "confidence": round(overall_score, 2),
+        "confidence": round(overall_score, 2) if overall_score is not None else None,
         "confidence_level": overall_level,
         "validation_status": "Model confidence distribution (unverified against external ground truth)",
     }
