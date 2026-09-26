@@ -18,25 +18,25 @@ async def lifespan(app: FastAPI):
             if detector.is_available:
                 print(f"[ORBITAL-AI] Building detector ready on {detector.device.upper()}.")
             else:
-                print(f"[SatQuery AI] Building detector unavailable (will degrade gracefully): {detector.load_error[:120]}")
+                print(f"[ORBITAL-AI] Building detector unavailable (will degrade gracefully): {detector.load_error[:120]}")
         except Exception as e:
-            print(f"[SatQuery AI] Warning: Building detector init error: {e}")
+            print(f"[ORBITAL-AI] Warning: Building detector init error: {e}")
 
         # Pre-warm BigEarthNet v2.0 classifier (non-fatal)
         try:
             from .services.ben_classifier import BENClassifier
             classifier = BENClassifier.get_instance()
             if classifier.is_available:
-                print(f"[SatQuery AI] BigEarthNet v2.0 classifier ready on {classifier.device.upper()} ({classifier.model_id}).")
+                print(f"[ORBITAL-AI] BigEarthNet v2.0 classifier ready on {classifier.device.upper()} ({classifier.model_id}).")
             else:
-                print(f"[SatQuery AI] BigEarthNet classifier in fallback mode: {classifier.load_error[:120]}")
+                print(f"[ORBITAL-AI] BigEarthNet classifier in fallback mode: {classifier.load_error[:120]}")
         except Exception as e:
-            print(f"[SatQuery AI] Warning: BEN classifier init error: {e}")
+            print(f"[ORBITAL-AI] Warning: BEN classifier init error: {e}")
     else:
-        print("[SatQuery AI] Services initialized in lazy warmup mode (on-demand loading enabled).")
+        print("[ORBITAL-AI] Services initialized in lazy warmup mode (on-demand loading enabled).")
 
     yield
-    print("[SatQuery AI] Shutting down — releasing model resources…")
+    print("[ORBITAL-AI] Shutting down — releasing model resources…")
     try:
         from .services.building_detector import BuildingDetector
         if BuildingDetector._instance is not None:
@@ -106,11 +106,11 @@ async def health():
         lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
         if lazy_warmup and BuildingDetector._instance is None:
             model_status["building_detector"] = {
-                "available": True,
+                "available": False,
                 "device": "cpu",
                 "model": "building_model.pt",
                 "state": "standby",
-                "error": None,
+                "error": "Model not loaded yet; availability will be verified on first use.",
             }
         else:
             detector = BuildingDetector.get_instance()
@@ -128,12 +128,12 @@ async def health():
         lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
         if lazy_warmup and BENClassifier._instance is None:
             model_status["ben_classifier"] = {
-                "available": True,
+                "available": False,
                 "device": "cpu",
                 "model_id": "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0",
                 "classes": 19,
                 "state": "standby",
-                "error": None,
+                "error": "Model not loaded yet; availability will be verified on first use.",
             }
         else:
             classifier = BENClassifier.get_instance()
