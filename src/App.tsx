@@ -299,16 +299,15 @@ function ConfidenceBadge({
   reason,
   mode,
 }: {
-  confidence?: 'high' | 'medium' | 'low'
+  confidence?: 'high' | 'medium' | 'low' | 'unavailable'
   percent?: number | null
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   reason?: string
   mode?: string
 }) {
   const [tip, setTip] = useState(false)
-  const isSynthetic = mode === 'synthetic_fallback'
-  const isCalibrated = confidence_status === 'calibrated' && !isSynthetic
-  const isUnavailable = confidence_status === 'unavailable' || isSynthetic || (percent === 0 && !isCalibrated)
+  const isCalibrated = confidence_status === 'calibrated'
+  const isUnavailable = confidence_status === 'unavailable' || confidence === 'unavailable' || (percent === 0 && !isCalibrated)
 
   let badgeColor: string = C.cyan
   let mainLabel = 'Confidence: Not calibrated'
@@ -2152,7 +2151,7 @@ export default function App() {
                     <ConfidenceBadge
                       confidence={temporalResult.confidenceScore >= 85 ? 'high' : 'medium'}
                       percent={temporalResult.confidenceScore}
-                      confidence_status={temporalResult.confidence_status || (temporalResult.mode === 'synthetic_fallback' ? 'unavailable' : 'not_calibrated')}
+                      confidence_status={temporalResult.confidence_status || (temporalResult.'not_calibrated')}
                       mode={temporalResult.mode}
                     />
                     <span className="text-[10px]" style={{ color: C.dim }}>Bi-Temporal CDVQA</span>
