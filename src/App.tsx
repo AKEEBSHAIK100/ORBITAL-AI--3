@@ -135,14 +135,7 @@ interface BENResult {
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 interface Toast { id: string; message: string; type: ToastType; duration?: number }
 
-// ── BigEarthNet 19 classes (display) ─────────────────────────────────────────
-const BEN_DEMO_LABELS: BENLabelScore[] = [
-  { name: 'Urban fabric', short: 'Urban Fabric', score: 0.82, active: true },
-  { name: 'Industrial or commercial units', short: 'Industrial/Commercial', score: 0.41, active: true },
-  { name: 'Arable land', short: 'Arable Land', score: 0.18, active: false },
-  { name: 'Broad-leaved forest', short: 'Broad-Leaved Forest', score: 0.14, active: false },
-  { name: 'Inland waters', short: 'Inland Waters', score: 0.09, active: false },
-]
+
 
 // ── Default telemetry ─────────────────────────────────────────────────────────
 export const DEFAULT_TELEMETRY: ImageTelemetry = {
@@ -159,86 +152,37 @@ const imageTelemetryCache = new Map<string, ImageTelemetry>()
 
 // ── Image compression + telemetry ────────────────────────────────────────────
 async function compressImage(file: File): Promise<{ dataUrl: string; telemetry: ImageTelemetry }> {
-  const isImage = file.type.startsWith('image/') ||
-    ['tif','tiff','geotiff'].some(e => file.name.toLowerCase().endsWith(`.${e}`))
-  if (!isImage) throw new Error('Please choose an image file (JPG, PNG, WEBP, or GeoTIFF).')
-  if (file.size > 20 * 1024 * 1024) throw new Error('Image exceeds 20 MB limit. Please resize.')
-
-  let canvas = document.createElement('canvas')
-  let ctx = canvas.getContext('2d')
-
-  try {
-    const source = await createImageBitmap(file)
-    const scale = Math.min(1, 1600 / Math.max(source.width, source.height))
-    canvas.width = Math.max(1, Math.round(source.width * scale))
-    canvas.height = Math.max(1, Math.round(source.height * scale))
-    ctx = canvas.getContext('2d')
-    ctx?.drawImage(source, 0, 0, canvas.width, canvas.height)
-    source.close()
-  } catch {
-    await new Promise<void>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = ev => {
-        const img = new Image()
-        img.onload = () => {
-          const scale = Math.min(1, 1600 / Math.max(img.width, img.height))
-          canvas.width = Math.max(1, Math.round(img.width * scale))
-          canvas.height = Math.max(1, Math.round(img.height * scale))
-          ctx = canvas.getContext('2d')
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
-          resolve()
-        }
-        img.onerror = () => reject(new Error('Cannot render this image format.'))
-        img.src = ev.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('Failed to read file.'))
-      reader.readAsDataURL(file)
-    }).catch(() => {
-      canvas.width = 800; canvas.height = 600
-      ctx = canvas.getContext('2d')
-      if (ctx) { ctx.fillStyle = C.surface; ctx.fillRect(0,0,800,600) }
-    })
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please choose a browser-decodable image (JPG, PNG, or WEBP).');
   }
+  if (file.size > 20 * 1024 * 1024) throw new Error('Image exceeds 20 MB limit. Please resize.');
+
+  let source: ImageBitmap;
+  try {
+    source = await createImageBitmap(file);
+  } catch {
+    throw new Error('This image format could not be decoded in the browser. TIFF/GeoTIFF files require a raster-aware backend.');
+  }
+
+  const scale = Math.min(1, 1600 / Math.max(source.width, source.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(source.width * scale));
+  canvas.height = Math.max(1, Math.round(source.height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    source.close();
+    throw new Error('Could not prepare the uploaded image.');
+  }
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  source.close();
 
   const telemetry: ImageTelemetry = {
     ...DEFAULT_TELEMETRY,
     locationTag: `${canvas.width}×${canvas.height} px · ${file.name}`,
-  }
-
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.82)
-  imageTerrainCache.set(dataUrl, telemetry.terrain)
-  imageTelemetryCache.set(dataUrl, telemetry)
-  return { dataUrl, telemetry }
+  };
+  return { dataUrl: canvas.toDataURL('image/jpeg', 0.82), telemetry };
 }
 
-function detectImageTerrain(imageData?: string | null): Terrain {
-  if (!imageData) return 'urban'
-  if (imageTelemetryCache.has(imageData)) return imageTelemetryCache.get(imageData)!.terrain
-  if (imageTerrainCache.has(imageData)) return imageTerrainCache.get(imageData)!
-  try {
-    const raw = imageData.split(',')[1] || imageData
-    const sampleLen = Math.min(raw.length, 3500)
-    let charCodeSum = 0
-    for (let i = 0; i < sampleLen; i += 7) charCodeSum += raw.charCodeAt(i)
-    const bucket = Math.abs(charCodeSum) % 4
-    if (bucket === 0) return 'vegetation'
-    if (bucket === 1) return 'water'
-    if (bucket === 2) return 'arid'
-    return 'urban'
-  } catch { return 'urban' }
-}
-
-function detectHiddenLayer(text: string): HiddenLayer | null {
-  const t = text.toLowerCase()
-  if (t.includes('drought') || t.includes('moisture') || t.includes('dry') || t.includes('arid')) return 'drought'
-  if (t.includes('harvest') || t.includes('crops') || t.includes('mature') || t.includes('yield')) return 'harvest'
-  if (t.includes('flood') || t.includes('water') || t.includes('river') || t.includes('inundat')) return 'flood'
-  if (t.includes('building') || t.includes('urban') || t.includes('density') || t.includes('structure')) return 'urban'
-  if (t.includes('road') || t.includes('blocked') || t.includes('transit') || t.includes('traffic')) return 'roads'
-  return null
-}
-
-// ── Demo analyze (fallback / demo mode) ──────────────────────────────────────
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null)
