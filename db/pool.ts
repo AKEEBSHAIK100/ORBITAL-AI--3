@@ -21,7 +21,7 @@ export function getPool(): pg.Pool | null {
   if (_initAttempted) return _pool
   _initAttempted = true
 
-  const url = process.env.DATABASE_URL
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING
   if (!url) {
     console.warn('[SatQuery][DB] DATABASE_URL not set — running without PostgreSQL (in-memory mode).')
     return null
