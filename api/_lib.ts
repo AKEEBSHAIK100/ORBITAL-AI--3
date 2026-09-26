@@ -1,13 +1,4 @@
 import 'dotenv/config'
-import OpenAI from 'openai'
-import { MODEL } from '../lib/constants.js'
-
-// ─── OpenAI/Anthropic client ──────────────────────────────────────────────────
-export { MODEL }
-export const client = new OpenAI({
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || 'sk-placeholder-key',
-  baseURL: process.env.OPENAI_API_BASE || undefined,
-})
 
 // ─── Deployment-wide call counter ─────────────────────────────────────────────
 // In-memory; resets on process restart. Console-logged so you can monitor
@@ -164,37 +155,3 @@ export function getBackendUrl(): string {
   return process.env.PYTHON_BACKEND_URL || process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
 }
 
-export function generateRealisticComparison(question?: string, beforeLabel?: string, afterLabel?: string) {
-  return {
-    answer: `Multi-temporal comparative baseline between ${beforeLabel || 'earlier baseline'} and ${afterLabel || 'recent pass'} indicates estimated surface alterations across approximately 12.4% of the surveyed observation area. Riparian channels display minimal shift. (Classical-CV baseline; spatial co-registration unverified from metadata).`,
-    alignment_confidence: 'unverified',
-    confidence: null,
-    confidence_percent: null,
-    confidenceScore: null,
-    confidence_reason: 'Classical-CV differencing baseline; spatial co-registration unverified without GCPs or geotransform metadata.',
-    detected_features: ['Surface Alteration', 'Canopy Variance', 'Riparian Interface', 'Transit Corridor'],
-    estimated_coverage_percent: 12.4,
-    change_regions: [
-      {
-        description: 'Radiometric variation consistent with surface construction.',
-        confidence: null,
-        region: { x_percent: 42, y_percent: 44, w_percent: 22, h_percent: 18 },
-        label: 'Surface alteration',
-      },
-      {
-        description: 'Localized canopy thinning detected by spectral differencing.',
-        confidence: null,
-        region: { x_percent: 71, y_percent: 28, w_percent: 20, h_percent: 24 },
-        label: 'Vegetation variance',
-      },
-    ],
-    label: 'Classical-CV Temporal Change Baseline',
-    suggested_followups: [
-      'Where is the largest visible change?',
-      'Is vegetation increasing or decreasing?',
-      'Which areas need closer inspection?',
-      'What is the rate of structural growth?',
-      'Are environmental buffer zones compromised?',
-    ],
-  }
-}
