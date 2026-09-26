@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { buildExecutionTrace, type ExecutionTraceStep } from '../lib/agentController.js'
 import { classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep } from '../lib/agentController.js'
 import { runWorkerChange } from './_hfWorker.js'
 
