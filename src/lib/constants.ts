@@ -3,7 +3,7 @@
 // Never hardcode these values elsewhere — always import from here.
 
 /** The vision model used for all AI calls. Change once here to affect the entire stack. */
-export const MODEL = 'claude-sonnet-5'
+export const MODEL = 'remote-sensing-specialists'
 
 /** Max output tokens for single-image analysis. The JSON schema fits comfortably under 700. */
 export const MAX_TOKENS_ANALYZE = 700
