@@ -11,13 +11,13 @@ This file is the living implementation status for the remote-sensing prototype. 
 - **Done:** audit/execution trace support is retained in the orchestration path.
 
 ## Single-image analysis
-- **Done:** real BLIP caption/VQA adapter paths exist with BigEarthNet-derived LoRA artifacts.
+- **Done:** real BLIP caption/VQA adapter runtime paths exist with strict artifact/config/runtime gates.
 - **Done:** BLIP adapter configs target verified attention modules and reject the stale `dense` target.
 - **Done:** PEFT loading plus real generation smoke tests are required before BLIP is marked AVAILABLE.
 - **Done:** ambiguous multispectral input is rejected instead of silently dropping bands.
 - **Done:** Sentinel-2 10-band input can be explicitly converted to B04/B03/B02 natural-colour RGB for BLIP.
 - **Scoped-down:** BLIP outputs are uncalibrated generative text; no benchmark accuracy is claimed.
-- **Blocked for runtime verification:** the Git repository intentionally excludes `adapter_model.safetensors`; both current BLIP adapter directories contain config files only. Real pilot weights must be mounted/copied through the documented adapter paths before PEFT + inference verification can occur.
+- **Blocked for runtime verification:** the Git repository currently contains config files only in both BLIP adapter directories; `adapter_model.safetensors` is absent. Real pilot weights must be mounted/copied through the documented adapter paths before PEFT + inference verification can occur.
 
 ## GeoTIFF / sensor integrity
 - **Done:** multi-band GeoTIFF/TIFF ingestion preserves H×W×bands arrays.
@@ -47,9 +47,16 @@ This file is the living implementation status for the remote-sensing prototype. 
 - **Scoped-down:** free Hugging Face ZeroGPU remote-sensing specialist is an external runtime dependency, not an ORBITAL-AI-owned model benchmark.
 - **Unavailable until runtime success:** local AdaptLLM/Qwen2-VL availability is based on executable weights/runtime, not model-name configuration alone.
 
+## API/provider architecture
+- **Done:** removed the unused OpenAI SDK and paid-provider fallback paths from the Node/Vercel analysis, compare, and fusion routes.
+- **Done:** free execution paths are Python remote-sensing specialists and the public Hugging Face ZeroGPU specialist; unavailable means unavailable.
+- **Done:** client/server runtime model labels are synchronized.
+
 ## Validation status
 - Added focused multispectral/BLIP integrity regression coverage; tests have not yet been executed in this environment. Earlier reported BLIP test counts are historical and must not be treated as current validation.
-- Latest full-project test/build gate: **not yet rerun after the current integrity changes**.
+- Added a reproducible GitHub Actions release gate for frontend typecheck/build and backend compile/pytest.
+- Current repository environment cannot reach GitHub/npm from the local container, and the newly created workflow has not produced a run for its commit; therefore no current full-project pass is claimed.
+- Focused integrity tests were added for free-only API routing, BLIP config correctness, multispectral ingestion, and unavailable-state semantics.
 
 ## Explicit non-goals
 - No fabricated model outputs.
