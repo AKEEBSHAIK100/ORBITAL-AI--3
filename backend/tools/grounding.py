@@ -181,7 +181,7 @@ class GroundingTool(BaseTool):
             "primary_region": all_regions[0]["region"] if all_regions else None,
             "detected": len(all_regions) > 0,
             "unsupported_targets": detected_unsupported,
-            "confidence_source": "heuristic",
+            "confidence_source": "not_calibrated",
             "method": "Spectral thresholding & connected component contour extraction",
             "duration_ms": duration_ms
         }
