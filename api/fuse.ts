@@ -131,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
     } catch {
-      // Backend offline or timeout; graceful fallback to calibrated simulation
+      // Backend offline or timeout; no synthetic fusion fallback is permitted
     }
 
     if (!fusionFeatures) {
