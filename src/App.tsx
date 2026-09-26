@@ -11,6 +11,7 @@ import ContactModal from './components/ContactModal'
 import DashboardView from './components/DashboardView'
 import { ExecutionTrace, ExecutionTraceStep, FusionFeatures, classifyTask } from './lib/agentController'
 import { createAnalysisSession, recordAnalysisRun } from './lib/supabase'
+import { runBrowserRemoteAnalysis } from './lib/hfRemote'
 
 export const API_BASE = (() => {
   const envUrl = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
@@ -1052,20 +1053,44 @@ export default function App() {
             const errorMsg = typeof payload.detail === 'string'
               ? payload.detail
               : (payload.error || `Specialist analysis failed (HTTP ${res.status})`)
-            // Production integrity guard: an unavailable specialist remains unavailable.
-            // A browser RGB heuristic is only allowed when explicitly opted in for development.
-            result = {
+            try {
+              setStatus('Switching to remote GPU specialist…')
+              const remote = await runBrowserRemoteAnalysis(
+                prompt,
+                imagePreview || '',
+                undefined,
+                message => setStatus(message),
+              )
+              result = {
+                answer: remote.answer,
+                confidence: 'low',
+                confidence_percent: null,
+                confidenceScore: null,
+                confidence_status: 'not_calibrated',
+                confidence_reason: 'External public Hugging Face ZeroGPU specialist returned the answer; no calibrated ORBITAL-AI confidence is claimed.',
+                detected_features: [],
+                label: 'External Remote-Sensing VLM',
+                suggested_followups: ['Ask a more specific question about the visible land cover', 'Upload a second date to compare change'],
+                mode: 'external_hf_zero_gpu',
+                is_synthetic: false,
+                execution_trace: payload.execution_trace || null,
+              }
+            } catch (remoteErr: any) {
+              // Production integrity guard: if the real specialist is unavailable,
+              // remain unavailable. Never substitute a browser heuristic.
+              result = {
                 answer: `Remote sensing analysis unavailable: ${errorMsg}`,
                 confidence: 'low',
                 confidence_percent: null,
                 confidenceScore: null,
                 confidence_status: 'unavailable',
-                confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
+                confidence_reason: remoteErr?.message || errorMsg,
                 detected_features: ['Analysis Unavailable'],
                 label: 'Analysis Error',
-                suggested_followups: ['Configure the production VLM provider', 'Use the adapted specialist through the Python backend'],
+                suggested_followups: ['Retry when the remote specialist is available', 'Use the adapted specialist through the Python backend'],
                 execution_trace: payload.execution_trace || null,
               }
+            }
           }
         } catch (fetchErr: any) {
           result = {
