@@ -11,7 +11,7 @@ export default function PrivacyPage() {
             className="flex items-center gap-2 text-xs font-mono font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
           >
             <span>←</span>
-            <span>Back to SatQuery AI</span>
+            <span>Back to ORBITAL-AI</span>
           </a>
           <nav className="flex items-center gap-4 text-xs font-mono">
             <span className="text-slate-400 font-semibold">Privacy Policy</span>
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
             Legal Documentation
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-100 mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            SatQuery AI Privacy Policy
+            ORBITAL-AI Privacy Policy
           </h1>
           <p className="text-xs font-mono text-slate-400">
             Last Updated: September 17, 2026
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
               1. Introduction
             </h2>
             <p>
-              This Privacy Policy describes how SatQuery AI handles information submitted through the web application. It outlines what data is processed when you interact with the platform, how that information is utilized during analysis sessions, and the choices available to you.
+              This Privacy Policy describes how ORBITAL-AI handles information submitted through the web application. It outlines what data is processed when you interact with the platform, how that information is utilized during analysis sessions, and the choices available to you.
             </p>
           </section>
 
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
               2. Information Processed
             </h2>
             <p>
-              SatQuery AI processes only the data necessary to perform the requested remote-sensing image analysis and maintain application functionality:
+              ORBITAL-AI processes only the data necessary to perform the requested remote-sensing image analysis and maintain application functionality:
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-2 text-slate-300">
               <li>
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
               7. Data Retention
             </h2>
             <p>
-              Data retention across SatQuery AI components is structured as follows:
+              Data retention across ORBITAL-AI components is structured as follows:
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-2 text-slate-300">
               <li>
@@ -192,7 +192,7 @@ export default function PrivacyPage() {
         {/* Bottom Navigation */}
         <div className="mt-16 pt-8 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400" style={{ borderColor: 'rgba(56, 189, 248, 0.16)' }}>
           <a href="/" className="text-cyan-400 hover:text-cyan-300 transition-colors">
-            ← Back to SatQuery AI
+            ← Back to ORBITAL-AI
           </a>
           <div className="flex items-center gap-4">
             <a href="/terms" className="hover:text-slate-200 transition-colors">
