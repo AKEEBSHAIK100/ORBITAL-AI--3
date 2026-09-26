@@ -1829,29 +1829,6 @@ export default function App() {
 
                       {/* AI response */}
                       <div className="rounded-xl px-4 py-3.5 space-y-2.5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-                        {m.is_synthetic && (
-                          <div
-                            className="w-full rounded-xl p-3.5 flex items-start gap-3 border"
-                            style={{
-                              background: 'rgba(255,159,67,0.08)',
-                              borderColor: 'rgba(255,159,67,0.4)',
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: '#FF9F43' }}>
-                              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                              <line x1="12" y1="9" x2="12" y2="13" />
-                              <line x1="12" y1="17" x2="12.01" y2="17" />
-                            </svg>
-                            <div className="space-y-1">
-                              <div className="text-xs font-mono font-bold tracking-wider uppercase" style={{ color: '#FFB86C' }}>
-                                Sample output: not a live model result
-                              </div>
-                              <div className="text-[11px] font-mono leading-relaxed" style={{ color: '#F4F7FA' }}>
-                                This response was generated from pre-configured demonstration data. It does not represent live specialist model execution.
-                              </div>
-                            </div>
-                          </div>
-                        )}
 
                         <div className="flex items-center justify-between text-[10px] font-mono flex-wrap gap-1">
                           <ConfidenceBadge confidence={m.confidence} percent={m.confidence_percent ?? m.confidenceScore} confidence_status={m.confidence_status} reason={m.confidence_reason} mode={m.mode} />
@@ -2011,7 +1988,7 @@ export default function App() {
             <div>
               <div className="inline-block text-xs font-mono tracking-widest mb-5 px-3 py-1.5 rounded-md" style={{ color: C.mint, background: `${C.mint}0E`, border: `1px solid ${C.mint}22` }}>BI-TEMPORAL ANALYSIS · CDVQA</div>
               <h2 className="text-4xl lg:text-5xl font-bold mb-5" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Compare Any Two<br />Points in Time</h2>
-              <p className="text-base leading-relaxed mb-8" style={{ color: C.muted, lineHeight: 1.8 }}>Upload before/after satellite passes or use demo imagery. SatQuery AI co-registers the scenes, quantifies structural and environmental changes, and generates a CDVQA-compliant change analysis with confidence bounds.</p>
+              <p className="text-base leading-relaxed mb-8" style={{ color: C.muted, lineHeight: 1.8 }}>Upload earlier and later observations. ORBITAL-AI compares the supplied scenes when an executable change specialist is available, and reports limitations when it is not.</p>
 
               <div className="flex flex-wrap gap-2.5 mb-8">
                 <button onClick={() => runComparison()} className="btn-outline-cyan px-5 py-2.5 text-sm font-medium rounded-xl flex items-center gap-2">
