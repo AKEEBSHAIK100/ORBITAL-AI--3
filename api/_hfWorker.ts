@@ -1,4 +1,4 @@
-const DEFAULT_WORKER_URL = 'https://akeeb100-orbital-ai-remote-sensing-backend.hf.space'
+const DEFAULT_WORKER_URL = 'https://cattolatte-satquery.hf.space'
 
 function workerUrl(): string {
   return (process.env.HF_RS_WORKER_URL || DEFAULT_WORKER_URL).replace(/\/$/, '')
@@ -69,25 +69,21 @@ function fileRef(path: string, filename: string) {
 
 export async function runWorkerVqaOrCaption(image: string, query: string) {
   const path = await uploadImage(image, 'orbital-input.jpg')
-  return callGradio('analyze', [fileRef(path, 'orbital-input.jpg'), query])
+  const raw = await callGradio('answer', [query, fileRef(path, 'orbital-input.jpg'), null])
+  const values = Array.isArray(raw) ? raw : [raw]
+  return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', task: /describe|caption|scene/i.test(query) ? 'caption' : 'vqa', model: 'external-zero-gpu-rs-vlm', adapter: 'external-space', provenance: 'External public Hugging Face ZeroGPU Space; not an ORBITAL-AI benchmark.' }
 }
 
 export async function runWorkerChange(beforeImage: string, afterImage: string) {
   const before = await uploadImage(beforeImage, 'orbital-before.jpg')
   const after = await uploadImage(afterImage, 'orbital-after.jpg')
-  return callGradio('change', [
-    fileRef(before, 'orbital-before.jpg'),
-    fileRef(after, 'orbital-after.jpg'),
-  ])
+  return callGradio('answer', ['What changed between these two observations, and where did the change occur?', fileRef(before, 'orbital-before.jpg'), fileRef(after, 'orbital-after.jpg')])
 }
 
 export async function runWorkerFusion(opticalImage: string, sarImage: string) {
   const optical = await uploadImage(opticalImage, 'orbital-optical.jpg')
   const sar = await uploadImage(sarImage, 'orbital-sar.jpg')
-  return callGradio('fusion', [
-    fileRef(optical, 'orbital-optical.jpg'),
-    fileRef(sar, 'orbital-sar.jpg'),
-  ])
+  return callGradio('answer', ['Use the optical and SAR images together to identify built-up and water-covered regions.', fileRef(optical, 'orbital-optical.jpg'), fileRef(sar, 'orbital-sar.jpg')])
 }
 
 export function isWorkerConfigured(): boolean {
