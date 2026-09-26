@@ -2318,15 +2318,15 @@ export default function App() {
           <div className="text-center mb-16">
             <div className="inline-block text-xs font-mono tracking-widest mb-4 px-3 py-1.5 rounded-md" style={{ color: C.orange, background: `${C.orange}0E`, border: `1px solid ${C.orange}22` }}>CORE CAPABILITIES</div>
             <h2 className="text-4xl lg:text-5xl font-bold mb-4" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}>Intelligence Across<br />Every Modality</h2>
-            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Six specialist pipelines: deterministically routed, observable, and built for remote-sensing workflows.</p>
+            <p className="text-base max-w-xl mx-auto" style={{ color: C.muted }}>Query-driven specialist workflows with observable execution traces and explicit capability limits.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { icon: '◉', color: C.cyan, badge: 'VQA', title: 'Single-Image VQA', desc: 'Multi-attribute natural-language visual question answering and scene descriptions for land-cover, dominant objects, and spatial layout.', detail: 'BigEarthNet taxonomy · Multi-label classification · ResNet-50 backbone' },
-              { icon: '⊕', color: C.mint, badge: 'Land Cover', title: 'Land Cover Classification', desc: 'Classifies dominant land cover type from a satellite image using the BigEarthNet 19-class taxonomy with confidence scoring.', detail: 'Normalized bbox output · RSVQA evaluation protocol' },
-              { icon: '△', color: C.orange, badge: 'Change', title: 'Bi-Temporal Change Detection', desc: 'Quantifies structural, vegetation, and hydrological changes between co-registered image pairs. Reports expansion rates, area deltas, and confidence bounds.', detail: 'Coregistration ≤2px tolerance · CDVQA change protocol' },
-              { icon: '⬡', color: C.mint, badge: 'Fusion', title: 'Optical-SAR Analysis', desc: 'Combines optical NIR reflectance with SAR microwave backscatter for all-weather, cloud-penetrating analysis of built-up and water-covered regions.', detail: 'SSIM + CrossCorr · C-band · VV/VH polarization' },
+              { icon: '◉', color: C.cyan, badge: 'VQA', title: 'Single-Image VQA', desc: 'Multi-attribute natural-language visual question answering and scene descriptions for land-cover, dominant objects, and spatial layout.', detail: 'BigEarthNet taxonomy · specialist model path · provenance' },
+              { icon: '⊕', color: C.mint, badge: 'Land Cover', title: 'Land Cover Classification', desc: 'Uses the BigEarthNet taxonomy when the trained classification specialist is available; raw model scores are labelled as uncalibrated unless empirical calibration is verified.', detail: 'Normalized region output · grounding workflow' },
+              { icon: '△', color: C.orange, badge: 'Change', title: 'Bi-Temporal Change Detection', desc: 'Compares two observations when a compatible change-analysis specialist is available. The system validates the pair and distinguishes qualitative change understanding from calibrated quantitative measurements.', detail: 'Co-registration checks · bi-temporal change workflow · provenance trace' },
+              { icon: '⬡', color: C.mint, badge: 'Fusion', title: 'Optical-SAR Analysis', desc: 'Combines supplied optical/multispectral evidence with SAR backscatter when both inputs are valid and co-registered. RGB-only uploads are never treated as multispectral.', detail: 'Cross-modal reasoning · modality validation · execution trace' },
               { icon: '◎', color: C.orange, badge: 'Agentic', title: 'Traceable Task Routing', desc: 'Every query passes through a transparent task classifier → tool registry → specialist model pipeline. Full execution trace viewable and exportable.', detail: 'Observable trace · Permitted parameters · JSON export' },
             ].map((f, i) => (
               <div key={i} className="rounded-2xl p-6 transition-all duration-300 cursor-default group stat-card"
