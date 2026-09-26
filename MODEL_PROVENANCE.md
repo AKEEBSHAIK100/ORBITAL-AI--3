@@ -1,4 +1,4 @@
-# SatQuery AI — Model Provenance & Attribution
+# ORBITAL-AI — Model Provenance & Attribution
 
 This document describes the exact model weights, datasets, and algorithms used by SatQuery AI. It is committed to the repository for transparency, reproducibility, and academic compliance.
 
@@ -64,14 +64,11 @@ This document describes the exact model weights, datasets, and algorithms used b
 
 | Field | Detail |
 |---|---|
-| **Algorithm** | Classical computer vision (no learned weights) |
-| **Optical Features** | NDVI vegetation proxy (red/near-IR channel ratio approximation on RGB), water fraction (blue channel dominance), built-up fraction (complement) |
-| **SAR Features** | Mean backscatter (dB), standard deviation backscatter, speckle index (σ/μ), Sobel edge density |
-| **Cross-Modal** | Structural Similarity Index (SSIM), normalized cross-correlation, complementarity index |
-| **Library** | OpenCV 4.x |
-| **Synthetic SAR Proxy** | When no real SAR image is provided, a synthetic radar approximation is generated from optical gradient magnitude + speckle noise (physically calibrated but not geometrically registered SAR). Responses flagged with `"mode": "synthetic_proxy"`. |
-
----
+| **Algorithm** | Classical computer vision baseline (no learned fusion weights) |
+| **Optical Features** | Image-derived RGB proxies only; no calibrated multispectral index is claimed from RGB-only input |
+| **SAR Features** | Raw SAR intensity/edge statistics when a real SAR input is supplied; calibration is not inferred |
+| **Cross-Modal** | SSIM/NCC-style structural comparisons only when input compatibility/registration checks pass |
+| **Synthetic SAR** | **Not a production fallback.** The current integrity policy rejects silent optical-to-SAR substitution. |
 
 ## 4. Change Detection (Bi-Temporal)
 
@@ -96,7 +93,8 @@ This document describes the exact model weights, datasets, and algorithms used b
 
 ## 6. Known Limitations
 
-- **RGB as proxy for multispectral**: BigEarthNet expects 10-band Sentinel-2 imagery. RGB-only input is a significant approximation.
-- **Model availability**: `building_model.pt` is not included in this repository due to file size. Place a YOLO weights file trained on aerial building footprint data at `backend/models/building_model.pt` or set the `BUILDING_MODEL_PATH` environment variable.
-- **Synthetic fallbacks**: When the specialist vision model is unavailable, the system may return heuristic estimates labelled with `"mode": "synthetic_fallback"`. These are explicitly disclosed in API responses and the UI.
-- **SAR mode**: The application simulates SAR analysis from single optical images when no real SAR data is provided. This is disclosed via `"sar_synthetic": true` in fusion API responses.
+- **BLIP multispectral boundary**: Sentinel-2 multi-band inputs are preserved through GeoTIFF ingestion and converted explicitly to B04/B03/B02 natural-colour RGB for BLIP. Other ambiguous multi-band arrays are rejected rather than silently truncated.
+- **BLIP runtime availability**: Adapter files alone do not make the specialist available. PEFT loading and a real generation smoke test must succeed at runtime before the adapter is marked AVAILABLE.
+- **Land-cover availability**: A configured model identifier is not treated as local availability; the classifier must have an executable model/runtime.
+- **Model confidence**: Generative VLM confidence is uncalibrated and remains null. Detector confidence scores are model scores, not independent accuracy validation.
+- **No synthetic intelligence fallback**: When a required specialist is unavailable, ORBITAL-AI returns an explicit unavailable result rather than inventing a result.
