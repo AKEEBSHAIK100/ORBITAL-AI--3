@@ -55,7 +55,7 @@ This file is the living implementation status for the remote-sensing prototype. 
 ## Validation status
 - Added focused multispectral/BLIP integrity regression coverage; tests have not yet been executed in this environment. Earlier reported BLIP test counts are historical and must not be treated as current validation.
 - Added a reproducible GitHub Actions release gate for frontend typecheck/build and backend compile/pytest.
-- Current repository environment cannot reach GitHub/npm from the local container, and the newly created workflow has not produced a run for its commit; therefore no current full-project pass is claimed.
+- Current repository environment cannot reach GitHub/npm from the local container. The release-gate workflow was added, but no workflow run is currently associated with the latest commits; therefore no current full-project pass is claimed.
 - Focused integrity tests were added for free-only API routing, BLIP config correctness, multispectral ingestion, and unavailable-state semantics.
 
 ## Explicit non-goals
