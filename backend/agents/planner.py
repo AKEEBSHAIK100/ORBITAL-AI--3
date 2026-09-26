@@ -730,16 +730,44 @@ def create_query_plan(
         )
 
     # ── 12. Open Remote-Sensing Question / AdaptLLM or Generalist Fallback ───
-    # Route to domain-adapted VLM candidate if available, else generalist multimodal VLM
-    open_spec, open_req = _get_open_vlm_specialist()
+    # Only use the open-vocabulary VLM path when the query is clearly about
+    # an image/scene. Never route arbitrary text to a vision model.
+    rs_context = any(k in q for k in [
+        "image", "scene", "satellite", "remote sensing", "aerial", "imagery",
+        "photo", "picture", "raster", "landscape", "area", "region"
+    ])
+    if rs_context or has_visual_question_form:
+        open_spec, open_req = _get_open_vlm_specialist()
+        return QueryPlan(
+            intent="general_vqa",
+            required_images=1,
+            required_modalities=["optical"],
+            required_tasks=["general_vqa"],
+            specialists=[open_spec],
+            execution_order=[open_spec],
+            evidence_requirements=[open_req],
+            planner_disposition=DISPOSITION_GENERALIST_FALLBACK,
+            task_category="OPEN_REMOTE_SENSING_QUESTION",
+        )
+
     return QueryPlan(
-        intent="general_vqa",
+        intent="unsupported",
         required_images=1,
         required_modalities=["optical"],
-        required_tasks=["general_vqa"],
-        specialists=[open_spec],
-        execution_order=[open_spec],
-        evidence_requirements=[open_req],
-        planner_disposition=DISPOSITION_GENERALIST_FALLBACK,
-        task_category="OPEN_REMOTE_SENSING_QUESTION",
+        required_tasks=[],
+        specialists=[],
+        execution_order=[],
+        evidence_requirements=[],
+        unsupported_reason=(
+            "The query is not a supported remote-sensing visual question. "
+            "Ask about observable content, land cover, objects, spatial features, "
+            "or changes in supplied imagery."
+        ),
+        supported_alternatives=[
+            "Describe the supplied satellite image",
+            "Identify visible land-cover or infrastructure features",
+            "Compare two supplied images for observable change",
+        ],
+        planner_disposition=DISPOSITION_NO_CAPABILITY,
+        task_category="UNSUPPORTED",
     )
