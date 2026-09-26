@@ -13,11 +13,11 @@ class OpticalSARTool(BaseTool):
     supported_tasks = ["sar_optical_fusion"]
     modalities = ["optical", "sar"]
     adapter = "OpenCV / NumPy Classical Computer Vision & Cross-Modal Telemetry Engine"
-    domain_adaptation = "Sensor-specific radar backscatter (dB), speckle noise modeling, and optical-SAR complementarity scoring."
+    domain_adaptation = "Uncalibrated RGB optical proxies plus raw SAR intensity telemetry; no sensor-specific calibration is assumed."
     model_id = "classical-cv-fusion-engine-v2"
     permitted_parameters = {
-        "optical_sensor": "Cartosat-2S",
-        "sar_sensor": "RISAT-1A / Sentinel-1",
+        "optical_sensor": "unspecified unless metadata is supplied",
+        "sar_sensor": "unspecified unless metadata is supplied",
         "decomposition": "SSIM+CrossCorr"
     }
 
@@ -30,63 +30,7 @@ class OpticalSARTool(BaseTool):
             return {"error": "Missing optical image for optical-SAR fusion", "status": "error"}
 
         if sar_bgr is None or not isinstance(sar_bgr, np.ndarray):
-            # Optical-only mode: calculate deterministic Visible-Band Vegetation Proxy
-            h, w = optical_bgr.shape[:2]
-            b, g, r = cv2.split(optical_bgr.astype(np.float32))
-            green_red_ratio = float(np.mean((g - r) / (g + r + 1e-5)))
-            excess_green = float((2.0 * g - r - b).mean())
-
-            interpretation = (
-                f"Visible-Band Vegetation Proxy (Green-Red Ratio): {green_red_ratio:.2f} "
-                f"(Excess Green Index: {excess_green:.1f}). "
-                "Calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery."
-            )
-            metrics = {
-                "optical": {
-                    "vegetation_proxy_value": round(green_red_ratio, 3),
-                    "green_red_ratio": round(green_red_ratio, 3),
-                    "excess_green_index": round(excess_green, 2),
-                    "vegetation_fraction": round(float(np.mean(g > r)), 3),
-                    "water_fraction": round(float(np.mean((b > r) & (b > g))), 3),
-                    "built_up_fraction": round(float(np.mean((r > 120) & (g > 120) & (b > 120))), 3),
-                    "proxy_metric": "Visible-Band Green-Red Reflectance Ratio (G-R)/(G+R)",
-                    "scientific_note": "Calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery.",
-                    "spectral_bands_used": ["visible_red", "visible_green", "visible_blue"],
-                    "calibrated_nir_present": False,
-                    "dimensions": [w, h],
-                },
-                "sar": None,
-                "cross_modal": None,
-            }
-            duration_ms = (time.time() - t0) * 1000
-            return {
-                "status": "success",
-                "mode": "optical_only",
-                "answer": interpretation,
-                "interpretation": interpretation,
-                "metrics": metrics,
-                "is_synthetic_sar": False,
-                "is_coregistered": False,
-                "confidence": 0.88,
-                "confidence_level": "High",
-                "confidence_source": "deterministic_visible_spectral_proxy",
-                "confidence_status": "calibrated",
-                "method": "Visible-Band Green-Red reflectance ratio & Excess Green Index",
-                "scientific_note": "Calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery.",
-                "evidence": {
-                    "vegetation_proxy_value": round(green_red_ratio, 3),
-                    "excess_green_index": round(excess_green, 2),
-                    "scientific_note": "Calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery.",
-                    "calibrated_nir_present": False,
-                },
-                "warnings": [
-                    "No SAR channel provided. Radar backscatter analysis bypassed.",
-                    "Visible-Band Vegetation Proxy: calculated from visible RGB reflectance; true NDVI requires calibrated NIR imagery."
-                ],
-                "duration_ms": duration_ms
-            }
-
-        # Co-registration verification
+            # Joint optical-SAR analysis requires both observations. Never silently\n        # downgrade a fusion request to optical-only analysis.\n        if sar_bgr is None or not isinstance(sar_bgr, np.ndarray):\n            return {\n                "status": "specialist_unavailable",\n                "answer": "Optical-SAR fusion requires both an optical image and a SAR image. No optical-only fallback is returned for a joint-analysis request.",\n                "metrics": None,\n                "is_synthetic_sar": False,\n                "is_coregistered": False,\n                "confidence": None,\n                "confidence_status": "unavailable",\n                "warnings": ["SAR input is missing; joint optical-SAR analysis was not executed."],\n                "duration_ms": (time.time() - t0) * 1000,\n            }\n\n        # Co-registration verification
         meta_opt = inputs.get("metadata") or {}
         meta_sar = inputs.get("secondary_metadata") or {}
 
@@ -116,13 +60,13 @@ class OpticalSARTool(BaseTool):
         opt_metrics = metrics.get("optical", {})
         cm_metrics = metrics.get("cross_modal", {})
 
-        built_up_frac = opt_metrics.get("built_up_fraction", 0.42)
-        water_frac = opt_metrics.get("water_fraction", 0.08)
-        mean_db = sar_metrics.get("mean_signal_level_db", sar_metrics.get("mean_backscatter_db", -14.2))
-        speckle = sar_metrics.get("speckle_index", 0.28)
+        built_up_frac = opt_metrics.get("built_up_fraction")
+        water_frac = opt_metrics.get("water_fraction")
+        mean_db = sar_metrics.get("mean_signal_level_db", sar_metrics.get("mean_backscatter_db"))
+        speckle = sar_metrics.get("speckle_index")
 
         interpretation_parts = [
-            f"Heuristic cross-modal telemetry baseline: optical spectral analysis indicates {built_up_frac*100:.1f}% built-up fabric "
+            f"Classical cross-modal telemetry baseline: optical visible-band proxies indicate {built_up_frac*100:.1f}% built-up fabric "
             f"and {water_frac*100:.1f}% water bodies.",
             f"SAR mean signal level derived from raw amplitude is {mean_db:.1f} dB (speckle index {speckle:.2f}; raw amplitude uncalibrated to sigma-nought backscatter)."
         ]
@@ -142,7 +86,9 @@ class OpticalSARTool(BaseTool):
             "metrics": metrics,
             "is_synthetic_sar": False,
             "is_coregistered": is_coregistered,
-            "confidence_source": "heuristic",
-            "method": "Rule-based optical indices & SAR signal level telemetry baseline",
+            "confidence": None,
+            "confidence_status": "not_calibrated",
+            "confidence_source": "classical_cv_uncalibrated",
+            "method": "Visible-band optical proxies & raw SAR signal-level telemetry baseline",
             "duration_ms": duration_ms
         }
