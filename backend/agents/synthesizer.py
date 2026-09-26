@@ -103,8 +103,10 @@ def synthesize_response(
 
     # Intent: land_cover ("What type of land is present?")
     if intent == "land_cover":
-        top_label = lc_ev.evidence.get("top_label") if lc_ev else "Undetermined"
+        top_label = lc_ev.evidence.get("top_label") if lc_ev else None
         active = lc_ev.evidence.get("active_labels", []) if lc_ev else []
+        if not lc_ev or not top_label:
+            return "SPECIALIST UNAVAILABLE: No land-cover classification evidence was returned.", None, "unavailable", warnings
         norm_active: List[str] = []
         for item in active:
             if isinstance(item, str):
@@ -149,7 +151,7 @@ def synthesize_response(
             f"The building detection specialist extracted {cnt} structural rooftop footprints. "
             f"{tier_text} Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
         )
-        return answer, conf, "calibrated", warnings
+        return answer, conf, "not_calibrated", warnings
 
     # Intent: grounding ("Where are the buildings?", "Highlight the road and the water body")
     if intent == "grounding":
@@ -177,14 +179,16 @@ def synthesize_response(
                 "Confidence is not calibrated for this workflow."
             )
         elif top_reg:
-            target_name = ground_ev.evidence.get("target", "target structure") if ground_ev else "target structure"
+            target_name = ground_ev.evidence.get("target") if ground_ev else None
+            if not target_name:
+                return "SPECIALIST UNAVAILABLE: Grounding returned a region without a verified target label.", None, "unavailable", warnings
             loc_str = f"X: {top_reg.get('x_percent', 0)}%, Y: {top_reg.get('y_percent', 0)}%, Width: {top_reg.get('w_percent', 0)}%, Height: {top_reg.get('h_percent', 0)}%"
             answer = (
                 f"The visual grounding specialist localized {target_name} at coordinates [{loc_str}].{bldg_part} "
                 "Confidence is not calibrated for this workflow."
             )
         else:
-            answer = f"Visual grounding localized target structures across the observation frame.{bldg_part} Confidence is not calibrated for this workflow."
+            return "SPECIALIST UNAVAILABLE: No localized grounding region was returned.", None, "unavailable", warnings
         return answer, None, "not_calibrated", warnings
 
     # Intent: change_vqa ("What changed?")
@@ -296,9 +300,9 @@ def synthesize_response(
                 parts.append(f"VQA assessment: {vqa_ev.result}.")
 
         if bldg_ev:
-            b_cnt = bldg_ev.evidence.get("building_count", 0)
-            hi_cnt = bldg_ev.evidence.get("high_confidence_count", 0)
-            parts.append(f"Structural audit: {b_cnt} building footprints detected ({hi_cnt} high certainty).")
+            b_cnt = bldg_ev.evidence.get("building_count")
+            hi_cnt = bldg_ev.evidence.get("high_confidence_count")
+            if b_cnt is not None:\n                tier = f" ({hi_cnt} specialist score-tiered detections)" if hi_cnt is not None else ""\n                parts.append(f"Structural audit: {b_cnt} building footprints detected{tier}.")
 
         if ground_ev:
             g_targets = ground_ev.evidence.get("targets", [])
@@ -328,8 +332,8 @@ def synthesize_response(
             chg_pct = change_ev.evidence.get("change_percentage")
             if chg_pct is None:
                 return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
-            clusters = change_ev.evidence.get("change_clusters", 0)
-            parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")
+            clusters = change_ev.evidence.get("change_clusters")
+            if clusters is not None:\n                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")\n            else:\n                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected; cluster count was not returned.")
 
         parts.append("Confidence is not calibrated across this multi-specialist workflow.")
         answer = " ".join(parts)
@@ -353,7 +357,7 @@ def synthesize_response(
                 return answer, None, "not_calibrated", warnings
 
         # Water or general VQA
-        vqa_res = vqa_ev.result if vqa_ev else "Remote sensing visual analysis completed."
+        vqa_res = vqa_ev.result if vqa_ev and vqa_ev.result else None\n        if not vqa_res:\n            return "SPECIALIST UNAVAILABLE: No VQA evidence was returned.", None, "unavailable", warnings
         answer = f"{vqa_res} Confidence is not calibrated for this workflow."
         return answer, None, "not_calibrated", warnings
 
@@ -370,7 +374,7 @@ def synthesize_response(
 
     gen_ev = ev_by_source.get("rs_generalist") or ev_by_task.get("general_vqa")
     if intent in ["general_vqa", "open_question", "open_scene_description", "open_remote_sensing_question"] or gen_ev:
-        ans_text = gen_ev.result if gen_ev else "General remote-sensing visual observation completed."
+        ans_text = gen_ev.result if gen_ev and gen_ev.result else None\n        if not ans_text:\n            return "SPECIALIST UNAVAILABLE: No general remote-sensing VLM evidence was returned.", None, "unavailable", warnings
         answer = (
             f"{ans_text} "
             "[Source: Qwen/Qwen2-VL-2B-Instruct (general multimodal VLM, uncalibrated). "
@@ -379,5 +383,5 @@ def synthesize_response(
         return answer, None, "not_calibrated", warnings
 
     # Fallback default
-    answer = "Remote sensing multi-specialist analysis completed. Confidence is not calibrated for this workflow."
+    answer = "SPECIALIST UNAVAILABLE: No synthesis path had sufficient specialist evidence to answer this query."
     return answer, None, "not_calibrated", warnings
