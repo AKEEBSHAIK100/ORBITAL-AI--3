@@ -86,7 +86,7 @@ class BENClassifier:
     """
     Singleton wrapper around the BigEarthNet v2.0 pretrained classifier.
     Uses configilm + PyTorchModelHubMixin to load weights from HuggingFace.
-    Falls back to a lightweight score estimator if configilm is unavailable.
+    If the real configilm/model stack is unavailable, classification is unavailable.
     """
 
     _instance: Optional["BENClassifier"] = None
@@ -179,7 +179,7 @@ class BENClassifier:
             self._available = True
 
         except ImportError:
-            # configilm not installed — use lightweight fallback
+            # configilm is required for the real BigEarthNet classifier
             self._load_error = (
                 "configilm not installed. Run: pip install configilm[full]~=0.7.0. "
                 "BigEarthNet classification is unavailable until the real classifier stack is installed."
