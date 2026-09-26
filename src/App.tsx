@@ -730,9 +730,9 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
 
   return {
     answer: payload.answer || 'Analysis complete.',
-    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct === null ? 'unavailable' : confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
-    confidence_percent: confPct ?? 0,
-    confidenceScore: confPct ?? 0,
+    confidence: payload.confidence_level ? String(payload.confidence_level).toLowerCase() as Analysis['confidence'] : 'unavailable',
+    confidence_percent: confPct,
+    confidenceScore: confPct,
     confidence_status: confStatus,
     confidence_reason: payload.reasoning || (confStatus === 'not_calibrated' ? 'Model output score; empirical calibration pending.' : undefined),
     detected_features: detected_features.length > 0 ? detected_features : [label],
@@ -1132,7 +1132,7 @@ export default function App() {
       setStatus('Analysis failed')
       setHistory(prev => [...prev, {
         question: prompt, answer: errAnswer,
-        confidence_percent: 0, confidenceScore: 0,
+        confidence_percent: null, confidenceScore: null,
         confidence: 'unavailable', confidence_status: 'unavailable', confidence_reason: 'Pipeline execution threw an unhandled exception.',
         detected_features: ['Pipeline Failure'], label: 'Execution Error',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
