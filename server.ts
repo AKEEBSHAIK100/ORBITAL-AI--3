@@ -1008,177 +1008,63 @@ Evaluate the scene combining both modalities and cross-reference features.`
 app.post('/api/fuse', async (req, res) => {
   const startTime = Date.now()
   const traceSteps: ExecutionTraceStep[] = []
-
   try {
-    if (!checkRateLimit(req.ip || 'unknown')) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a minute before requesting fusion.' })
-    }
+    const { opticalImage, sarImage, question = 'Explain what the optical and SAR observations show together.' } =
+      req.body as Record<string, string | undefined>
+    if (!opticalImage || !sarImage) return res.status(400).json({ error: 'Both optical and SAR images are required.' })
 
-    const {
-      opticalImage,
-      sarImage,
-      question = 'Conduct joint optical and SAR cross-modal feature analysis.',
-      opticalLabel = 'Cartosat-2S / Optical RGB',
-      sarLabel = 'RISAT-1A / Sentinel-1 SAR',
-    } = req.body as Record<string, string | undefined>
-
-    const step1Start = Date.now()
     const taskType = classifyTask(question, 2, ['optical', 'sar'])
-    traceSteps.push({
-      step: 1,
-      tool: 'rs_task_classifier',
-      description: 'Deterministic rule-based task routing and intent extraction',
-      input_summary: `Query: "${question.slice(0, 70)}" | Modalities: [Optical, SAR]`,
-      output_summary: `Task classified as: "${taskType}"`,
-      duration_ms: Math.max(1, Date.now() - step1Start),
-      status: 'success',
-      parameters: { task_type: taskType },
-    })
-
-    const step2Start = Date.now()
     const validation = validateInputs(taskType, 2, ['optical', 'sar'], ['jpeg', 'png'])
     traceSteps.push({
-      step: 2,
-      tool: 'rs_input_validator',
-      description: 'Multi-sensor alignment and radiometric verification',
-      input_summary: `Optical: ${opticalLabel} | SAR: ${sarLabel}`,
-      output_summary: validation.notes.join('; '),
-      duration_ms: Math.max(1, Date.now() - step2Start),
-      status: 'success',
-      parameters: { compatibility: validation.compatibility },
+      step: 1, tool: 'rs_task_classifier',
+      description: 'Rule-based query routing and modality validation',
+      input_summary: question.slice(0, 120),
+      output_summary: `Task classified as: ${taskType}`,
+      duration_ms: 1, status: 'success', parameters: { task_type: taskType },
     })
 
-    const step3Start = Date.now()
-    let fusionFeatures = computeSimulatedFusionFeatures(opticalImage, sarImage)
+    // Prefer the configured Python specialist.
     try {
-      if (opticalImage && sarImage) {
-        const pyRes = await fetch(`${PYTHON_BACKEND_URL}/analyze/fusion`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage }),
-          signal: AbortSignal.timeout(5000),
-        })
-        if (pyRes.ok) {
-          const pyJson = (await pyRes.json()) as Record<string, any>
-          if (pyJson && pyJson.fusion_features) fusionFeatures = pyJson.fusion_features
+      const pyRes = await fetch(`${PYTHON_BACKEND_URL}/analyze/fusion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optical_image: opticalImage, sar_image: sarImage, query: question }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (pyRes.ok) {
+        const data = await pyRes.json()
+        if (data && (data.answer || data.fusion_features)) {
+          traceSteps.push({ step: 2, tool: 'rs_optical_sar_specialist', description: 'Configured Python remote-sensing fusion specialist', input_summary: 'Optical + SAR', output_summary: 'Specialist returned a result', duration_ms: 1, status: 'success' })
+          return res.json({ ...data, execution_trace: buildExecutionTrace(taskType, traceSteps, Date.now()-startTime, validation, 'rs_optical_sar_specialist') })
         }
       }
-    } catch {
-      // Backend offline fallback
-    }
+    } catch {}
 
-    traceSteps.push({
-      step: 3,
-      tool: 'rs_fusion_cv',
-      description: 'Classical CV optical NDVI proxy & SAR backscatter/speckle calculation',
-      input_summary: 'Dual sensor telemetry array',
-      output_summary: `NDVI Proxy: ${fusionFeatures.optical.vegetation_fraction} | SAR Backscatter: ${fusionFeatures.sar.mean_backscatter_db} dB | Cross-Corr: ${fusionFeatures.cross_modal.cross_correlation}`,
-      duration_ms: Math.max(8, Date.now() - step3Start),
-      status: 'success',
-      parameters: {
-        ssim: fusionFeatures.cross_modal.structural_similarity,
-        speckle_index: fusionFeatures.sar.speckle_index,
-      },
-    })
-
-    const step4Start = Date.now()
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
-
-    let resultPayload: Record<string, unknown>
-    if (isPlaceholderKey || !opticalImage || !sarImage) {
-      incrementCallCounter()
-      resultPayload = {
-        answer: `Joint Optical–SAR analysis reveals complementary multi-modal characteristics: Optical reflectance demonstrates strong chlorophyll absorption (NDVI proxy ~${Math.round(fusionFeatures.optical.vegetation_fraction * 100)}%), while microwave backscatter (${fusionFeatures.sar.mean_backscatter_db} dB) confirms solid volumetric dielectric scattering from underlying topography. High cross-correlation (${fusionFeatures.cross_modal.cross_correlation}) confirms spatial coregistration fidelity.`,
-        confidence: 'high',
-        confidence_percent: 94,
-        confidence_reason: `Consistent physical boundaries observed between optical albedo and radar backscatter (SSIM: ${fusionFeatures.cross_modal.structural_similarity}).`,
-        detected_features: [
-          `Optical Canopy Density (~${Math.round(fusionFeatures.optical.vegetation_fraction * 100)}%)`,
-          `SAR Mean Backscatter (${fusionFeatures.sar.mean_backscatter_db} dB)`,
-          `Speckle Ratio (${fusionFeatures.sar.speckle_index})`,
-          'Coregistered Multi-Modal Interface',
-        ],
-        estimated_coverage_percent: Math.round(fusionFeatures.optical.vegetation_fraction * 100),
-        water_coverage_percent: Math.round(fusionFeatures.optical.water_fraction * 100),
-        vegetation_percent: Math.round(fusionFeatures.optical.vegetation_fraction * 100),
-        data_limitation_note: 'Optical–SAR cross-modal analysis grounded in classical telemetry combined with domain prompt adaptation.',
-        region: { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 60 },
-        label: 'Optical–SAR Cross-Modal Assessment',
-        suggested_followups: [
-          'What structures are visible in SAR through vegetative canopy?',
-          'Are there flood inundations obscured by cloud shadow?',
-          'What is the dielectric moisture variation across sectors?',
-          'Is any high-density built infrastructure detected?',
-        ],
-      }
-    } else {
-      const optParsed = parseDataUrl(opticalImage)
-      const sarParsed = parseDataUrl(sarImage)
-      incrementCallCounter()
-
-      const cvSummary = `Extracted CV Telemetry: Optical Vegetation: ${fusionFeatures.optical.vegetation_fraction}, Water: ${fusionFeatures.optical.water_fraction}, Built-up: ${fusionFeatures.optical.built_up_fraction}. SAR Backscatter: ${fusionFeatures.sar.mean_backscatter_db} dB, Speckle: ${fusionFeatures.sar.speckle_index}. SSIM: ${fusionFeatures.cross_modal.structural_similarity}, Cross-Correlation: ${fusionFeatures.cross_modal.cross_correlation}.`
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: MAX_TOKENS_COMPARE,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: OPTICAL_SAR_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: `Question: ${question}\n${cvSummary}\nEvaluate optical image (${opticalLabel}) against SAR image (${sarLabel}). Return valid JSON only.` },
-              { type: 'text', text: `IMAGE 1: OPTICAL (${opticalLabel})` },
-              imageContent(optParsed.full),
-              { type: 'text', text: `IMAGE 2: SAR (${sarLabel})` },
-              imageContent(sarParsed.full),
-            ],
-          },
-        ],
+    // Free external specialist fallback. It must not fabricate calibration/registration.
+    try {
+      const worker = await runWorkerFusion(opticalImage, sarImage)
+      traceSteps.push({ step: 2, tool: 'external_rs_fusion', description: 'External public Hugging Face ZeroGPU remote-sensing specialist', input_summary: 'Optical + SAR', output_summary: 'External specialist returned a semantic result', duration_ms: 1, status: 'success', parameters: { confidence_status: 'not_calibrated' } })
+      return res.json({
+        answer: worker.answer,
+        confidence: null,
+        confidence_percent: null,
+        confidence_source: 'none',
+        confidence_status: 'not_calibrated',
+        label: 'External Remote-Sensing Optical + SAR Analysis',
+        mode: 'external_hf_zero_gpu',
+        provenance: worker.method,
+        data_limitation_note: worker.note,
+        execution_trace: buildExecutionTrace(taskType, traceSteps, Date.now()-startTime, validation, 'external_rs_fusion'),
       })
-      resultPayload = cleanJson(response.choices[0]?.message?.content ?? '{}')
+    } catch (err) {
+      console.warn('[Orbital-AI] Fusion specialists unavailable:', err)
+      return res.status(503).json({
+        error: 'Optical + SAR specialist is temporarily unavailable. No synthetic telemetry or confidence is returned.',
+        execution_trace: buildExecutionTrace(taskType, traceSteps, Date.now()-startTime, validation, 'rs_optical_sar_specialist'),
+      })
     }
-
-    traceSteps.push({
-      step: 4,
-      tool: 'rs_vqa',
-      description: 'Multi-modal vision-language synthesis with BigEarthNet domain adaptation',
-      input_summary: 'Joint optical-SAR imagery + telemetry summary',
-      output_summary: `Confidence: ${resultPayload.confidence ?? 'high'} (${resultPayload.confidence_percent ?? 94}%)`,
-      duration_ms: Math.max(12, Date.now() - step4Start),
-      status: 'success',
-      parameters: { model: MODEL },
-    })
-
-    const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
-    return res.status(200).json({
-      ...resultPayload,
-      fusion_features: fusionFeatures,
-      execution_trace: trace,
-    })
   } catch (err) {
-    const { userMessage } = classifyError(err)
-    const fallbackFeatures = computeSimulatedFusionFeatures()
-    const validation = validateInputs('sar_optical_fusion', 2, ['optical', 'sar'])
-    const trace = buildExecutionTrace('sar_optical_fusion', traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
-
-    return res.status(200).json({
-      answer: `Optical-SAR fusion completed via fallback telemetry engine: ${userMessage}`,
-      confidence: 'medium',
-      confidence_percent: 82,
-      confidence_reason: 'Fallback cross-modal synthesis using localized telemetry modeling.',
-      detected_features: ['Optical Surface Albedo', 'SAR Microwave Backscatter', 'Coregistration Grid'],
-      estimated_coverage_percent: 60,
-      water_coverage_percent: 15,
-      vegetation_percent: 45,
-      data_limitation_note: 'Online upstream provider error encountered; rendered using local deterministic telemetry.',
-      region: null,
-      label: 'Optical-SAR Telemetry Fallback',
-      suggested_followups: ['Retry joint optical-SAR analysis', 'Inspect SAR backscatter distribution'],
-      fusion_features: fallbackFeatures,
-      execution_trace: trace,
-    })
+    return res.status(500).json({ error: 'Fusion request could not be processed.' })
   }
 })
 
