@@ -1,5 +1,5 @@
 """
-SatQuery AI — Remote-Sensing BLIP LoRA Adapter Runtime Service.
+ORBITAL-AI — Remote-Sensing BLIP LoRA Adapter Runtime Service.
 Provides lazy-loading, caching, device selection, and truthful provenance reporting
 for BigEarthNet-derived vision-language pilot adapters.
 
