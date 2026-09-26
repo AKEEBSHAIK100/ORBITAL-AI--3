@@ -1,7 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 export const config = {
   api: {
@@ -11,102 +8,67 @@ export const config = {
   },
 }
 
-let cachedDetections: any = null
-
-function getDefaultDetections() {
-  if (cachedDetections) return cachedDetections
-  const possiblePaths = [
-    path.join(process.cwd(), 'api', 'defaultDetections.json'),
-    fileURLToPath(new URL('./defaultDetections.json', import.meta.url)),
-    path.join(process.cwd(), 'src', 'data', 'defaultDetections.json'),
-  ]
-  for (const p of possiblePaths) {
-    try {
-      if (fs.existsSync(p)) {
-        cachedDetections = JSON.parse(fs.readFileSync(p, 'utf8'))
-        return cachedDetections
-      }
-    } catch {
-      // Continue to next path
-    }
-  }
-  return {
-    building_count: 81,
-    high_confidence_count: 10,
-    medium_confidence_count: 29,
-    low_confidence_count: 42,
-    partial_count: 0,
-    confidence: 0.88,
-    confidence_level: 'High',
-    validation_status: 'Deep-learning segmentation verified (ground truth comparison optional)',
-    detections: [],
-  }
-}
-
+/**
+ * Building detection is only returned when the executable Python specialist
+ * actually performs the inference. This serverless handler deliberately has
+ * no default/sample detections and no client-side heuristic fallback.
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST')
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
   )
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed. Use POST.' })
+
+  const base = (process.env.PYTHON_BACKEND_URL || '').replace(/\/+$/, '')
+  if (!base) {
+    return res.status(503).json({
+      error: 'Building detection specialist is unavailable.',
+      code: 'MODEL_UNAVAILABLE',
+      building_count: null,
+      detections: [],
+      confidence: null,
+      confidence_level: 'unavailable',
+      data_limitation_note: 'No executable building-detection specialist is configured for this deployment. No sample or heuristic detections are returned.',
+    })
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
-  }
-
-  const pythonBackendBase = (process.env.PYTHON_BACKEND_URL || '').replace(/\/+$/, '')
-  const pythonBackend = pythonBackendBase ? `${pythonBackendBase}/analyze/buildings` : null
-
-  // Attempt live proxy to Python backend if reachable
-  if (pythonBackend) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 6000)
-
-      const proxyRes = await fetch(pythonBackend, {
-        method: 'POST',
-        headers: {
-          'Content-Type': req.headers['content-type'] || 'application/json',
-        },
-        body: typeof req.body === 'object' ? JSON.stringify(req.body) : req.body,
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-
-      if (proxyRes.ok) {
-        const data = await proxyRes.json()
-        return res.status(200).json(data)
-      }
-    } catch {
-      // Python backend not running or timed out; fall through to Vercel standalone logic
-    }
-  }
-
-  // Standalone Vercel Serverless Fallback:
-  // Deliver deep-learning instance segmentation detections
-  const defaultDetections = getDefaultDetections()
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
-    const isCustom = Boolean(body.image && !body.image.includes('photo-1472146936668-d987bf0a6e38'))
+    const response = await fetch(`${base}/analyze/buildings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: typeof req.body === 'object' ? JSON.stringify(req.body) : req.body,
+      signal: AbortSignal.timeout(10_000),
+    })
 
-    if (isCustom) {
-      // Signal client to run dynamic computer vision detector on custom image
-      return res.status(202).json({
-        custom_analysis_required: true,
-        message: 'Compute custom building detection on client canvas',
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      return res.status(503).json({
+        error: 'Building detection specialist is unavailable.',
+        code: 'MODEL_UNAVAILABLE',
+        building_count: null,
+        detections: [],
+        confidence: null,
+        confidence_level: 'unavailable',
+        data_limitation_note: `Building specialist returned HTTP ${response.status}. No fallback estimate was generated.`,
       })
     }
 
-    // Default aerial scene — exact model detections (81 buildings)
-    return res.status(200).json(defaultDetections)
+    return res.status(200).json(data)
   } catch {
-    return res.status(200).json(defaultDetections)
+    return res.status(503).json({
+      error: 'Building detection specialist is unavailable.',
+      code: 'MODEL_UNAVAILABLE',
+      building_count: null,
+      detections: [],
+      confidence: null,
+      confidence_level: 'unavailable',
+      data_limitation_note: 'The configured building specialist could not be reached. No sample or heuristic detections are returned.',
+    })
   }
 }
