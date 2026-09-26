@@ -182,7 +182,7 @@ class BENClassifier:
             # configilm not installed — use lightweight fallback
             self._load_error = (
                 "configilm not installed. Run: pip install configilm[full]~=0.7.0. "
-                "Falling back to heuristic land-cover estimation."
+                "BigEarthNet classification is unavailable until the real classifier stack is installed."
             )
             logger.warning(f"[BEN] {self._load_error}")
             self._available = False
