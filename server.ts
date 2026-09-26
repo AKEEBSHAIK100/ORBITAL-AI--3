@@ -423,7 +423,7 @@ app.get(['/api/models'], async (req, res) => {
 
 const OPTICAL_SAR_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
 You are operating in Optical–SAR Multi-Modal Fusion mode.
-Analyze the two co-registered remote-sensing views:
+Analyze the supplied optical and SAR views. Do not assume they are co-registered unless input metadata or the specialist verifies registration:
 1. OPTICAL VIEW (surface albedo, vegetation chlorophyll, spectral reflectance).
 2. SAR VIEW (microwave backscatter intensity, surface roughness, dielectric properties, structural double-bounce).
 Evaluate the scene combining both modalities and cross-reference features.`
