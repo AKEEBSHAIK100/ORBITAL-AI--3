@@ -5,7 +5,7 @@ import OpenAI from 'openai'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MODEL, MAX_TOKENS_ANALYZE, MAX_TOKENS_COMPARE, SESSION_CALL_LIMIT } from './lib/constants'
+import { MODEL, SESSION_CALL_LIMIT } from './lib/constants'
 import {
   classifyTask, validateInputs, buildExecutionTrace,
   TOOL_REGISTRY, ExecutionTraceStep, FusionFeatures,
@@ -34,12 +34,6 @@ const _allowedOrigins = _rawFrontendOrigin.split(',').map(o => o.trim()).filter(
 export const PYTHON_BACKEND_URL = (process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000')
   .replace(/\/api\/analyze.*$/, '')
   .replace(/\/+$/, '')
-
-// ─── OpenAI/Anthropic-compatible client ───────────────────────────────────────
-const client = new OpenAI({
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_BASE || undefined,
-})
 
 // ─── Deployment-wide call counter ─────────────────────────────────────────────
 let totalCallsThisDeployment = 0
@@ -202,9 +196,9 @@ app.get('/api/health', async (_req, res) => {
   ])
   res.json({
     ok: true,
-    provider: 'openai-compat',
+    provider: 'remote-sensing-specialists',
     model: MODEL,
-    configured: Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY),
+    configured: true,
     totalCallsThisDeployment,
     sessionCallLimit: SESSION_CALL_LIMIT,
     database: {
@@ -373,18 +367,17 @@ async function proxyToPython(
 
 app.all(['/analyze/buildings', '/api/analyze/buildings', '/api/buildings'], async (req, res) => {
   await proxyToPython(req, res, '/api/analyze/buildings', () => {
-    try {
-      const p = path.join(__dirname, 'backend', 'data', 'default_detections.json')
-      if (fs.existsSync(p)) {
-        res.json(JSON.parse(fs.readFileSync(p, 'utf8')))
-        return
-      }
-    } catch { /* pass */ }
-    res.status(502).json({ error: 'Building detection service unavailable.' })
+    res.status(503).json({
+      available: false,
+      building_count: null,
+      detections: [],
+      confidence: null,
+      error: 'Building detection service unavailable.',
+      note: 'No sample, heuristic, or synthetic building detections are returned.',
+    })
   })
 })
 
-// New unified analysis sub-endpoints — proxy to FastAPI first
 app.post(['/api/analyze/vqa'], async (req, res) => {
   await proxyToPython(req, res, '/api/analyze/vqa')
 })
