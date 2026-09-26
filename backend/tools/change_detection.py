@@ -158,12 +158,12 @@ class ChangeDetectionTool(BaseTool):
 
         # Built-up alteration interpretation (Pixel-diff heuristic baseline)
         if change_ratio < 0.02:
-            answer = f"Pixel-differencing baseline confirms surface structure remained largely unchanged between the two acquisition dates (only {change_ratio*100:.1f}% radiometric variance). Built-up footprint remained stable."
+            answer = f"Pixel-differencing baseline found limited radiometric change ({change_ratio*100:.1f}% of pixels exceeded the configured threshold). This does not by itself verify built-up footprint stability."
         elif change_ratio < 0.12:
             direction = "increased" if exg2 > exg1 else "decreased"
             answer = (
                 f"Pixel-differencing baseline identified surface alterations across {change_ratio*100:.1f}% of the scene ({len(significant_changes)} change clusters). "
-                f"Vegetation index has {direction} by {abs(veg_delta_pct)}%. Structural alterations demarcated in highlighted sectors."
+                f"Vegetation proxy changed {direction} by {abs(veg_delta_pct)}%. This is an image-derived excess-green proxy, not a calibrated vegetation index. Structural alterations were demarcated in highlighted sectors."
             )
         else:
             answer = (
