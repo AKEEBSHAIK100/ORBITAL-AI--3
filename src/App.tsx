@@ -239,251 +239,6 @@ function detectHiddenLayer(text: string): HiddenLayer | null {
 }
 
 // ── Demo analyze (fallback / demo mode) ──────────────────────────────────────
-function _rawDemoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
-  const telem = imageDataUrl && imageTelemetryCache.get(imageDataUrl) ? imageTelemetryCache.get(imageDataUrl)! : null
-  const terrain = telem ? telem.terrain : (imageDataUrl ? detectImageTerrain(imageDataUrl) : 'urban')
-  const q = question.toLowerCase()
-
-  if (q.includes('highlight the water body') || q.includes('water body referred to') || q.includes('highlight') || q.includes('grounding')) {
-    return {
-      answer: 'Target water body successfully localized via RSVQA/VRSBench spatial grounding. The primary hydrological feature is demarcated at coordinates [X:24%, Y:32%, W:48%, H:44%], exhibiting low optical albedo and specular absorption consistent with inland water courses (BigEarthNet CLC-511 · Inland Waters).',
-      confidence: 'high', confidence_percent: 98, confidenceScore: 98,
-      confidence_reason: 'Unambiguous radiometric contrast between terrestrial shoreline and open water body.',
-      detected_features: ['Demarcated Water Body', 'Riparian Shoreline', 'BigEarthNet Inland Waters', 'BBox [24,32,48,44]'],
-      region: { x_percent: 24, y_percent: 32, w_percent: 48, h_percent: 44 },
-      label: 'RSVQA Grounding: Water Body', revealed_layer: 'flood', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['What is the surface area of this water body?','Are there adjoining tributaries?','Assess shoreline vegetation buffer','Describe surrounding land-cover'],
-    }
-  }
-  if (q.includes('land-cover and major objects') || q.includes('major objects visible') || q.includes('describe the land')) {
-    return {
-      answer: 'VRSBench Scene Captioning: The scene encompasses a heterogeneous landscape with continuous urban fabric (BigEarthNet-01), orthogonal residential structures, multi-lane transit corridors (BigEarthNet-04), complex agricultural parcels, broad-leaved tree canopies (BigEarthNet-09), and a defined hydrological drainage basin along the southern sector.',
-      confidence: 'high', confidence_percent: 97, confidenceScore: 97,
-      confidence_reason: 'Full-scene multi-attribute visual synthesis per BigEarthNet 43-class vocabulary.',
-      detected_features: ['Continuous Urban Fabric', 'Road Transit Corridors', 'Complex Cultivation', 'Broad-Leaved Canopy', 'Inland Drainage Basin'],
-      region: { x_percent: 10, y_percent: 10, w_percent: 80, h_percent: 80 },
-      label: 'VRSBench Multi-Attribute Scene Caption', revealed_layer: 'urban', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Highlight the water body referred to in the query','How many distinct building footprints are present?','What is vegetation percentage?','Detect multitemporal changes'],
-    }
-  }
-  if (q.includes('increased, decreased, or remained unchanged') || q.includes('built-up area') || q.includes('between these two dates')) {
-    return {
-      answer: 'Bi-temporal CDVQA analysis confirms the built-up area has INCREASED by +12.4% between passes. Geometric comparison reveals new residential structures and foundation paving in the northeastern quadrant, with a corresponding 8.3% localized reduction in peripheral agricultural canopy.',
-      confidence: 'high', confidence_percent: 96, confidenceScore: 96,
-      confidence_reason: 'Coregistered baseline comparison reveals distinct edge additions in built-up footprint.',
-      detected_features: ['Built-up Expansion (+12.4%)', 'New Rooftop Footprints', 'Canopy Reduction (−8.3%)', 'CDVQA Detected Change'],
-      region: { x_percent: 28, y_percent: 22, w_percent: 44, h_percent: 46 },
-      label: 'CDVQA Built-Up Change Analysis', revealed_layer: 'urban', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Where exactly did the largest change occur?','Audit newly constructed footprints','What changed between these two dates?'],
-    }
-  }
-  if (q.includes('optical and sar') || q.includes('built-up and water-covered') || q.includes('sar')) {
-    return {
-      answer: 'Joint Optical–SAR cross-modal analysis: SAR microwave backscatter (−5.2 dB double-bounce) confirms dense structural infrastructure penetrating through vegetative haze, while optical NIR reflectance distinguishes healthy canopy from open water exhibiting dark specular absorption in both modalities (SSIM: 0.74, Cross-Correlation: 0.81).',
-      confidence: 'high', confidence_percent: 98, confidenceScore: 98,
-      confidence_reason: 'Consistent dielectric and spectral boundary alignment between optical albedo and radar backscatter.',
-      detected_features: ['Optical Surface Reflectance', 'SAR Double-Bounce (+6 dB)', 'Specular Water Absorption', 'Multi-Modal Coregistered Grid'],
-      region: { x_percent: 20, y_percent: 20, w_percent: 60, h_percent: 60 },
-      label: 'Optical–SAR Cross-Modal Joint Analysis', revealed_layer: 'urban', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['What structures are visible in SAR through canopy?','Inspect SAR speckle distribution','Compare water surface boundaries'],
-    }
-  }
-  if (q.includes('flood') || q.includes('water') || q.includes('river') || q.includes('submerge') || q.includes('inundat')) {
-    return {
-      answer: 'Surface water is confined to the primary drainage channel and low-lying coastal marshes, occupying ~8.2% of the scene. Floodwaters have not breached the primary levee or reached residential perimeters, maintaining a safe buffer of approximately 140 metres.',
-      confidence: 'high', confidence_percent: 95, confidenceScore: 95,
-      confidence_reason: 'Distinct specular reflectance from drainage channels; safe buffer margin observed.',
-      detected_features: ['River Drainage Basin', 'Riparian Wetlands', 'Protective Levee', '140m Structural Buffer'],
-      region: { x_percent: 22, y_percent: 42, w_percent: 46, h_percent: 40 },
-      label: 'Hydrological & Flood Assessment', revealed_layer: 'flood', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Minimum clearance to nearest buildings?','Any culverts experiencing overflow?','Has the river line expanded?'],
-    }
-  }
-  if (q.includes('vegetation') || q.includes('crop') || q.includes('harvest') || q.includes('canopy') || q.includes('ndvi')) {
-    const vegVal = telem ? telem.vegetationPct : '76%'
-    return {
-      answer: `Agricultural/canopy terrain with strong near-infrared reflectance across ${vegVal} of frame. Canopy photosynthetic activity is healthy (NDVI ~0.76), structural footprints detected along demarcated access corridors. No acute drought stress or pest infestation signatures detected.`,
-      confidence: 'high', confidence_percent: 96, confidenceScore: 96,
-      confidence_reason: 'Clear NIR reflectance signature with sharp boundary contrast along parcel roads.',
-      detected_features: ['Healthy Crop Canopy', 'Active Photosynthesis (NDVI 0.76)', 'Field Boundaries', 'Access Corridors'],
-      region: { x_percent: 14, y_percent: 16, w_percent: 48, h_percent: 52 },
-      label: 'Vegetation & Canopy Health', revealed_layer: 'harvest', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Estimated harvest readiness?','Signs of localized crop disease?','How healthy are field buffer strips?','Estimated biomass density?'],
-    }
-  }
-  if (q.includes('road') || q.includes('blocked') || q.includes('transit') || q.includes('highway')) {
-    return {
-      answer: 'Primary transit arteries are completely clear with uninterrupted traffic flow. No debris, structural failure, or standing water blockages detected along the central multi-lane corridor. Minor shoulder maintenance observed at junction 4. Alternate access routes are available.',
-      confidence: 'high', confidence_percent: 93, confidenceScore: 93,
-      confidence_reason: 'Uninterrupted linear asphalt signature with no standing water.',
-      detected_features: ['Primary Highway Corridor', 'Connecting Arterials', 'Overpass Structures', 'Clear Transit Flow'],
-      region: { x_percent: 12, y_percent: 26, w_percent: 68, h_percent: 32 },
-      label: 'Transportation Corridor Audit', revealed_layer: 'roads', count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Secondary access roads open?','Thermal anomalies on bridge?','Average vehicle density?'],
-    }
-  }
-  if (q.includes('building') || q.includes('structure') || q.includes('how many') || q.includes('count') || q.includes('footprint')) {
-    return {
-      answer: 'Deep-learning instance segmentation is primed for this scene. Click "Audit Buildings" in the toolbar to extract individual rooftop footprints using tiled YOLO inference with NMS duplicate removal. Results include unique IDs (B001, B002…), polygon coordinates, and per-structure confidence tiers.',
-      confidence: 'medium', confidence_percent: 85, confidenceScore: 85,
-      confidence_reason: 'Building detection requires explicit audit pass via segmentation model.',
-      detected_features: ['Rooftop Instance Detection Ready', 'Tile Inference Engine', 'IoU Deduplication', 'Polygon Coordinates'],
-      label: 'Building Footprint Audit', revealed_layer: 'urban', region: null, count_estimate: null, count_uncertainty_factors: [],
-      suggested_followups: ['Total roof area for solar?','Buildings closest to flood zones?','Density distribution?'],
-    }
-  }
-  return {
-    answer: `Land classification: ${terrain === 'water' ? '72% open water surface, hydrological survey' : terrain === 'vegetation' ? '76% photosynthetic crop/forest canopy (NDVI ~0.76), agricultural parcels' : terrain === 'arid' ? '68% arid mineral substrate, exposed soil profile' : '67% urban developed land (residential + transit), 24.6% mixed vegetation, 8.2% inland water'}. Full BigEarthNet 19-class multi-label taxonomy breakdown available via the classification panel.`,
-    confidence: 'high', confidence_percent: 98, confidenceScore: 98,
-    confidence_reason: 'Multi-class spectral decomposition across built-up, vegetative, and hydrological features.',
-    region: { x_percent: 10, y_percent: 10, w_percent: 64, h_percent: 58 },
-    count_estimate: null, count_uncertainty_factors: [],
-    detected_features: ['High-Density Urban Footprints', 'Arterial Road Network', 'Riparian Water System', 'Urban Tree Canopy'],
-    label: 'Land Use & Terrain Classification', revealed_layer: 'urban',
-    suggested_followups: ['Describe the land-cover and major objects visible in this image.','Highlight the water body referred to in the query.','Has the built-up area increased, decreased, or remained unchanged?','Use the optical and SAR images together to identify built-up and water-covered regions.'],
-  }
-}
-
-function demoAnalyze(question: string, imageDataUrl?: string | null): Analysis {
-  const base = _rawDemoAnalyze(question, imageDataUrl)
-  return {
-    ...base,
-    is_synthetic: true,
-    mode: 'demo_scene',
-  }
-}
-
-/**
- * Emergency browser-side visual baseline.
- *
- * This is deliberately NOT presented as a trained remote-sensing model.
- * It reads actual rendered RGB pixels from the uploaded image and provides
- * qualitative evidence when the production specialist/VLM service is not
- * configured. No spectral bands, calibrated percentages, confidence scores,
- * NDVI, SAR measurements, or other unsupported measurements are invented.
- */
-async function clientVisualBaseline(question: string, imageDataUrl: string): Promise<Analysis> {
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('Unable to read the uploaded image in the browser.'))
-    img.src = imageDataUrl
-  })
-
-  const canvas = document.createElement('canvas')
-  const width = 160
-  const height = 120
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) throw new Error('Browser image analysis is unavailable.')
-  ctx.drawImage(image, 0, 0, width, height)
-
-  const pixels = ctx.getImageData(0, 0, width, height).data
-  let green = 0
-  let blue = 0
-  let brightNeutral = 0
-  let dark = 0
-  let edges = 0
-  let samples = 0
-  let previousLuma: number | null = null
-
-  for (let i = 0; i < pixels.length; i += 4) {
-    const r = pixels[i]
-    const g = pixels[i + 1]
-    const b = pixels[i + 2]
-    const luma = 0.299 * r + 0.587 * g + 0.114 * b
-
-    if (g > r * 1.06 && g > b * 1.02 && g > 55) green++
-    if (b > r * 1.08 && b > g * 1.01 && b > 60) blue++
-    if (r > 105 && g > 105 && b > 105 && Math.max(r, g, b) - Math.min(r, g, b) < 35) brightNeutral++
-    if (luma < 65) dark++
-
-    if (previousLuma !== null && Math.abs(luma - previousLuma) > 42) edges++
-    previousLuma = luma
-    samples++
-  }
-
-  const greenRatio = green / Math.max(samples, 1)
-  const blueRatio = blue / Math.max(samples, 1)
-  const builtRatio = brightNeutral / Math.max(samples, 1)
-  const edgeRatio = edges / Math.max(samples, 1)
-  const q = question.toLowerCase()
-
-  let answer: string
-  let label = 'Browser Visual Baseline'
-  let features: string[] = []
-
-  if (q.includes('land cover') || q.includes('land-cover') || q.includes('type of land') || q.includes('kind of land') || q.includes('land use')) {
-    if (greenRatio > 0.22 && builtRatio > 0.08) {
-      answer = 'The RGB image shows a mixed developed-and-vegetated scene, with substantial green vegetation alongside built or paved areas.'
-      label = 'Mixed Developed + Vegetated Land'
-      features = ['Visible vegetation', 'Developed/paved surfaces', 'Mixed land cover', 'Aerial RGB imagery']
-    } else if (greenRatio > 0.22) {
-      answer = 'The RGB image is vegetation-dominant, with extensive green areas visible across the scene.'
-      label = 'Vegetated Land'
-      features = ['Visible vegetation', 'Green canopy/ground cover', 'Aerial RGB imagery']
-    } else {
-      answer = 'The RGB image appears predominantly developed or non-vegetated, with built/paved surfaces more visually prominent than green cover.'
-      label = 'Developed / Non-Vegetated Land'
-      features = ['Built/paved surfaces', 'Limited visible green cover', 'Aerial RGB imagery']
-    }
-  } else if (q.includes('vegetation') || q.includes('forest') || q.includes('crop') || q.includes('plant')) {
-    const present = greenRatio > 0.10
-    answer = present
-      ? 'Yes. Green vegetation is visibly present in the RGB imagery. This is a qualitative visual assessment; no NDVI or calibrated vegetation percentage was computed.'
-      : 'No strong vegetation signature is visible in the RGB imagery. This is a qualitative visual assessment; no NDVI or calibrated vegetation percentage was computed.'
-    label = 'Vegetation Visual Assessment'
-    features = present ? ['Visible green vegetation', 'Vegetated patches'] : ['Limited visible vegetation']
-  } else if (q.includes('water') || q.includes('lake') || q.includes('river') || q.includes('flood')) {
-    const possible = blueRatio > 0.04
-    answer = possible
-      ? 'Blue/dark regions are visible in the RGB image and may include water-like surfaces, but RGB pixels alone are insufficient to certify water coverage or hydrological measurements.'
-      : 'No large water-like region is confidently identified by this simple RGB baseline. A calibrated water detector or multispectral data is required for a stronger conclusion.'
-    label = 'Water Visual Assessment'
-    features = possible ? ['Water-like RGB regions', 'Dark/blue surface areas'] : ['No strong water-like RGB region']
-  } else if (q.includes('describe') || q.includes('caption') || q.includes('scene')) {
-    const parts: string[] = []
-    if (builtRatio > 0.08 || edgeRatio > 0.18) parts.push('developed or structured surfaces')
-    if (greenRatio > 0.12) parts.push('visible vegetation')
-    if (blueRatio > 0.04) parts.push('some blue/dark surface regions')
-    if (parts.length === 0) parts.push('mixed surface textures')
-    answer = `The uploaded RGB aerial image visibly contains ${parts.join(', ')}. This is a browser-side qualitative baseline, not a trained remote-sensing model.`
-    label = 'RGB Scene Description Baseline'
-    features = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1))
-  } else {
-    const vegetation = greenRatio > 0.10
-    answer = q.includes('are there') || q.includes('is there')
-      ? (vegetation
-        ? 'The image contains visible green vegetation. This qualitative browser baseline does not provide calibrated confidence or spectral measurements.'
-        : 'The requested feature is not reliably established by the browser RGB baseline. Use the configured specialist/VLM for a stronger answer.')
-      : 'The uploaded image was successfully inspected at the RGB-pixel level. The production specialist/VLM is currently unavailable, so this baseline provides qualitative evidence only.'
-    label = 'RGB Visual Baseline'
-    features = vegetation ? ['Visible vegetation', 'RGB pixel evidence'] : ['RGB pixel evidence']
-  }
-
-  return {
-    answer,
-    confidence: 'low',
-    confidence_percent: 0,
-    confidenceScore: 0,
-    confidence_status: 'unavailable',
-    confidence_reason: 'Production specialist/VLM was unavailable; browser RGB baseline used instead.',
-    detected_features: features.slice(0, 5),
-    suggested_followups: [
-      'Describe this image.',
-      'What type of land is present?',
-      'Is there vegetation present?',
-    ],
-    label,
-    region: null,
-    count_estimate: null,
-    count_uncertainty_factors: [],
-    mode: 'client_visual_baseline',
-    is_synthetic: false,
-  }
-}
-
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null)
@@ -1043,8 +798,8 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
     suggested_followups: payload.suggested_followups || ['What is the main feature in this image?', 'Where is the most important area to inspect?', 'Can you explain that in simpler terms?'],
     execution_trace: payload.execution_trace || null,
     region,
-    mode: payload.mode || (payload.available === false ? 'synthetic_fallback' : undefined),
-    is_synthetic: payload.is_synthetic === true || payload.mode === 'synthetic_fallback' || payload.mode === 'demo_scene',
+    mode: payload.mode || (payload.available === false ? 'unavailable' : undefined),
+    is_synthetic: payload.is_synthetic === true,
   }
 }
 
@@ -1329,9 +1084,6 @@ export default function App() {
             suggested_followups: ['Verify the specialist backend is running', 'Retry analysis'],
           }
         }
-      } else if (import.meta.env.VITE_DEMO_MODE === 'true') {
-        await new Promise(r => setTimeout(r, 700))
-        result = demoAnalyze(prompt, imagePreview)
       } else {
         try {
           const task_type = isBuildingQuery ? 'building_segmentation' : 'vqa'
@@ -1374,26 +1126,7 @@ export default function App() {
               : (payload.error || `Specialist analysis failed (HTTP ${res.status})`)
             // Production integrity guard: an unavailable specialist remains unavailable.
             // A browser RGB heuristic is only allowed when explicitly opted in for development.
-            if (import.meta.env.VITE_ALLOW_BROWSER_HEURISTIC === 'true' && imagePreview && specialistUnavailable) {
-              try {
-                result = await clientVisualBaseline(prompt, imagePreview)
-                if (payload.execution_trace) result.execution_trace = payload.execution_trace
-              } catch {
-                result = {
-                  answer: `Remote sensing analysis unavailable: ${errorMsg}`,
-                  confidence: 'low',
-                  confidence_percent: 0,
-                  confidenceScore: 0,
-                  confidence_status: 'unavailable',
-                  confidence_reason: `API response HTTP ${res.status}: ${errorMsg}`,
-                  detected_features: ['Analysis Unavailable'],
-                  label: 'Analysis Error',
-                  suggested_followups: ['Configure the production VLM provider', 'Use the adapted specialist through the Python backend'],
-                  execution_trace: payload.execution_trace || null,
-                }
-              }
-            } else {
-              result = {
+            result = {
                 answer: `Remote sensing analysis unavailable: ${errorMsg}`,
                 confidence: 'low',
                 confidence_percent: 0,
@@ -1405,7 +1138,6 @@ export default function App() {
                 suggested_followups: ['Configure the production VLM provider', 'Use the adapted specialist through the Python backend'],
                 execution_trace: payload.execution_trace || null,
               }
-            }
           }
         } catch (fetchErr: any) {
           result = {
@@ -1442,7 +1174,7 @@ export default function App() {
             sessionId: activeSessionId,
             taskType: classifyTask(prompt, 1, ['optical']),
             modelName: result.execution_trace?.steps?.find((step: any) => step?.tool)?.tool || null,
-            modelAdaptation: result.mode === 'synthetic_fallback' || result.is_synthetic ? 'not_applicable_or_synthetic' : null,
+            modelAdaptation: result.is_synthetic ? 'not_applicable_or_synthetic' : null,
             result,
             executionTrace: result.execution_trace,
             confidence: typeof result.confidence_percent === 'number' ? result.confidence_percent / 100 : null,
@@ -1742,7 +1474,7 @@ export default function App() {
     const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `satquery_analysis_report_${Date.now()}.md`
+    a.href = url; a.download = `orbital_ai_analysis_report_${Date.now()}.md`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
     addToast('Analysis report exported as Markdown', 'success')
   }
