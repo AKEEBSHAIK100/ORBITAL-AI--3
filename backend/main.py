@@ -10,13 +10,13 @@ from .routers.classify import router as classify_router
 async def lifespan(app: FastAPI):
     lazy_warmup = os.getenv("LAZY_MODEL_WARMUP", "false").lower() in ("1", "true", "yes")
     if not lazy_warmup:
-        print("[SatQuery AI] Initializing services (eager warmup)…")
+        print("[ORBITAL-AI] Initializing services (eager warmup)…")
         # Pre-warm building detector (non-fatal)
         try:
             from .services.building_detector import BuildingDetector
             detector = BuildingDetector.get_instance()
             if detector.is_available:
-                print(f"[SatQuery AI] Building detector ready on {detector.device.upper()}.")
+                print(f"[ORBITAL-AI] Building detector ready on {detector.device.upper()}.")
             else:
                 print(f"[SatQuery AI] Building detector unavailable (will degrade gracefully): {detector.load_error[:120]}")
         except Exception as e:
@@ -65,10 +65,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SatQuery AI — Agentic Remote-Sensing VLM Backend",
+    title="ORBITAL-AI — Agentic Remote-Sensing VLM Backend",
     description=(
-        "Multi-specialist deep-learning backend: building instance segmentation (YOLO), "
-        "optical–SAR classical-CV fusion (OpenCV), and BigEarthNet v2.0 19-class land-cover classification (ResNet-50)."
+        "Remote-sensing specialist backend with executable model availability reported at runtime. "
+        "Optional building detection, optical–SAR analysis, and BigEarthNet land-cover classification components are exposed only when their runtimes are available."
     ),
     version="3.0.0",
     lifespan=lifespan,
@@ -173,7 +173,7 @@ async def health():
     overall = "healthy" if all(v.get("available") for v in model_status.values()) else "degraded"
     return {
         "status": overall,
-        "service": "SatQuery AI Backend",
+        "service": "ORBITAL-AI Backend",
         "version": "3.0.0",
         "models": model_status,
     }
