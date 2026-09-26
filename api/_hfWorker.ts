@@ -69,7 +69,7 @@ function fileRef(path: string, filename: string) {
 
 export async function runWorkerVqaOrCaption(image: string, query: string) {
   const path = await uploadImage(image, 'orbital-input.jpg')
-  const raw = await callGradio('answer', [query, fileRef(path, 'orbital-input.jpg'), null])
+  const raw = await callGradio('answer', [query + '\nAnswer for a non-expert: start with the direct answer, use simple words, explain technical terms briefly, and do not invent measurements or confidence.', fileRef(path, 'orbital-input.jpg'), null])
   const values = Array.isArray(raw) ? raw : [raw]
   return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', task: /describe|caption|scene/i.test(query) ? 'caption' : 'vqa', model: 'external-zero-gpu-rs-vlm', adapter: 'external-space', provenance: 'External public Hugging Face ZeroGPU Space; not an ORBITAL-AI benchmark.' }
 }
@@ -77,7 +77,7 @@ export async function runWorkerVqaOrCaption(image: string, query: string) {
 export async function runWorkerChange(beforeImage: string, afterImage: string) {
   const before = await uploadImage(beforeImage, 'orbital-before.jpg')
   const after = await uploadImage(afterImage, 'orbital-after.jpg')
-  const raw = await callGradio('answer', ['What changed between these two observations, and where did the change occur?', fileRef(before, 'orbital-before.jpg'), fileRef(after, 'orbital-after.jpg')])
+  const raw = await callGradio('answer', ['In simple language, what visibly changed between these two observations, and where did it change? Do not give percentages or measurements unless directly supported. Explain any uncertainty briefly.', fileRef(before, 'orbital-before.jpg'), fileRef(after, 'orbital-after.jpg')])
   const values = Array.isArray(raw) ? raw : [raw]
   return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', method: 'external_zero_gpu_rs_vlm', note: 'External public ZeroGPU specialist; no calibrated quantitative change fraction is claimed.' }
 }
@@ -85,7 +85,7 @@ export async function runWorkerChange(beforeImage: string, afterImage: string) {
 export async function runWorkerFusion(opticalImage: string, sarImage: string) {
   const optical = await uploadImage(opticalImage, 'orbital-optical.jpg')
   const sar = await uploadImage(sarImage, 'orbital-sar.jpg')
-  const raw = await callGradio('answer', ['Use the optical and SAR images together to identify built-up and water-covered regions.', fileRef(optical, 'orbital-optical.jpg'), fileRef(sar, 'orbital-sar.jpg')])
+  const raw = await callGradio('answer', ['Using both images together, explain in simple language what areas appear built-up or water-covered. Clearly separate what the optical image shows from what the SAR image adds. Do not invent measurements or claim the images are co-registered unless verified.', fileRef(optical, 'orbital-optical.jpg'), fileRef(sar, 'orbital-sar.jpg')])
   const values = Array.isArray(raw) ? raw : [raw]
   return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', method: 'external_zero_gpu_rs_vlm', note: 'External public ZeroGPU specialist; optical/SAR semantic result is not independently benchmarked by ORBITAL-AI.' }
 }
