@@ -9,8 +9,7 @@ const JPEG_QUALITY = 0.82
 
 /**
  * Resize + re-encode a File to a JPEG data URL.
- * Handles GeoTIFF via fallback (FileReader -> <img>) and produces a
- * placeholder canvas for multi-band TIFFs the browser cannot decode.
+ * Browser-decodable raster formats can be rendered for visual inference.
  *
  * @param file   The File selected by the user.
  * @param label  Optional display label for the placeholder canvas overlay.
@@ -24,7 +23,7 @@ export async function compressToJpeg(file: File, label?: string): Promise<string
     file.name.toLowerCase().endsWith('.geotiff')
 
   if (!isImage) {
-    throw new Error('Please choose an image file (JPG, PNG, WEBP, GeoTIFF, or TIFF).')
+    throw new Error('Please choose a visual image file (JPG, PNG, or WEBP).')
   }
   if (file.size > 20 * 1024 * 1024) {
     throw new Error('That file is larger than 20 MB. Please choose a smaller file.')
