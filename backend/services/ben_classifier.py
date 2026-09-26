@@ -252,13 +252,38 @@ class BENClassifier:
             # BigEarthNet v2.0 ResNet-50 expects the original Sentinel-2
             # 10-band feature stack. An RGB JPEG/PNG cannot be converted into
             # truthful multispectral bands by duplicating or synthesizing channels.
-            arr = np.load(io.BytesIO(image_bytes), allow_pickle=False)
-            if arr.ndim != 3 or arr.shape[2] != 10:
+            bands = None
+            decode_errors = []
+
+            # Native NumPy tensor input is supported for internal/data-pipeline use.
+            try:
+                arr = np.load(io.BytesIO(image_bytes), allow_pickle=False)
+                if arr.ndim == 3 and arr.shape[2] == 10:
+                    bands = arr.astype(np.float32)
+            except Exception as exc:
+                decode_errors.append(f"NumPy decode: {exc}")
+
+            # SIH accepts GeoTIFF/TIFF. Preserve the actual 10-band raster; never
+            # synthesize missing spectral channels from RGB.
+            if bands is None:
+                try:
+                    import rasterio
+                    with rasterio.MemoryFile(image_bytes) as memfile:
+                        with memfile.open() as src:
+                            if src.count != 10:
+                                raise ValueError(
+                                    f"Expected 10 Sentinel-2 bands, received {src.count}."
+                                )
+                            bands = np.transpose(src.read(), (1, 2, 0)).astype(np.float32)
+                except Exception as exc:
+                    decode_errors.append(f"GeoTIFF decode: {exc}")
+
+            if bands is None:
                 raise ValueError(
-                    "BigEarthNet v2.0 inference requires a 10-band Sentinel-2 array; "
-                    "RGB/JPEG/PNG input is not a valid substitute for missing spectral bands."
+                    "BigEarthNet v2.0 inference requires a compatible 10-band Sentinel-2 "
+                    "GeoTIFF/TIFF or 10-channel NumPy array; RGB/JPEG/PNG input cannot "
+                    "substitute for missing spectral bands. " + " | ".join(decode_errors)
                 )
-            bands = arr.astype(np.float32)
         except Exception as e:
             logger.warning(f"[BEN] Input decoding/compatibility failed: {e}")
             return {
