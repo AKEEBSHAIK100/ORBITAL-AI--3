@@ -302,7 +302,9 @@ def synthesize_response(
         if bldg_ev:
             b_cnt = bldg_ev.evidence.get("building_count")
             hi_cnt = bldg_ev.evidence.get("high_confidence_count")
-            if b_cnt is not None:\n                tier = f" ({hi_cnt} specialist score-tiered detections)" if hi_cnt is not None else ""\n                parts.append(f"Structural audit: {b_cnt} building footprints detected{tier}.")
+            if b_cnt is not None:
+                tier = f" ({hi_cnt} specialist score-tiered detections)" if hi_cnt is not None else ""
+                parts.append(f"Structural audit: {b_cnt} building footprints detected{tier}.")
 
         if ground_ev:
             g_targets = ground_ev.evidence.get("targets", [])
@@ -333,7 +335,10 @@ def synthesize_response(
             if chg_pct is None:
                 return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
             clusters = change_ev.evidence.get("change_clusters")
-            if clusters is not None:\n                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")\n            else:\n                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected; cluster count was not returned.")
+            if clusters is not None:
+                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")
+            else:
+                parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected; cluster count was not returned.")
 
         parts.append("Confidence is not calibrated across this multi-specialist workflow.")
         answer = " ".join(parts)
@@ -343,21 +348,23 @@ def synthesize_response(
     if intent == "vqa":
         q_lower = query.lower()
         if "building" in q_lower and bldg_ev:
-            b_cnt = bldg_ev.evidence.get("building_count", 0)
-            hi = bldg_ev.evidence.get("high_confidence_count", 0)
+            b_cnt = bldg_ev.evidence.get("building_count")
+            hi = bldg_ev.evidence.get("high_confidence_count")
             vqa_part = f"VQA assessment: {vqa_ev.result}." if vqa_ev and vqa_ev.result else ""
             if b_cnt > 0:
                 answer = (
                     f"Yes, structural footprints are present. The building footprint detector identified {b_cnt} structures "
-                    f"({hi} high confidence). {vqa_part} Footprint confidence is calibrated from the YOLO instance segmentation detector."
+                    (f"({hi} specialist score-tiered detections). " if hi is not None else "") + f"{vqa_part} Confidence is not calibrated unless the specialist provides validation evidence."
                 )
-                return answer, bldg_ev.confidence, "calibrated", warnings
+                return answer, bldg_ev.confidence, "not_calibrated", warnings
             else:
                 answer = f"No building footprints were detected in this scene. {vqa_part} Confidence is not calibrated for this workflow."
                 return answer, None, "not_calibrated", warnings
 
         # Water or general VQA
-        vqa_res = vqa_ev.result if vqa_ev and vqa_ev.result else None\n        if not vqa_res:\n            return "SPECIALIST UNAVAILABLE: No VQA evidence was returned.", None, "unavailable", warnings
+        vqa_res = vqa_ev.result if vqa_ev and vqa_ev.result else None
+        if not vqa_res:
+            return "SPECIALIST UNAVAILABLE: No VQA evidence was returned.", None, "unavailable", warnings
         answer = f"{vqa_res} Confidence is not calibrated for this workflow."
         return answer, None, "not_calibrated", warnings
 
@@ -374,7 +381,9 @@ def synthesize_response(
 
     gen_ev = ev_by_source.get("rs_generalist") or ev_by_task.get("general_vqa")
     if intent in ["general_vqa", "open_question", "open_scene_description", "open_remote_sensing_question"] or gen_ev:
-        ans_text = gen_ev.result if gen_ev and gen_ev.result else None\n        if not ans_text:\n            return "SPECIALIST UNAVAILABLE: No general remote-sensing VLM evidence was returned.", None, "unavailable", warnings
+        ans_text = gen_ev.result if gen_ev and gen_ev.result else None
+        if not ans_text:
+            return "SPECIALIST UNAVAILABLE: No general remote-sensing VLM evidence was returned.", None, "unavailable", warnings
         answer = (
             f"{ans_text} "
             "[Source: Qwen/Qwen2-VL-2B-Instruct (general multimodal VLM, uncalibrated). "
