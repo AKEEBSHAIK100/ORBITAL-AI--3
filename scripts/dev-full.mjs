@@ -7,7 +7,15 @@ const isWin = process.platform === 'win32'
 // 1. Programmatically launch Vite on port 8443
 console.log('[Orbital-AI] Launching Vite dev server on port 8443...')
 const viteServer = await createServer({
-  server: { host: '0.0.0.0', port: 8443 }
+  server: {
+    host: '0.0.0.0',
+    port: 8443,
+    proxy: {
+      '/api': 'http://127.0.0.1:8787',
+      '/analyze': 'http://127.0.0.1:8000',
+      '/classify': 'http://127.0.0.1:8000',
+    },
+  }
 })
 await viteServer.listen()
 viteServer.printUrls()
