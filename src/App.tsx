@@ -1209,7 +1209,7 @@ export default function App() {
       label: 'Bi-Temporal Change Detection', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       region: null, execution_trace: traceData, fusion_features: null,
       is_synthetic: false,
-      mode: mode === 'synthetic_fallback' ? 'unavailable' : mode,
+      mode,
     }])
     setStatus('Change detection complete')
     addToast('Change detection complete: results below', 'success')
