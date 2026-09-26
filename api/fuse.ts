@@ -1,9 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import {
-  client, classifyError, cleanJson, imageContent, incrementCallCounter,
-  MODEL, parseDataUrl, systemPrompt,
-} from './_lib.js'
-import { MAX_TOKENS_COMPARE } from '../lib/constants.js'
+import { classifyError } from './_lib.js'
 import {
   classifyTask, validateInputs, buildExecutionTrace,
   type ExecutionTraceStep, type FusionFeatures,
@@ -161,9 +157,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     traceSteps.push({
       step: 3,
       tool: 'rs_fusion_cv',
-      description: 'Classical CV optical NDVI proxy & SAR backscatter/speckle calculation',
+      description: 'Classical CV visible-band vegetation proxy and raw SAR intensity/speckle telemetry',
       input_summary: 'Co-registered dual sensor matrix',
-      output_summary: `NDVI Proxy: ${fusionFeatures.optical.vegetation_fraction} | SAR Backscatter: ${fusionFeatures.sar.mean_backscatter_db} dB | Cross-Corr: ${fusionFeatures.cross_modal.cross_correlation}`,
+      output_summary: 'Classical optical/SAR telemetry returned; physical calibration is not inferred',
       duration_ms: Math.max(8, Date.now() - step3Start),
       status: 'success',
       parameters: {
@@ -172,87 +168,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     })
 
-    // 4. Step 4: Vision-Language Cross-Modal Reasoning
-    const step4Start = Date.now()
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key') || apiKey === 'sk-placeholder-key'
-
-    let resultPayload: Record<string, unknown>
-
-    if (isPlaceholderKey || !opticalImage || !sarImage) {
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
-      return res.status(200).json({
-        answer: 'Optical–SAR reasoning is unavailable because no configured vision provider is reachable. The classical telemetry was not converted into unsupported semantic claims.',
-        confidence: null,
-        confidence_percent: null,
-        confidenceScore: null,
-        confidence_source: 'none',
-        detected_features: [],
-        estimated_coverage_percent: null,
-        water_coverage_percent: null,
-        vegetation_percent: null,
-        data_limitation_note: 'The current classical fusion specialist returns telemetry; semantic cross-modal reasoning requires an executable specialist or configured vision provider.',
-        region: null,
-        label: 'Optical–SAR reasoning unavailable',
-        suggested_followups: ['Connect the real Python backend and retry.'],
-        fusion_features: fusionFeatures,
-        execution_trace: trace,
-      })
-    } else {
-      let optParsed: string
-      let sarParsed: string
-      try {
-        optParsed = parseDataUrl(opticalImage)
-        sarParsed = parseDataUrl(sarImage)
-      } catch {
-        optParsed = opticalImage
-        sarParsed = sarImage
-      }
-
-      incrementCallCounter()
-      const cvTelemetrySummary = `Extracted CV Telemetry: Optical Vegetation Fraction: ${fusionFeatures.optical.vegetation_fraction}, Water Fraction: ${fusionFeatures.optical.water_fraction}, Built-up: ${fusionFeatures.optical.built_up_fraction}. SAR Mean Backscatter: ${fusionFeatures.sar.mean_backscatter_db} dB, Speckle Index: ${fusionFeatures.sar.speckle_index}, Edge Density: ${fusionFeatures.sar.edge_density}. Structural Similarity: ${fusionFeatures.cross_modal.structural_similarity}, Cross-Correlation: ${fusionFeatures.cross_modal.cross_correlation}.`
-
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: MAX_TOKENS_COMPARE,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: OPTICAL_SAR_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: `Question: ${question}\n${cvTelemetrySummary}\nEvaluate optical image (${opticalLabel}) against SAR image (${sarLabel}). Return valid JSON only.` },
-              { type: 'text', text: `IMAGE 1: OPTICAL (${opticalLabel})` },
-              imageContent(optParsed),
-              { type: 'text', text: `IMAGE 2: SYNTHETIC APERTURE RADAR (${sarLabel})` },
-              imageContent(sarParsed),
-            ],
-          },
-        ],
-      })
-
-      resultPayload = cleanJson(response.choices[0]?.message?.content ?? '{}')
-    }
-
+    // No paid VLM fallback. The classical fusion specialist is the final free path.
+    const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
     traceSteps.push({
       step: 4,
-      tool: 'rs_vqa',
-      description: 'Plain-language optical-SAR synthesis with explicit sensor and calibration limits',
-      input_summary: 'Joint optical-SAR imagery + telemetry summary',
-      output_summary: `Confidence: ${resultPayload.confidence ?? 'not provided'} (${resultPayload.confidence_percent ?? 'not calibrated'})`,
-      duration_ms: Math.max(12, Date.now() - step4Start),
+      tool: 'fusion_result_guard',
+      description: 'Returned classical optical-SAR telemetry without unverified semantic synthesis',
+      input_summary: 'Joint optical + SAR specialist output',
+      output_summary: 'Classical telemetry returned; no paid-provider semantic fallback used',
+      duration_ms: 0,
       status: 'success',
-      parameters: { model: MODEL },
+      confidence_source: 'none',
+      parameters: { semantic_vlm_fallback: false },
     })
-
-    const totalDurationMs = Date.now() - startTime
-    const executionTrace = buildExecutionTrace(taskType, traceSteps, totalDurationMs, validation, 'rs_fusion_cv')
-
+    const finalTrace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_fusion_cv')
     return res.status(200).json({
-      ...resultPayload,
+      answer: 'The optical-SAR specialist returned classical cross-modal telemetry. These measurements are image-derived and are not presented as calibrated physical SAR quantities or semantic model conclusions.',
+      confidence: null,
+      confidence_percent: null,
+      confidenceScore: null,
+      confidence_source: 'none',
+      confidence_status: 'not_calibrated',
+      detected_features: [],
+      estimated_coverage_percent: null,
+      water_coverage_percent: null,
+      vegetation_percent: null,
+      data_limitation_note: 'Semantic cross-modal VLM reasoning is not enabled. Optical and SAR telemetry should be interpreted with sensor calibration and registration metadata when available.',
+      region: null,
+      label: 'Classical Optical-SAR Telemetry',
+      suggested_followups: ['Provide verified CRS/geotransform metadata for registration checks.', 'Use calibrated SAR products for physical backscatter interpretation.'],
       fusion_features: fusionFeatures,
-      execution_trace: executionTrace,
+      execution_trace: finalTrace,
     })
   } catch (err) {
     const { userMessage } = classifyError(err)
