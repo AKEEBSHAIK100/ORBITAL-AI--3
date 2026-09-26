@@ -17,7 +17,7 @@ This file is the living implementation status for the remote-sensing prototype. 
 - **Done:** ambiguous multispectral input is rejected instead of silently dropping bands.
 - **Done:** Sentinel-2 10-band input can be explicitly converted to B04/B03/B02 natural-colour RGB for BLIP.
 - **Scoped-down:** BLIP outputs are uncalibrated generative text; no benchmark accuracy is claimed.
-- **Blocked for runtime verification:** first live BLIP inference still requires the base BLIP model weights and a working Python environment with the required dependencies/network access.
+- **Blocked for runtime verification:** the Git repository intentionally excludes `adapter_model.safetensors`; both current BLIP adapter directories contain config files only. Real pilot weights must be mounted/copied through the documented adapter paths before PEFT + inference verification can occur.
 
 ## GeoTIFF / sensor integrity
 - **Done:** multi-band GeoTIFF/TIFF ingestion preserves H×W×bands arrays.
@@ -48,7 +48,7 @@ This file is the living implementation status for the remote-sensing prototype. 
 - **Unavailable until runtime success:** local AdaptLLM/Qwen2-VL availability is based on executable weights/runtime, not model-name configuration alone.
 
 ## Validation status
-- Existing focused BLIP tests reported previously: 31/31 preprocessing/runtime-contract tests and 10/10 adapter regression tests. These results predate any future changes and must be rerun after repository modifications.
+- Added focused multispectral/BLIP integrity regression coverage; tests have not yet been executed in this environment. Earlier reported BLIP test counts are historical and must not be treated as current validation.
 - Latest full-project test/build gate: **not yet rerun after the current integrity changes**.
 
 ## Explicit non-goals
