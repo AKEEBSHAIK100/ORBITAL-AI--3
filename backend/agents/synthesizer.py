@@ -128,19 +128,21 @@ def synthesize_response(
 
     # Intent: caption ("Describe this image")
     if intent == "caption":
-        cap_text = cap_ev.result if cap_ev else "Descriptive scene caption generated."
+        cap_text = cap_ev.result if cap_ev and cap_ev.result else None
+        if not cap_text:
+            return "SPECIALIST UNAVAILABLE: No caption evidence was returned; no scene description has been fabricated.", None, "unavailable", warnings
         answer = f"{cap_text} Confidence is not calibrated for this workflow."
         return answer, None, "not_calibrated", warnings
 
     # Intent: building_detection ("How many buildings?")
     if intent == "building_detection":
-        cnt = bldg_ev.evidence.get("building_count", 0) if bldg_ev else 0
-        hi = bldg_ev.evidence.get("high_confidence_count", 0) if bldg_ev else 0
-        med = bldg_ev.evidence.get("medium_confidence_count", 0) if bldg_ev else 0
+        cnt = bldg_ev.evidence.get("building_count") if bldg_ev else None
+        hi = bldg_ev.evidence.get("high_confidence_count") if bldg_ev else None
+        med = bldg_ev.evidence.get("medium_confidence_count") if bldg_ev else None
         conf = bldg_ev.confidence if bldg_ev else None
         answer = (
             f"The building detection specialist extracted {cnt} structural rooftop footprints "
-            f"({hi} high certainty, {med} medium certainty). "
+            + (f"({hi} high certainty, {med} medium certainty). " if hi is not None and med is not None else "The specialist did not return confidence-tier counts. ")
             f"Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
         )
         return answer, conf, "calibrated", warnings
@@ -184,8 +186,10 @@ def synthesize_response(
     # Intent: change_vqa ("What changed?")
     if intent == "change_vqa":
         chg_pct = change_ev.evidence.get("change_percentage") if change_ev else None
-        clusters = change_ev.evidence.get("change_clusters", 0) if change_ev else 0
-        chg_vqa_ans = change_vqa_ev.result if change_vqa_ev else (change_ev.result if change_ev else "Bi-temporal change analysis completed.")
+        clusters = change_ev.evidence.get("change_clusters") if change_ev else None
+        chg_vqa_ans = change_vqa_ev.result if change_vqa_ev and change_vqa_ev.result else (change_ev.result if change_ev and change_ev.result else None)
+        if chg_pct is None or clusters is None or not chg_vqa_ans:
+            return "SPECIALIST UNAVAILABLE: Incomplete bi-temporal evidence was returned; no change result has been fabricated.", None, "unavailable", warnings
         answer = (
             f"Surface alterations were identified across {chg_pct:.1f}% of the scene ({clusters} distinct clusters). "
             f"The change specialist reports: {chg_vqa_ans} "
@@ -196,19 +200,25 @@ def synthesize_response(
     # Intent: change_detection
     # e.g. "Has vegetation increased?" or "Are there new buildings?"
     if intent == "change_detection":
-        chg_pct = change_ev.evidence.get("change_percentage", 0.0) if change_ev else 0.0
+        chg_pct = change_ev.evidence.get("change_percentage") if change_ev else None
         q_lower = query.lower()
 
         if "vegetation" in q_lower:
+            veg_delta = change_ev.evidence.get("vegetation_delta_pct") if change_ev else None
+            if veg_delta is None or chg_pct is None:
+                return "SPECIALIST UNAVAILABLE: The change specialist did not return sufficient vegetation evidence.", None, "unavailable", warnings
+            direction = "increase" if veg_delta > 0 else "decrease" if veg_delta < 0 else "no directional change"
             answer = (
-                "The analysis indicates an increase in vegetation between the two supplied images. "
+                f"The image-derived vegetation proxy shows a {direction} between the two supplied images. "
                 f"The change detector identified increased vegetated-area evidence across {chg_pct:.1f}% "
                 "of the comparison region. Confidence is not calibrated for this workflow."
             )
             return answer, None, "not_calibrated", warnings
 
         if "building" in q_lower:
-            b_cnt = bldg_ev.evidence.get("building_count", 0) if bldg_ev else 0
+            b_cnt = bldg_ev.evidence.get("building_count") if bldg_ev else None
+            if chg_pct is None or b_cnt is None:
+                return "SPECIALIST UNAVAILABLE: Insufficient evidence to answer the requested building-change question.", None, "unavailable", warnings
             answer = (
                 f"The bi-temporal comparison identified surface alterations across {chg_pct:.1f}% of the observation area. "
                 f"Structural footprint analysis detected {b_cnt} building footprints in the analyzed scene. "
@@ -311,7 +321,9 @@ def synthesize_response(
                 )
 
         if change_ev:
-            chg_pct = change_ev.evidence.get("change_percentage", 0.0)
+            chg_pct = change_ev.evidence.get("change_percentage")
+            if chg_pct is None:
+                return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
             clusters = change_ev.evidence.get("change_clusters", 0)
             parts.append(f"Bi-temporal alteration: {chg_pct:.1f}% surface alteration detected across {clusters} cluster(s).")
 
