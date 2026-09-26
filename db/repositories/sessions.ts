@@ -153,16 +153,19 @@ export async function completeAnalysisRun(
 
 export async function persistAnalysisResult(
   runId: string,
-  taskType: string,
+  _taskType: string,
   resultJson: Record<string, unknown>,
-  confidence?: string,
+  _confidence?: string,
   confidencePct?: number
 ): Promise<void> {
-  const id = randomUUID()
   await dbQuery(`
-    INSERT INTO analysis_results (id, run_id, task_type, result_json, confidence, confidence_pct)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [id, runId, taskType, JSON.stringify(resultJson), confidence ?? null, confidencePct ?? null])
+    UPDATE analysis_runs
+    SET result = $2,
+        confidence = $3,
+        confidence_status = CASE WHEN $3::numeric IS NULL THEN 'not_calibrated' ELSE 'reported' END,
+        completed_at = COALESCE(completed_at, NOW())
+    WHERE id = $1
+  `, [runId, JSON.stringify(resultJson), confidencePct ?? null])
 }
 
 export async function persistAnalysisInput(
@@ -173,15 +176,15 @@ export async function persistAnalysisInput(
   modality?: string,
   label?: string
 ): Promise<void> {
-  const id = randomUUID()
-  await dbQuery(`
-    INSERT INTO analysis_inputs (id, run_id, input_type, query_text, asset_id, modality, label)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-  `, [id, runId, inputType, queryText ?? null, assetId ?? null, modality ?? null, label ?? null])
+  const current = await dbQuery<{input_metadata: Record<string, unknown>}>(
+    `SELECT input_metadata FROM analysis_runs WHERE id = $1`, [runId]
+  )
+  const metadata = current?.rows[0]?.input_metadata ?? {}
+  const inputs = Array.isArray(metadata.inputs) ? metadata.inputs : []
+  inputs.push({ input_type: inputType, query_text: queryText ?? null, asset_id: assetId ?? null, modality: modality ?? null, label: label ?? null })
+  await dbQuery(`UPDATE analysis_runs SET input_metadata = $2 WHERE id = $1`, [runId, JSON.stringify({...metadata, inputs})])
 }
 
-// ─── Trace Steps ──────────────────────────────────────────────────────────────
-
 export async function persistTraceSteps(runId: string, steps: TraceStep[]): Promise<void> {
-  await dbQuery(`UPDATE analysis_runs SET execution_trace=$2 WHERE id=$1`, [runId, JSON.stringify(steps)])
+  await dbQuery(`UPDATE analysis_runs SET execution_trace = $2 WHERE id = $1`, [runId, JSON.stringify(steps)])
 }
