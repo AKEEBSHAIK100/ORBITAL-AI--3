@@ -57,7 +57,7 @@ export type Region = { x_percent: number; y_percent: number; w_percent: number; 
 
 type Analysis = {
   answer: string
-  confidence: 'high' | 'medium' | 'low'
+  confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_percent: number
   confidenceScore: number
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
@@ -80,7 +80,7 @@ type ChatMessage = {
   answer: string
   confidenceScore: number
   confidence_percent: number
-  confidence: 'high' | 'medium' | 'low'
+  confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
@@ -788,7 +788,7 @@ function normalizeAnalyzeResponse(payload: Record<string, any>, fallbackPrompt: 
 
   return {
     answer: payload.answer || 'Analysis complete.',
-    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct === null ? 'low' : confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
+    confidence: payload.confidence_level ? payload.confidence_level.toLowerCase() : (confPct === null ? 'unavailable' : confPct >= 80 ? 'high' : confPct >= 50 ? 'medium' : 'low'),
     confidence_percent: confPct ?? 0,
     confidenceScore: confPct ?? 0,
     confidence_status: confStatus,
@@ -1206,7 +1206,7 @@ export default function App() {
       setHistory(prev => [...prev, {
         question: prompt, answer: errAnswer,
         confidence_percent: 0, confidenceScore: 0,
-        confidence: 'low', confidence_status: 'unavailable', confidence_reason: 'Pipeline execution threw an unhandled exception.',
+        confidence: 'unavailable', confidence_status: 'unavailable', confidence_reason: 'Pipeline execution threw an unhandled exception.',
         detected_features: ['Pipeline Failure'], label: 'Execution Error',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         region: null, execution_trace: null, fusion_features: null,
@@ -1278,7 +1278,7 @@ export default function App() {
     setTemporalResult({ question: queryPrompt, answer: compAnswer, confidenceScore: confScore, confidence_status: confStatus, features, execution_trace: traceData, mode })
     setHistory(prev => [...prev, {
       question: queryPrompt, answer: compAnswer, confidence_percent: confScore, confidenceScore: confScore,
-      confidence: confStatus === 'unavailable' ? 'low' : (confScore >= 85 ? 'high' : 'medium'), confidence_status: confStatus, detected_features: features,
+      confidence: confStatus === 'unavailable' ? 'unavailable' : (confScore >= 85 ? 'high' : 'medium'), confidence_status: confStatus, detected_features: features,
       label: 'Bi-Temporal Change Detection', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       region: null, execution_trace: traceData, fusion_features: null,
       is_synthetic: false,
@@ -1316,7 +1316,7 @@ export default function App() {
         const confVal = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (typeof data.confidence_percent === 'number' ? data.confidence_percent : 0)
         setHistory(prev => [...prev, {
           question: fusionQuery, answer: data.answer, confidence_percent: confVal, confidenceScore: confVal,
-          confidence: data.confidence_level ? data.confidence_level.toLowerCase() : (data.confidence || 'high'),
+          confidence: data.confidence_level ? data.confidence_level.toLowerCase() : (data.confidence_status === 'unavailable' || data.confidence == null ? 'unavailable' : data.confidence),
           confidence_reason: data.reasoning || data.confidence_reason,
           detected_features: data.detected_features || ['Optical–SAR Joint Fusion'], label: 'Optical–SAR Fusion',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1337,7 +1337,7 @@ export default function App() {
           const confVal = typeof legacyData.confidence_percent === 'number' ? legacyData.confidence_percent : 0
           setHistory(prev => [...prev, {
             question: fusionQuery, answer: legacyData.answer, confidence_percent: confVal, confidenceScore: confVal,
-            confidence: legacyData.confidence || 'low', confidence_reason: legacyData.confidence_reason, confidence_status: legacyData.confidence_status || 'not_calibrated',
+            confidence: legacyData.confidence || 'unavailable', confidence_reason: legacyData.confidence_reason, confidence_status: legacyData.confidence_status || 'not_calibrated',
             detected_features: legacyData.detected_features || [], label: legacyData.label || 'Optical–SAR Fusion',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             execution_trace: legacyData.execution_trace ?? null, fusion_features: legacyData.fusion_features ?? null,
