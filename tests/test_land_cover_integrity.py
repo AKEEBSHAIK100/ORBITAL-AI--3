@@ -41,6 +41,20 @@ class TestLandCoverIntegrity(unittest.TestCase):
         self.assertEqual(result["labels"], [])
         self.assertEqual(result["active_labels"], [])
 
+
+    def test_rgb_input_is_not_promoted_to_multispectral_inference(self):
+        from backend.services.ben_classifier import BENClassifier
+        classifier = BENClassifier.__new__(BENClassifier)
+        classifier._available = True
+        classifier._model = object()
+        classifier._device = "cpu"
+        classifier._model_id = "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0"
+        result = classifier._run_model_inference(b"not-a-valid-10-band-array")
+        self.assertEqual(result["status"], "unavailable")
+        self.assertIsNone(result["top_label"])
+        self.assertIsNone(result["confidence"])
+        self.assertIn("10-band", result["error"])
+
     def test_tool_does_not_expose_heuristic_model_identity(self):
         tool = BigEarthNetTool(classifier=FakeUnavailableClassifier())
         image = io.BytesIO()
