@@ -384,6 +384,66 @@ def run_orbital_analysis(
         res = tool_obj.run(curr_tool_inputs, spec_params)
         exec_dur = (time.time() - t_exec) * 1000
 
+        # Runtime availability is authoritative. A registry entry alone must never
+        # turn an unavailable/error specialist response into a successful analysis.
+        runtime_status = str(res.get("status", "")).lower()
+        if runtime_status in ("specialist_unavailable", "unavailable", "error"):
+            reason = res.get("answer") or res.get("error") or f"Specialist '{specialist_id}' failed to execute."
+            warnings = res.get("warnings", [])
+            if not isinstance(warnings, list):
+                warnings = [str(warnings)]
+            ev_runtime = SpecialistEvidenceObject(
+                task=spec_entry.task if spec_entry else specialist_id,
+                result=str(reason),
+                evidence=res.get("evidence", {}),
+                source=specialist_id,
+                model=model_id,
+                provenance=res.get("provenance"),
+                confidence=None,
+                confidence_status="unavailable" if runtime_status != "error" else "unavailable",
+                warnings=warnings,
+            )
+            evidence_list.append(ev_runtime)
+            answer, conf, conf_status, final_warnings = synthesize_response(
+                query, plan, evidence_list, validation, status="SPECIALIST_UNAVAILABLE"
+            )
+            final_warnings = list(dict.fromkeys([*final_warnings, *warnings]))
+            trace = build_observable_trace(
+                task_type=plan.intent,
+                steps=steps_log + [{
+                    "step": step_num,
+                    "tool": specialist_name,
+                    "description": f"Runtime execution of {specialist_name} did not produce a usable specialist result",
+                    "input_summary": f"Scene observation with query: '{effective_query}'",
+                    "output_summary": str(reason)[:100],
+                    "duration_ms": round(exec_dur, 2),
+                    "status": runtime_status,
+                    "success": False,
+                    "confidence_source": "none",
+                    "parameters": {},
+                }],
+                total_duration_ms=(time.time() - t_start) * 1000,
+                validation=validation,
+                primary_tool=primary_tool_spec
+            )
+            return UnifiedAnalysisResponse(
+                status="SPECIALIST_UNAVAILABLE",
+                answer=answer,
+                query_plan=plan,
+                evidence=evidence_list,
+                visual_evidence={},
+                warnings=final_warnings,
+                confidence=None,
+                confidence_status="unavailable",
+                execution_trace=trace,
+                success=False,
+                task_type=plan.intent,
+                tools_used=tools_used,
+                input_modality=(modalities or ["optical"])[0],
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ"),
+                execution_time_ms=round((time.time() - t_start) * 1000, 2),
+            )
+
         # Update request-scoped shared evidence context with successful outputs
         if res.get("status") in ("success", "SUCCESS"):
             if specialist_id == "land_cover":
