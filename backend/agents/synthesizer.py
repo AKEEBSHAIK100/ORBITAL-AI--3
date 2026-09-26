@@ -247,7 +247,7 @@ def synthesize_response(
         if chg_pct is None:
             return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
         answer = (
-            f"Bi-temporal change detection localized alterations across {chg_pct:.1f}% of the observation surface. "
+            f"The classical change baseline reports alterations across {chg_pct:.1f}% of the observation surface; this is an image-derived estimate, not independently validated ground truth. "
             "Confidence is not calibrated for this workflow."
         )
         return answer, None, "not_calibrated", warnings
@@ -269,7 +269,7 @@ def synthesize_response(
         )
 
         answer = (
-            f"Optical–SAR cross-modal analysis demonstrates complementary multi-sensor signatures. "
+            f"Optical–SAR cross-modal analysis reports complementary image-derived sensor telemetry. "
             f"{alignment_text} "
             (f"SAR mean signal level reported by the specialist is {signal_db:.1f} dB; it is not treated as calibrated sigma-nought backscatter. " if signal_db is not None else "No SAR signal-level metric was provided. ")
             + (f"Optical telemetry reports {veg * 100:.1f}% vegetative surface fraction. " if veg is not None else "No optical vegetation-fraction metric was provided. ")
