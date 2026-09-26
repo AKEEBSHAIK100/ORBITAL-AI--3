@@ -1,5 +1,6 @@
 """
-Change Visual Question Answering (CDVQA) Specialist.
+Classical Bi-Temporal Change Question Answering Baseline.
+No calibrated confidence is produced.
 Interprets natural language inquiries across bi-temporal satellite image pairs.
 Answers queries regarding expansion, vegetation trends, and structural changes.
 """
@@ -58,7 +59,7 @@ class ChangeVQASpecialist:
                 f"Bi-temporal spectral comparison indicates vegetation has {direction} by {abs(veg_delta)}% "
                 f"between the observation captures. Total surface change across the scene is {change_pct}%."
             )
-            confidence = 0.86
+            confidence = None
         elif "building" in q_lower or "built" in q_lower or "urban" in q_lower or "expansion" in q_lower:
             if change_pct > 3.0:
                 answer = (
@@ -70,7 +71,7 @@ class ChangeVQASpecialist:
                     f"Structural footprint remained stable between the two observation dates. "
                     f"Only {change_pct}% surface variation was observed."
                 )
-            confidence = 0.84
+            confidence = None
         else:
             if change_pct < 1.5:
                 answer = (
@@ -82,12 +83,12 @@ class ChangeVQASpecialist:
                     f"Detectable alterations occurred across {change_pct}% of the surface area, "
                     f"distributed across {clusters_count} distinct spatial clusters."
                 )
-            confidence = 0.85
+            confidence = None
 
         return {
             "answer": answer,
             "confidence": confidence,
-            "confidence_level": "High" if confidence >= 0.80 else "Medium",
+            "confidence_level": "UNAVAILABLE",
             "evidence": {
                 "change_percentage": change_pct,
                 "clusters_count": clusters_count,
