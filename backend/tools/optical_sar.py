@@ -77,9 +77,18 @@ class OpticalSARTool(BaseTool):
         mean_db = sar_metrics.get("mean_signal_level_db", sar_metrics.get("mean_backscatter_db"))
         speckle = sar_metrics.get("speckle_index")
 
+        optical_parts = []
+        if built_up_frac is not None:
+            optical_parts.append(f"{built_up_frac*100:.1f}% built-up fabric")
+        if water_frac is not None:
+            optical_parts.append(f"{water_frac*100:.1f}% water bodies")
+        optical_summary = (
+            "Optical visible-band proxies report " + " and ".join(optical_parts) + "."
+            if optical_parts
+            else "Optical telemetry metrics are unavailable from the specialist output."
+        )
         interpretation_parts = [
-            f"Classical cross-modal telemetry baseline: optical visible-band proxies indicate {built_up_frac*100:.1f}% built-up fabric "
-            f"and {water_frac*100:.1f}% water bodies.",
+            f"Classical cross-modal telemetry baseline: {optical_summary}",
             (f"SAR mean signal level derived from raw amplitude is {mean_db:.1f} dB (speckle index {speckle:.2f}; raw amplitude uncalibrated to sigma-nought backscatter)." if mean_db is not None and speckle is not None else "SAR signal-level telemetry is unavailable from the specialist output.")
         ]
 
