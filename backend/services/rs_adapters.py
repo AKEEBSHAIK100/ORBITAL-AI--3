@@ -130,8 +130,8 @@ class RSAdapterRuntime:
         """Check filesystem for adapter artifacts without loading weights into memory."""
         # Check Caption adapter
         if self._has_adapter_weights(CAPTION_ADAPTER_PATH):
-            self.caption_state = SpecialistState.AVAILABLE
-            self.caption_unavailable_reason = None
+            self.caption_state = SpecialistState.UNAVAILABLE
+            self.caption_unavailable_reason = "Caption adapter artifacts are present, but runtime execution has not been verified yet."
         else:
             self.caption_state = SpecialistState.UNAVAILABLE
             self.caption_unavailable_reason = (
@@ -141,8 +141,8 @@ class RSAdapterRuntime:
 
         # Check VQA adapter
         if self._has_adapter_weights(VQA_ADAPTER_PATH):
-            self.vqa_state = SpecialistState.AVAILABLE
-            self.vqa_unavailable_reason = None
+            self.vqa_state = SpecialistState.UNAVAILABLE
+            self.vqa_unavailable_reason = "VQA adapter artifacts are present, but runtime execution has not been verified yet."
         else:
             self.vqa_state = SpecialistState.UNAVAILABLE
             self.vqa_unavailable_reason = (
@@ -213,8 +213,12 @@ class RSAdapterRuntime:
         if self._caption_model is not None and self._caption_processor is not None:
             return self._caption_model, self._caption_processor
 
-        if self.caption_state == SpecialistState.UNAVAILABLE:
+        if self.caption_state == SpecialistState.ERROR:
             raise RuntimeError(self.caption_unavailable_reason or "Caption specialist unavailable.")
+        if not self._has_adapter_weights(CAPTION_ADAPTER_PATH):
+            self.caption_state = SpecialistState.UNAVAILABLE
+            self.caption_unavailable_reason = f"Caption adapter artifacts not found at '{CAPTION_ADAPTER_PATH}'."
+            raise RuntimeError(self.caption_unavailable_reason)
 
         self.caption_state = SpecialistState.LOADING
         try:
@@ -250,8 +254,8 @@ class RSAdapterRuntime:
             return self._caption_model, self._caption_processor
 
         except Exception as e:
-            self.caption_state = SpecialistState.ERROR
-            self.caption_unavailable_reason = f"Failed to load caption adapter: {e}"
+            self.caption_state = SpecialistState.UNAVAILABLE
+            self.caption_unavailable_reason = f"Caption runtime verification failed: {e}"
             raise
 
     def _load_vqa_model(self):
@@ -259,8 +263,12 @@ class RSAdapterRuntime:
         if self._vqa_model is not None and self._vqa_processor is not None:
             return self._vqa_model, self._vqa_processor
 
-        if self.vqa_state == SpecialistState.UNAVAILABLE:
+        if self.vqa_state == SpecialistState.ERROR:
             raise RuntimeError(self.vqa_unavailable_reason or "VQA specialist unavailable.")
+        if not self._has_adapter_weights(VQA_ADAPTER_PATH):
+            self.vqa_state = SpecialistState.UNAVAILABLE
+            self.vqa_unavailable_reason = f"VQA adapter artifacts not found at '{VQA_ADAPTER_PATH}'."
+            raise RuntimeError(self.vqa_unavailable_reason)
 
         self.vqa_state = SpecialistState.LOADING
         try:
@@ -295,8 +303,8 @@ class RSAdapterRuntime:
             return self._vqa_model, self._vqa_processor
 
         except Exception as e:
-            self.vqa_state = SpecialistState.ERROR
-            self.vqa_unavailable_reason = f"Failed to load VQA adapter: {e}"
+            self.vqa_state = SpecialistState.UNAVAILABLE
+            self.vqa_unavailable_reason = f"VQA runtime verification failed: {e}"
             raise
 
     # ─── Public Inference API ─────────────────────────────────────────────────
