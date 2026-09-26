@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Free Hugging Face ZeroGPU worker provides the classical change baseline when enabled.
-    if (process.env.ENABLE_HF_RS_WORKER === 'true') {
+    if (process.env.ENABLE_HF_RS_WORKER !== 'false') {
       try {
         const worker = await runWorkerChange(beforeImage, afterImage) as Record<string, any>
         if (worker?.ok) {
@@ -88,15 +88,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             tool: 'change_detection_classical',
             description: 'Hugging Face worker classical bi-temporal change baseline',
             input_summary: 'Two temporal optical observations',
-            output_summary: `Changed fraction: ${worker.change_fraction_percent ?? 'n/a'}%`,
+            output_summary: 'External ZeroGPU change-understanding response returned',
             duration_ms: Math.max(1, Number(worker.duration_ms) || Date.now() - step2Start),
             status: 'success',
             confidence_source: 'none',
-            parameters: { method: worker.method, geospatial_compatibility: worker.geospatial_compatibility },
+            parameters: { method: worker.method, external_dependency: true, confidence_status: 'not_calibrated' },
           })
           const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'change_detection_classical')
           return res.status(200).json({
-            answer: `Classical bi-temporal change baseline detected ${worker.change_fraction_percent ?? 'an unquantified amount'}% of pixels above the configured intensity-difference threshold.`,
+            answer: String(worker.answer || 'The external change specialist returned no textual result.'),
             confidence: null,
             confidence_percent: null,
             confidenceScore: null,
@@ -104,8 +104,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             confidence_status: 'not_calibrated',
             change_regions: [],
             alignment_confidence: null,
-            label: 'Classical Change Baseline',
-            data_limitation_note: worker.note,
+            label: 'External Remote-Sensing Change Analysis',
+            data_limitation_note: worker.note || 'External ZeroGPU specialist; no calibrated quantitative change fraction is claimed.',
             change_baseline: worker,
             execution_trace: trace,
           })
