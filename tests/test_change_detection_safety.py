@@ -104,7 +104,7 @@ class TestChangeDetectionSafety(unittest.TestCase):
         self.assertIn("metadata", note.lower())
         self.assertNotEqual(result.get("geospatial_compatibility"), "verified")
 
-    def test_metadata_compatible_crs_accepted(self):
+    def test_metadata_matching_crs_alone_is_not_full_registration_verification(self):
         inputs = {
             "image": self.t1_100,
             "secondary_image": self.t2_100,
@@ -113,8 +113,21 @@ class TestChangeDetectionSafety(unittest.TestCase):
         }
         result = self.tool.run(inputs)
         self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("geospatial_compatibility"), "unverified")
+        self.assertIn("could not be fully verified", result.get("geospatial_note", ""))
+
+    def test_matching_crs_and_affine_verifies_registration(self):
+        gt = [500000.0, 10.0, 0.0, 4500000.0, 0.0, -10.0]
+        inputs = {
+            "image": self.t1_100,
+            "secondary_image": self.t2_100,
+            "metadata": {"crs": "EPSG:32632", "geotransform": gt},
+            "secondary_metadata": {"crs": "EPSG:32632", "geotransform": gt},
+        }
+        result = self.tool.run(inputs)
+        self.assertEqual(result.get("status"), "success")
         self.assertEqual(result.get("geospatial_compatibility"), "verified")
-        self.assertIn("EPSG:32632", result.get("geospatial_note", ""))
+        self.assertIn("matching CRS and affine", result.get("geospatial_note", ""))
 
     def test_metadata_incompatible_crs_rejected(self):
         inputs = {
