@@ -2230,7 +2230,7 @@ export default function App() {
                     <ConfidenceBadge
                       confidence={temporalResult.confidenceScore >= 85 ? 'high' : 'medium'}
                       percent={temporalResult.confidenceScore}
-                      confidence_status={temporalResult.confidence_status || (temporalResult.'not_calibrated')}
+                      confidence_status={temporalResult.confidence_status || 'not_calibrated'}
                       mode={temporalResult.mode}
                     />
                     <span className="text-[10px]" style={{ color: C.dim }}>Bi-Temporal CDVQA</span>
