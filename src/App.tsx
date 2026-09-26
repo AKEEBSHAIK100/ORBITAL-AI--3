@@ -183,6 +183,82 @@ async function compressImage(file: File): Promise<{ dataUrl: string; telemetry: 
   return { dataUrl: canvas.toDataURL('image/jpeg', 0.82), telemetry };
 }
 
+
+/**
+ * Honest offline fallback used when no specialist endpoint is reachable.
+ * This is deterministic browser image statistics, not an AI/VLM claim:
+ * pixels are sampled from the uploaded image and grouped by broad color cues.
+ */
+async function runClassicalBrowserAnalysis(
+  question: string,
+  dataUrl: string,
+): Promise<{ answer: string; features: string[] }> {
+  const image = new Image()
+  image.src = dataUrl
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('Could not decode the analysis image.'))
+  })
+
+  const size = 320
+  const scale = Math.min(1, size / Math.max(image.naturalWidth, image.naturalHeight))
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('Browser image-analysis canvas is unavailable.')
+  ctx.drawImage(image, 0, 0, width, height)
+  const { data } = ctx.getImageData(0, 0, width, height)
+
+  let green = 0, blue = 0, bright = 0, dark = 0, neutral = 0, sampled = 0
+  for (let i = 0; i < data.length; i += 16) {
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    const max = Math.max(r, g, b), min = Math.min(r, g, b)
+    const sat = max - min
+    if (max > 210) bright++
+    if (max < 65) dark++
+    if (g > r * 1.08 && g > b * 1.08 && g > 70) green++
+    if (b > r * 1.10 && b > g * 1.02 && b > 70) blue++
+    if (sat < 28) neutral++
+    sampled++
+  }
+
+  const pct = (n: number) => Math.round((n / Math.max(1, sampled)) * 100)
+  const vegetation = pct(green)
+  const water = pct(blue)
+  const brightPct = pct(bright)
+  const darkPct = pct(dark)
+  const neutralPct = pct(neutral)
+
+  let dominant = 'mixed / built environment'
+  if (vegetation >= 24 && vegetation >= water) dominant = 'vegetation-dominant'
+  else if (water >= 18 && water > vegetation) dominant = 'water-dominant'
+  else if (brightPct >= 45 && neutralPct >= 35) dominant = 'bright / arid or built-up'
+  else if (darkPct >= 28) dominant = 'dark / shadowed or dense built-up'
+
+  const q = question.toLowerCase()
+  let answer = `Classical browser image analysis indicates a ${dominant} scene. Pixel-level color cues cover approximately ${vegetation}% green-dominant pixels and ${water}% blue-dominant pixels. This is an image-statistics fallback, not a trained remote-sensing model, so no calibrated confidence or geospatial measurement is claimed.`
+  if (/water|lake|river|sea|flood|hydro/.test(q)) {
+    answer = `The image contains approximately ${water}% blue-dominant pixels by this browser image-statistics fallback. Blue pixels can indicate water but can also come from haze, shadows, roofs, or other surfaces, so this is not a validated water-area measurement.`
+  } else if (/vegetation|forest|crop|green|plant/.test(q)) {
+    answer = `The image contains approximately ${vegetation}% green-dominant pixels by this browser image-statistics fallback. Green color is only a visual cue and is not equivalent to a validated vegetation index or land-cover classification.`
+  } else if (/land|terrain|scene|describe|built|urban|building|road/.test(q)) {
+    answer = `The broad visual signal is ${dominant}. Green-dominant pixels: ${vegetation}%; blue-dominant pixels: ${water}%; bright pixels: ${brightPct}%. These are deterministic image statistics only, not a trained land-cover or object-detection result.`
+  }
+
+  return {
+    answer,
+    features: [
+      `Broad scene cue: ${dominant}`,
+      `Green-dominant pixels: ${vegetation}%`,
+      `Blue-dominant pixels: ${water}%`,
+      'Method: deterministic browser pixel statistics',
+    ],
+  }
+}
+
 // ── Scroll reveal hook ────────────────────────────────────────────────────────
 function useScrollReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null)
@@ -1076,19 +1152,37 @@ export default function App() {
                 execution_trace: payload.execution_trace || null,
               }
             } catch (remoteErr: any) {
-              // Production integrity guard: if the real specialist is unavailable,
-              // remain unavailable. Never substitute a browser heuristic.
-              result = {
-                answer: `Remote sensing analysis unavailable: ${errorMsg}`,
-                confidence: 'low',
-                confidence_percent: null,
-                confidenceScore: null,
-                confidence_status: 'unavailable',
-                confidence_reason: remoteErr?.message || errorMsg,
-                detected_features: ['Analysis Unavailable'],
-                label: 'Analysis Error',
-                suggested_followups: ['Retry when the remote specialist is available', 'Use the adapted specialist through the Python backend'],
-                execution_trace: payload.execution_trace || null,
+              // Honest last-resort path: deterministic image statistics. This does not
+              // fabricate a VLM answer and does not claim calibrated confidence.
+              try {
+                const classical = await runClassicalBrowserAnalysis(prompt, imagePreview || '')
+                result = {
+                  answer: classical.answer,
+                  confidence: 'low',
+                  confidence_percent: null,
+                  confidenceScore: null,
+                  confidence_status: 'not_calibrated',
+                  confidence_reason: 'Remote specialist unavailable; result comes from deterministic browser pixel statistics, not a trained remote-sensing model.',
+                  detected_features: classical.features,
+                  label: 'Classical Image Analysis Fallback',
+                  suggested_followups: ['Retry the specialist analysis when the GPU service is available', 'Upload a second date for change analysis'],
+                  mode: 'browser_classical_fallback',
+                  is_synthetic: false,
+                  execution_trace: payload.execution_trace || null,
+                }
+              } catch (fallbackErr: any) {
+                result = {
+                  answer: `Remote sensing analysis unavailable: ${errorMsg}`,
+                  confidence: 'unavailable',
+                  confidence_percent: null,
+                  confidenceScore: null,
+                  confidence_status: 'unavailable',
+                  confidence_reason: remoteErr?.message || fallbackErr?.message || errorMsg,
+                  detected_features: ['Analysis Unavailable'],
+                  label: 'Analysis Error',
+                  suggested_followups: ['Retry when the remote specialist is available'],
+                  execution_trace: payload.execution_trace || null,
+                }
               }
             }
           }
