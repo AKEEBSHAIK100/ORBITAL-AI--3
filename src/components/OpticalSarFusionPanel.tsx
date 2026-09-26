@@ -30,7 +30,7 @@ export default function OpticalSarFusionPanel({
   const [sarImage, setSarImage] = useState<string | null>(null)
   const [opticalLabel, setOpticalLabel] = useState<string>('Cartosat-2S (Optical RGB)')
   const [sarLabel, setSarLabel] = useState<string>('RISAT-1A / Sentinel-1 (C-Band SAR)')
-  const [customQuery, setCustomQuery] = useState<string>('Analyze cross-modal optical canopy and microwave backscatter structure.')
+  const [customQuery, setCustomQuery] = useState<string>('In simple language, what does each image show, and what additional information does the SAR image provide?')
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   const optInputRef = useRef<HTMLInputElement>(null)
@@ -89,11 +89,11 @@ export default function OpticalSarFusionPanel({
                 className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
                 style={{ background: `${MNT}22`, color: MNT, border: `1px solid ${MNT}55` }}
               >
-                CO-REGISTERED INPUTS
+                OPTICAL + SAR INPUTS
               </span>
             </div>
             <p className="text-xs font-mono" style={{ color: GRY }}>
-              Joint complementary analysis: Visible spectral reflectance + Microwave radar backscatter
+              Joint analysis: optical imagery + microwave radar observations
             </p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function OpticalSarFusionPanel({
             color: CYN,
             border: `1px solid ${CYN}44`,
           }}
-          title="Use real co-registered optical and SAR inputs"
+          title="Upload two observations of the same area; co-registration is verified by the backend when metadata is available."
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="2" />
