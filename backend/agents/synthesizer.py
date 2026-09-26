@@ -137,11 +137,11 @@ def synthesize_response(
         cnt = bldg_ev.evidence.get("building_count", 0) if bldg_ev else 0
         hi = bldg_ev.evidence.get("high_confidence_count", 0) if bldg_ev else 0
         med = bldg_ev.evidence.get("medium_confidence_count", 0) if bldg_ev else 0
-        conf = bldg_ev.confidence if bldg_ev else 0.85
+        conf = bldg_ev.confidence if bldg_ev else None
         answer = (
             f"The building detection specialist extracted {cnt} structural rooftop footprints "
             f"({hi} high certainty, {med} medium certainty). "
-            f"Confidence is calibrated from the YOLO instance segmentation detector."
+            f"Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
         )
         return answer, conf, "calibrated", warnings
 
@@ -183,7 +183,7 @@ def synthesize_response(
 
     # Intent: change_vqa ("What changed?")
     if intent == "change_vqa":
-        chg_pct = change_ev.evidence.get("change_percentage", 0.0) if change_ev else 0.0
+        chg_pct = change_ev.evidence.get("change_percentage") if change_ev else None
         clusters = change_ev.evidence.get("change_clusters", 0) if change_ev else 0
         chg_vqa_ans = change_vqa_ev.result if change_vqa_ev else (change_ev.result if change_ev else "Bi-temporal change analysis completed.")
         answer = (
@@ -228,9 +228,9 @@ def synthesize_response(
         cross_m = metrics.get("cross_modal", {})
         ssim_val = cross_m.get("structural_similarity")
         sar_m = metrics.get("sar", {})
-        signal_db = sar_m.get("mean_signal_level_db", sar_m.get("mean_backscatter_db", -14.2))
+        signal_db = sar_m.get("mean_signal_level_db", sar_m.get("mean_backscatter_db"))
         opt_m = metrics.get("optical", {})
-        veg = opt_m.get("vegetation_fraction", 0.35)
+        veg = opt_m.get("vegetation_fraction")
 
         alignment_text = (
             f"Structural similarity (SSIM) between sensors is {ssim_val:.2f}."
@@ -241,9 +241,9 @@ def synthesize_response(
         answer = (
             f"Optical–SAR cross-modal analysis demonstrates complementary multi-sensor signatures. "
             f"{alignment_text} "
-            f"SAR mean signal level derived from raw amplitude is {signal_db:.1f} dB (uncalibrated to sigma-nought backscatter) with characteristic roughness signatures, "
-            f"while optical telemetry indicates {veg * 100:.1f}% vegetative surface reflection. "
-            "Structures with strong dielectric double-bounce appear prominent across both modalities. "
+            (f"SAR mean signal level reported by the specialist is {signal_db:.1f} dB; it is not treated as calibrated sigma-nought backscatter. " if signal_db is not None else "No SAR signal-level metric was provided. ")
+            + (f"Optical telemetry reports {veg * 100:.1f}% vegetative surface fraction. " if veg is not None else "No optical vegetation-fraction metric was provided. ")
+            "Any structural interpretation is limited to evidence returned by the fusion specialist. "
             "Confidence is not calibrated for this workflow."
         )
         return answer, None, "not_calibrated", warnings
