@@ -10,10 +10,9 @@
   "peft_type": "LORA",
   "r": 8,
   "target_modules": [
-    "qkv",
-    "projection"
+    "qkv"
   ],
-  "task_type": null,
+  "task_type": "FEATURE_EXTRACTION",
   "domain_adaptation": "BigEarthNet-S2 pilot (87 image-text pairs, 3 epochs, pilot only; no benchmark accuracy claim)",
   "band_strategy": "B04/B03/B02 natural-colour Sentinel-2 representation for BLIP",
   "preprocessing": "Per-channel 2%-98% percentile stretch to RGB; no synthetic band substitution."
