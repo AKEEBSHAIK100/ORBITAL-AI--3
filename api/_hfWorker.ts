@@ -32,7 +32,7 @@ async function callGradio(apiName: string, data: unknown[]): Promise<unknown> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(12_000),
   })
   if (!response.ok) throw new Error(`Worker call failed: HTTP ${response.status}`)
   const started = await response.json()
@@ -40,7 +40,7 @@ async function callGradio(apiName: string, data: unknown[]): Promise<unknown> {
   if (!eventId) throw new Error('Worker call returned no event id.')
 
   const stream = await fetch(`${workerUrl()}/gradio_api/call/${apiName}/${encodeURIComponent(eventId)}`, {
-    signal: AbortSignal.timeout(130_000),
+    signal: AbortSignal.timeout(48_000),
   })
   if (!stream.ok) throw new Error(`Worker result stream failed: HTTP ${stream.status}`)
 
