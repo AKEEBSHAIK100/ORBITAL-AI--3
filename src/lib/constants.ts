@@ -2,7 +2,7 @@
 // Single source of truth for model selection, token budgets, and usage caps.
 // Never hardcode these values elsewhere — always import from here.
 
-/** The vision model used for all AI calls. Change once here to affect the entire stack. */
+/** Runtime model label used by API routing and telemetry. Free specialists are selected by the agent registry. */
 export const MODEL = 'remote-sensing-specialists'
 
 /** Max output tokens for single-image analysis. The JSON schema fits comfortably under 700. */
