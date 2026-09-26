@@ -140,7 +140,7 @@ def synthesize_response(
     if intent == "building_detection":
         cnt = bldg_ev.evidence.get("building_count") if bldg_ev else None
         if cnt is None:
-            return "SPECIALIST UNAVAILABLE: Building detection returned no verified building count.", None, "unavailable", warnings
+            return "SPECIALIST UNAVAILABLE: Building detection returned no building count.", None, "unavailable", warnings
         hi = bldg_ev.evidence.get("high_confidence_count") if bldg_ev else None
         med = bldg_ev.evidence.get("medium_confidence_count") if bldg_ev else None
         conf = bldg_ev.confidence if bldg_ev else None
@@ -150,7 +150,7 @@ def synthesize_response(
             else "The specialist did not return confidence-tier counts."
         )
         answer = (
-            f"The building detection specialist extracted {cnt} structural rooftop footprints. "
+            f"The building detection specialist returned {cnt} structural rooftop footprints. "
             f"{tier_text} Confidence is reported only when provided by the building specialist; otherwise it is not calibrated."
         )
         return answer, conf, "not_calibrated", warnings
@@ -169,7 +169,7 @@ def synthesize_response(
                 if not t_label:
                     continue
                 t_status = t.get("status")
-                t_cnt = t.get("count", len(t.get("regions", [])))
+                t_cnt = t.get("count")
                 if t_status == "unsupported":
                     target_parts.append(f"'{t_label}' is unsupported by classical spectral grounding")
                 elif t_cnt > 0:
