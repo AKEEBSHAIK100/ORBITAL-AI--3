@@ -370,189 +370,45 @@ app.post(['/classify', '/api/classify'], async (req, res) => {
 
 app.post('/api/analyze', async (req, res) => {
   const startTime = Date.now()
-  const traceSteps: ExecutionTraceStep[] = []
+  const { image, question, query } = req.body as Record<string, any>
+  const prompt = String(query || question || '').trim()
+  if (!prompt) return res.status(400).json({ error: 'A question is required.' })
+  if (!image) return res.status(400).json({ error: 'An image is required for visual analysis.' })
 
   try {
-    if (!checkRateLimit(req.ip || 'unknown')) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a minute before asking again.' })
-    }
-
-    const { image, question, query, history, sessionId } = req.body as {
-      image?: string; question?: string; query?: string; history?: unknown; sessionId?: string
-    }
-
-    const rawPrompt = (query || question || '').trim()
-    if (!rawPrompt) return res.status(400).json({ error: 'A question is required.' })
-
-    const promptText = rawPrompt
-
-    // Try FastAPI master analysis first if Python backend is active
-    try {
-      const targetUrl = `${PYTHON_BACKEND_URL}/api/analyze`
-      console.log(`[Orbital-AI] Dispatching specialist analysis: POST ${targetUrl} (task_type: ${(req.body as Record<string, unknown>).task_type || 'auto'})`)
-      const pyRes = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: promptText,
-          image: image || undefined,
-          task_type: (req.body as Record<string, unknown>).task_type,
-        }),
-        signal: AbortSignal.timeout(60_000),
-      })
-      console.log(`[Orbital-AI] Specialist response HTTP status: ${pyRes.status}`)
-      if (pyRes.ok) {
-        const pyData = (await pyRes.json()) as Record<string, any>
-        console.log(`[Orbital-AI] Specialist response status: ${pyData?.status}, task_type: ${pyData?.task_type}`)
-        // Only pass through if FastAPI returned a genuine SUCCESS response with real content.
-        // If all specialists are unavailable (no local model weights), fall through to the
-        // Node/OpenAI engine which can answer using the configured API key.
-        const isSpecialistUnavailable = pyData?.status === 'SPECIALIST_UNAVAILABLE'
-          || String(pyData?.answer || '').startsWith('SPECIALIST UNAVAILABLE')
-          || String(pyData?.answer || '').startsWith('UNSUPPORTED QUERY')
-        const hasRealAnswer = pyData && (pyData.answer || pyData.building_analysis) && !isSpecialistUnavailable
-        if (hasRealAnswer) {
-          console.log('[Orbital-AI] Returning real specialist model analysis from FastAPI backend')
-          return res.json(pyData)
-        }
-      } else {
-        const errText = await pyRes.text().catch(() => '')
-        console.warn(`[Orbital-AI] Specialist analysis returned HTTP ${pyRes.status}: ${errText.slice(0, 300)}`)
-      }
-    } catch (pyErr: any) {
-      console.warn(`[Orbital-AI] Specialist analysis dispatch error: ${pyErr?.message || pyErr}`)
-    }
-
-    // 1. Task classification step
-    const step1Start = Date.now()
-    const taskType = classifyTask(promptText, 1, ['optical'])
-    traceSteps.push({
-      step: 1,
-      tool: 'rs_task_classifier',
-      description: 'Deterministic rule-based task routing and intent extraction',
-      input_summary: `Query: "${promptText.slice(0, 70)}"`,
-      output_summary: `Task classified as: "${taskType}"`,
-      duration_ms: Math.max(1, Date.now() - step1Start),
-      status: 'success',
-      parameters: { task_type: taskType },
+    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/api/analyze`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...req.body, query: prompt }),
+      signal: AbortSignal.timeout(45_000),
     })
+    if (pyRes.ok) {
+      const data = await pyRes.json()
+      if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') {
+        return res.json(data)
+      }
+    }
+  } catch {}
 
-    // 2. Input validation step
-    const step2Start = Date.now()
-    const validation = validateInputs(taskType, 1, ['optical'], ['jpeg'])
-    traceSteps.push({
-      step: 2,
-      tool: 'rs_input_validator',
-      description: 'Radiometric and spatial resolution verification',
-      input_summary: 'Single-scene optical observation',
-      output_summary: validation.notes.join('; '),
-      duration_ms: Math.max(1, Date.now() - step2Start),
-      status: 'success',
-      parameters: { compatibility: validation.compatibility },
+  try {
+    const worker = await runWorkerVqaOrCaption(image, prompt)
+    return res.json({
+      answer: worker.answer,
+      confidence: null, confidence_percent: null, confidenceScore: null,
+      confidence_source: 'none', confidence_status: 'not_calibrated',
+      label: worker.task === 'caption' ? 'External Remote-Sensing Caption' : 'External Remote-Sensing VQA',
+      mode: 'external_hf_zero_gpu', is_synthetic: false,
+      provenance: worker.provenance,
+      data_limitation_note: 'External public ZeroGPU specialist; not an ORBITAL-AI benchmark result.',
+      execution_trace: buildExecutionTrace('vqa', [], Date.now()-startTime, validateInputs('vqa', 1, ['optical'], ['jpeg']), worker.task === 'caption' ? 'external_rs_caption' : 'external_rs_vqa'),
     })
-
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
-
-    // Image resolution: always use client's image if provided, or retrieve cached image
-    let imageDataUrl: string | null = null
-    if (image) {
-      try {
-        const parsed = parseDataUrl(image)
-        if (sessionId) setCachedImage(sessionId, parsed.full)
-        imageDataUrl = parsed.full
-      } catch {
-        imageDataUrl = null
-      }
-    } else if (sessionId) {
-      imageDataUrl = getCachedImage(sessionId)
-    }
-
-    // If no real API key is configured or no image provided on initial call, deliver realistic satellite analysis
-    if (isPlaceholderKey || (!imageDataUrl && !sessionId && !image)) {
-      incrementCallCounter()
-      const analysis = generateRealisticAnalysis(promptText, history, imageDataUrl)
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_vqa',
-        description: 'Visual evidence extraction using BigEarthNet domain taxonomy',
-        input_summary: `Observation scene: ${analysis.label || 'Optical Area'}`,
-        output_summary: `Extracted ${analysis.detected_features?.length || 0} remote-sensing indicators (classical-CV baseline)`,
-        duration_ms: Math.max(8, Date.now() - step2Start),
-        status: 'success',
-        parameters: { fallback_mode: 'classical_cv_heuristic' },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
-      return res.status(200).json({ ...analysis, execution_trace: trace })
-    }
-
-    const userContent = [
-      { type: 'text' as const, text: `Previous conversation:\n${historyText(history)}\n\nCurrent question:\n${promptText}\n\nAnalyze this image and return JSON only.` },
-      ...(imageDataUrl ? [imageContent(imageDataUrl)] : []),
-    ]
-
-    incrementCallCounter()
-    const step3Start = Date.now()
-    try {
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: MAX_TOKENS_ANALYZE,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userContent },
-        ],
-      })
-
-      const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      if (!parsed.confidenceScore && parsed.confidence_percent) {
-        parsed.confidenceScore = parsed.confidence_percent
-      }
-      if (typeof parsed.building_count === 'number') {
-        parsed.building_count = Math.max(0, Math.round(parsed.building_count))
-      }
-
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_vqa',
-        description: 'VLM inference with BigEarthNet domain adaptation',
-        input_summary: `Visual tokens from optical observation`,
-        output_summary: `Model returned ${parsed.confidence || 'uncalibrated'} confidence`,
-        duration_ms: Math.max(15, Date.now() - step3Start),
-        status: 'success',
-        parameters: { model: MODEL },
-      })
-
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
-      return res.status(200).json({ ...parsed, execution_trace: trace })
-    } catch (apiError) {
-      const { userMessage, logTag } = classifyError(apiError)
-      console.warn(`[Orbital-AI] Upstream provider error (${logTag}: ${userMessage}). Delivering fallback satellite analysis so demo never interrupts.`)
-      // Gracefully fall back to image-aware analysis
-      const fallbackAnalysis = generateRealisticAnalysis(promptText, history, imageDataUrl)
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_vqa',
-        description: 'Telemetry fallback analysis with domain adaptation',
-        input_summary: `Upstream error: ${logTag}`,
-        output_summary: `Delivered reliable baseline telemetry`,
-        duration_ms: Math.max(8, Date.now() - step3Start),
-        status: 'success',
-        parameters: { fallback: true },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
-      return res.status(200).json({ ...fallbackAnalysis, execution_trace: trace })
-    }
-  } catch (error) {
-    const q = (req.body as any)?.question || ''
-    const img = (req.body as any)?.image
-    const fallback = generateRealisticAnalysis(q, (req.body as any)?.history, img)
-    const trace = buildExecutionTrace('vqa', traceSteps, Date.now() - startTime, validateInputs('vqa', 1), 'rs_vqa')
-    return res.status(200).json({ ...fallback, execution_trace: trace })
+  } catch (err) {
+    console.warn('[Orbital-AI] Analysis specialists unavailable:', err)
+    return res.status(503).json({
+      error: 'Remote-sensing specialist is temporarily unavailable. No synthetic analysis is returned.',
+      execution_trace: buildExecutionTrace('vqa', [], Date.now()-startTime, validateInputs('vqa', 1, ['optical'], ['jpeg']), 'rs_vqa'),
+    })
   }
 })
-
 
 // ── Python FastAPI generic proxy helper ────────────────────────────────────────
 async function proxyToPython(
@@ -713,126 +569,33 @@ app.post('/api/fuse', async (req, res) => {
 
 app.post('/api/compare', async (req, res) => {
   const startTime = Date.now()
-  const traceSteps: ExecutionTraceStep[] = []
-
+  const { beforeImage, afterImage, question = 'What changed between these two observations?' } = req.body as Record<string, any>
+  if (!beforeImage || !afterImage) return res.status(400).json({ error: 'Two images are required for change analysis.' })
   try {
-    if (!checkRateLimit(req.ip || 'unknown')) {
-      return res.status(429).json({ error: 'Too many requests. Please wait a minute before comparing again.' })
-    }
-
-    const { beforeImage, afterImage, question, beforeLabel, afterLabel } =
-      req.body as Record<string, string | undefined>
-
-    const promptText = question || 'What changed between these two satellite passes?'
-
-    const step1Start = Date.now()
-    const taskType = classifyTask(promptText, 2, ['optical'])
-    traceSteps.push({
-      step: 1,
-      tool: 'rs_task_classifier',
-      description: 'Deterministic rule-based task routing and intent extraction',
-      input_summary: `Query: "${promptText.slice(0, 70)}" | Mode: Bi-Temporal Comparison`,
-      output_summary: `Task classified as: "${taskType}"`,
-      duration_ms: Math.max(1, Date.now() - step1Start),
-      status: 'success',
-      parameters: { task_type: taskType },
+    const pyRes = await fetch(`${PYTHON_BACKEND_URL}/api/compare`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...req.body, question }),
+      signal: AbortSignal.timeout(45_000),
     })
-
-    const step2Start = Date.now()
-    const validation = validateInputs(taskType, 2, ['optical'], ['jpeg'])
-    traceSteps.push({
-      step: 2,
-      tool: 'rs_input_validator',
-      description: 'Bi-temporal coregistration & pixel alignment verification',
-      input_summary: `T1: ${beforeLabel || 'Baseline'} | T2: ${afterLabel || 'Recent'}`,
-      output_summary: validation.notes.join('; '),
-      duration_ms: Math.max(1, Date.now() - step2Start),
-      status: 'success',
-      parameters: { compatibility: validation.compatibility },
+    if (pyRes.ok) {
+      const data = await pyRes.json()
+      if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') return res.json(data)
+    }
+  } catch {}
+  try {
+    const worker = await runWorkerChange(beforeImage, afterImage)
+    return res.json({
+      answer: worker.answer,
+      confidence: null, confidence_percent: null, confidence_source: 'none',
+      confidence_status: 'not_calibrated',
+      label: 'External Remote-Sensing Change Analysis',
+      mode: 'external_hf_zero_gpu', provenance: worker.method,
+      data_limitation_note: worker.note,
+      execution_trace: buildExecutionTrace('change_detection', [], Date.now()-startTime, validateInputs('change_detection', 2, ['optical'], ['jpeg']), 'external_rs_change'),
     })
-
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
-
-    if (isPlaceholderKey || !beforeImage || !afterImage) {
-      incrementCallCounter()
-      const compResult = generateRealisticComparison(promptText, beforeLabel, afterLabel)
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_change_detector',
-        description: 'Bi-temporal difference and spatial change delineation (CDVQA standard)',
-        input_summary: 'Dual temporal observations',
-        output_summary: `Detected ${compResult.change_regions?.length || 2} significant change clusters`,
-        duration_ms: Math.max(10, Date.now() - step2Start),
-        status: 'success',
-        parameters: { alignment_confidence: compResult.alignment_confidence },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.json({ ...compResult, execution_trace: trace })
-    }
-
-    const before = parseDataUrl(beforeImage)
-    const after = parseDataUrl(afterImage)
-
-    incrementCallCounter()
-    const step3Start = Date.now()
-    try {
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: MAX_TOKENS_COMPARE,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: `${SYSTEM_PROMPT}\nFor two images, additionally return alignment_confidence and change_regions. Each change region must include description, confidence, region, and label. If alignment is low, state that plainly.`,
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: `Compare ${beforeLabel || 'the earlier image'} with ${afterLabel || 'the later image'}. Question: ${promptText}. Return JSON only.` },
-              { type: 'text', text: 'EARLIER IMAGE' }, imageContent(before.full),
-              { type: 'text', text: 'LATER IMAGE' }, imageContent(after.full),
-            ],
-          },
-        ],
-      })
-
-      const parsed = cleanJson(response.choices[0]?.message?.content ?? '{}')
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_change_detector',
-        description: 'Bi-temporal vision model inference adapted for CDVQA',
-        input_summary: 'Optical pair visual tokens',
-        output_summary: `Alignment: ${parsed.alignment_confidence || 'high'} | Confidence: ${parsed.confidence || 'high'}`,
-        duration_ms: Math.max(15, Date.now() - step3Start),
-        status: 'success',
-        parameters: { model: MODEL },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.json({ ...parsed, execution_trace: trace })
-    } catch (apiError) {
-      const { userMessage, logTag } = classifyError(apiError)
-      console.warn(`[Orbital-AI] Upstream provider error (${logTag}: ${userMessage}). Delivering fallback comparison analysis.`)
-      const fallbackComp = generateRealisticComparison(promptText, beforeLabel, afterLabel)
-      traceSteps.push({
-        step: 3,
-        tool: 'rs_change_detector',
-        description: 'Fallback bi-temporal change synthesis',
-        input_summary: `Upstream error: ${logTag}`,
-        output_summary: `Delivered reliable change telemetry`,
-        duration_ms: Math.max(8, Date.now() - step3Start),
-        status: 'success',
-        parameters: { fallback: true },
-      })
-      const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
-      return res.json({ ...fallbackComp, execution_trace: trace })
-    }
-  } catch (error) {
-    const { question, beforeLabel, afterLabel } = (req.body || {}) as Record<string, string | undefined>
-    const fallbackComp = generateRealisticComparison(question, beforeLabel, afterLabel)
-    const trace = buildExecutionTrace('change_detection', traceSteps, Date.now() - startTime, validateInputs('change_detection', 2), 'rs_change_detector')
-    return res.json({ ...fallbackComp, execution_trace: trace })
+  } catch (err) {
+    console.warn('[Orbital-AI] Change specialists unavailable:', err)
+    return res.status(503).json({ error: 'Change specialist is temporarily unavailable. No synthetic change result is returned.' })
   }
 })
 
