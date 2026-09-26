@@ -9,7 +9,7 @@ from ..services.fusion_service import analyze_fusion_pair
 class OpticalSARTool(BaseTool):
     id = "optical_sar"
     name = "Optical–SAR Cross-Modal Fusion Specialist"
-    description = "Joint reasoning over co-registered optical and SAR pairs. Computes radar backscatter intensity, surface roughness, speckle index, SSIM structural similarity, and optical NDVI proxy."
+    description = "Joint analysis of supplied optical and SAR pairs using visible-band optical proxies, raw SAR intensity telemetry, and SSIM/correlation when co-registration is verified."
     supported_tasks = ["sar_optical_fusion"]
     modalities = ["optical", "sar"]
     adapter = "OpenCV / NumPy Classical Computer Vision & Cross-Modal Telemetry Engine"
