@@ -106,9 +106,9 @@ class GroundingTool(BaseTool):
             if unsupp_kw in query and unsupp_kw not in detected_unsupported:
                 detected_unsupported.append(unsupp_kw)
 
-        # Default fallback if no known keywords matched
+        # No target means the planner/tool contract is incomplete; never invent a target.
         if not detected_target_keys and not detected_unsupported:
-            detected_target_keys = ["building"]
+            return {"status": "unsupported", "error": "No supported grounding target was identified in the query.", "regions": [], "targets": []}
 
         targets_output: List[Dict[str, Any]] = []
         all_regions: List[Dict[str, Any]] = []
@@ -134,7 +134,7 @@ class GroundingTool(BaseTool):
                             "w_percent": round(rw / w * 100, 2),
                             "h_percent": round(rh / h * 100, 2),
                         },
-                        "confidence": round(min(0.95, 0.70 + (area / (w * h)) * 0.5), 3),
+                        "confidence": None,
                         "label": f"Demarcated {label.title()}"
                     })
 
