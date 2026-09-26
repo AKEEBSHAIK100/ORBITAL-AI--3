@@ -11,7 +11,7 @@ export default function TermsPage() {
             className="flex items-center gap-2 text-xs font-mono font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
           >
             <span>←</span>
-            <span>Back to SatQuery AI</span>
+            <span>Back to ORBITAL-AI</span>
           </a>
           <nav className="flex items-center gap-4 text-xs font-mono">
             <a href="/privacy" className="text-slate-400 hover:text-slate-200 transition-colors">
@@ -44,7 +44,7 @@ export default function TermsPage() {
               1. Acceptance and Scope
             </h2>
             <p>
-              By accessing or using the SatQuery AI web application, you agree to be bound by these Terms & Conditions. If you do not agree to these terms, you should immediately discontinue use of the application.
+              By accessing or using the ORBITAL-AI web application, you agree to be bound by these Terms & Conditions. If you do not agree to these terms, you should immediately discontinue use of the application.
             </p>
           </section>
 
@@ -54,7 +54,7 @@ export default function TermsPage() {
               2. Permitted Use
             </h2>
             <p>
-              Users may use SatQuery AI for lawful analysis, research, education, testing, and demonstration purposes. You agree to interact with the platform in compliance with all applicable local, national, and international laws and regulations.
+              Users may use ORBITAL-AI for lawful analysis, research, education, testing, and demonstration purposes. You agree to interact with the platform in compliance with all applicable local, national, and international laws and regulations.
             </p>
           </section>
 
@@ -90,7 +90,7 @@ export default function TermsPage() {
               5. No Guaranteed Accuracy
             </h2>
             <p>
-              SatQuery AI does not provide any guarantee regarding analytical accuracy or precision. Specifically, the service does not guarantee:
+              ORBITAL-AI does not provide any guarantee regarding analytical accuracy or precision. Specifically, the service does not guarantee:
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-2 text-slate-300">
               <li>Exact building footprint counts or geometric polygon delineations</li>
@@ -127,7 +127,7 @@ export default function TermsPage() {
               8. Prohibited Use
             </h2>
             <p>
-              When using SatQuery AI, you agree not to engage in:
+              When using ORBITAL-AI, you agree not to engage in:
             </p>
             <ul className="list-disc list-inside space-y-1.5 pl-2 text-slate-300">
               <li>Any activity that violates applicable laws or regulations</li>
@@ -154,7 +154,7 @@ export default function TermsPage() {
               10. Intellectual Property
             </h2>
             <p>
-              Users retain responsibility for and rights in the imagery and text content they upload. SatQuery AI does not assert ownership over user-submitted satellite imagery or user-generated analysis prompts.
+              Users retain responsibility for and rights in the imagery and text content they upload. ORBITAL-AI does not assert ownership over user-submitted satellite imagery or user-generated analysis prompts.
             </p>
           </section>
 
@@ -182,7 +182,7 @@ export default function TermsPage() {
         {/* Bottom Navigation */}
         <div className="mt-16 pt-8 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400" style={{ borderColor: 'rgba(56, 189, 248, 0.16)' }}>
           <a href="/" className="text-cyan-400 hover:text-cyan-300 transition-colors">
-            ← Back to SatQuery AI
+            ← Back to ORBITAL-AI
           </a>
           <div className="flex items-center gap-4">
             <a href="/privacy" className="hover:text-slate-200 transition-colors">
