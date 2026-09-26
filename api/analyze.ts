@@ -1,9 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
-  client, cleanJson, getCachedImage, historyText,
-  imageContent, incrementCallCounter, MODEL, parseDataUrl, setCachedImage, systemPrompt,
+  getCachedImage, parseDataUrl, setCachedImage,
 } from './_lib.js'
-import { MAX_TOKENS_ANALYZE } from '../lib/constants.js'
 import { runWorkerVqaOrCaption } from './_hfWorker.js'
 import {
   classifyTask, validateInputs, buildExecutionTrace, type ExecutionTraceStep,
@@ -162,24 +160,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parameters: { compatibility: validation.compatibility },
     })
 
-    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
-    const isPlaceholderKey = !apiKey || apiKey === 'sk-your-key-here' || apiKey.includes('your-key')
-
-
-
-    // Vercel serverless does not have the trained BigEarthNet classifier.
-    // Never synthesize a land-cover label from encoded JPEG bytes: that is not
-    // a valid image-analysis signal. Use the configured VLM or Python specialist,
-    // otherwise return an honest unavailable result.
-
-        // Image resolution: always use client's image if provided, or retrieve cached image
-    let resolvedImage: string | null = null
-    if (image) {
-      try {
-        const safeImage = parseDataUrl(image)
-        if (sessionId) setCachedImage(sessionId, safeImage)
-        resolvedImage = safeImage
-      } catch {
+    // No paid-provider fallback is permitted. The free execution path is:
+    // Python remote-sensing specialists -> public HF ZeroGPU specialist -> honest unavailable.
+    incrementCallCounter()
+    const analysis = buildUnavailableAnalysis(taskType)
+    traceSteps.push({
+      step: 3,
+      tool: 'rs_provider_guard',
+      description: 'Free remote-sensing specialist availability guard',
+      input_summary: resolvedImage ? 'Single optical observation' : 'No usable image',
+      output_summary: 'No executable free specialist returned a result; no fabricated analysis generated',
+      duration_ms: Math.max(1, Date.now() - step2Start),
+      status: 'unavailable',
+      confidence_source: 'none',
+      parameters: { python_backend: Boolean(process.env.PYTHON_BACKEND_URL), hf_zero_gpu: process.env.ENABLE_HF_RS_WORKER !== 'false' },
+    })
+    const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_vqa')
+    return res.status(200).json({ ...analysis, execution_trace: trace })
+  } catch {
         resolvedImage = null
       }
     } else if (sessionId) {
