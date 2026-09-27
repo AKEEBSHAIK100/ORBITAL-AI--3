@@ -1,30 +1,6 @@
 import React from 'react'
-import { ImageTelemetry, BuildingAnalysisResult } from '../App'
+import { ImageTelemetry, BuildingAnalysisResult, ChatMessage, BENResult } from '../App'
 import { ExecutionTrace, FusionFeatures } from '../lib/agentController'
-
-interface BENLabelScore { name: string; short: string; score: number; active: boolean }
-interface BENResult {
-  labels: BENLabelScore[]
-  active_labels: BENLabelScore[]
-  top_label: string
-  confidence: number
-  model_id: string
-  available: boolean
-  device: string
-}
-
-interface ChatMessage {
-  question: string
-  answer: string
-  confidenceScore: number
-  confidence_percent: number
-  confidence: 'high' | 'medium' | 'low'
-  confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
-  confidence_reason?: string
-  detected_features: string[]
-  label: string
-  timestamp: string
-}
 
 interface DashboardViewProps {
   sessionId: string | null
@@ -135,7 +111,7 @@ export default function DashboardView({
             {benResults ? benResults.top_label : 'Awaiting analysis'}
           </div>
           <div className="text-[10px] font-mono text-cyan-400">
-            {benResults ? `${benResults.confidence.toFixed(1)}% model score` : 'Zero unverified measurements'}
+            {benResults?.confidence != null ? `${benResults.confidence.toFixed(1)}% model score` : 'Confidence unavailable'}
           </div>
         </div>
 
