@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           signal: AbortSignal.timeout(45_000),
         })
         if (pyRes.ok) {
-          const pyData = await pyRes.json()
+          const pyData = await pyRes.json() as Record<string, any>
           const trace = buildExecutionTrace(taskType, traceSteps, Date.now() - startTime, validation, 'rs_change_detector')
           return res.status(200).json({ ...pyData, execution_trace: pyData.execution_trace || trace })
         }
