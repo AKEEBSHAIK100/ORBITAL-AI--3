@@ -28,5 +28,6 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install --upgrade pip
       - run: pip install -r backend/requirements.txt
+      - run: python -m pip install pytest
       - run: python -m compileall -q backend
       - run: pytest -q
