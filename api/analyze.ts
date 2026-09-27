@@ -181,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const effectiveQuestion = (question || promptText).trim()
 
     // Free Hugging Face ZeroGPU is the no-cost external RS specialist fallback.
-    if (resolvedImage && process.env.ENABLE_HF_RS_WORKER !== 'false') {
+    if (resolvedImage && process.env.ENABLE_HF_RS_WORKER === 'true') {
       try {
         const workerResult = await runWorkerVqaOrCaption(resolvedImage, effectiveQuestion)
         if (workerResult && typeof workerResult === 'object' && (workerResult as any).ok) {
