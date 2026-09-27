@@ -63,7 +63,10 @@ def synthesize_response(
     if status == "SPECIALIST_UNAVAILABLE" or unavail:
         unavail_tool = unavail[0].source if unavail else (query_plan.specialists[0] if query_plan.specialists else "required_specialist")
         reason = unavail[0].warnings[0] if (unavail and unavail[0].warnings) else f"Specialist '{unavail_tool}' is not installed or checkpoint is missing."
-        answer = f"SPECIALIST UNAVAILABLE: {reason}. The analysis cannot proceed without the required model checkpoint. No answer has been fabricated."
+        if query_plan.intent == "caption":
+            answer = "SPECIALIST UNAVAILABLE: No scene description has been fabricated because the required caption specialist is unavailable."
+        else:
+            answer = f"SPECIALIST UNAVAILABLE: {reason}. The analysis cannot proceed without the required model checkpoint. No answer has been fabricated."
         return answer, None, "unavailable", warnings
 
     # ── 4. Synthesize from Specialist Evidence ───────────────────────────────
@@ -159,7 +162,7 @@ def synthesize_response(
     if intent == "grounding":
         regions = ground_ev.evidence.get("regions", []) if ground_ev else []
         targets = ground_ev.evidence.get("targets", []) if ground_ev else []
-        top_reg = ground_ev.evidence.get("primary_region") if ground_ev else (regions[0]["region"] if regions else None)
+        top_reg = (ground_ev.evidence.get("primary_region") or (regions[0].get("region") if regions else None)) if ground_ev else None
         bldg_part = f" Concurrently, {bldg_ev.evidence.get('building_count')} building footprints were demarcated." if bldg_ev and bldg_ev.evidence.get("building_count") is not None else ""
 
         if len(targets) > 1:
@@ -245,7 +248,7 @@ def synthesize_response(
             return answer, None, "not_calibrated", warnings
 
         if chg_pct is None:
-            return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
+            return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned; no change result has been fabricated.", None, "unavailable", warnings
         answer = (
             f"The classical change baseline reports alterations across {chg_pct:.1f}% of the observation surface; this is an image-derived estimate, not independently validated ground truth. "
             "Confidence is not calibrated for this workflow."
