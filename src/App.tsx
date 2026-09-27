@@ -1420,7 +1420,7 @@ export default function App() {
             sarDataUrl,
             message => setStatus(message),
           )
-          const remoteData = {
+          const remoteData: Analysis = {
             answer: remote.answer,
             confidence: 'unavailable',
             confidence_status: 'not_calibrated',
