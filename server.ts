@@ -507,7 +507,7 @@ app.post('/api/compare', async (req, res) => {
       if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') return res.json(data)
     }
   } catch {}
-  try {
+  if (process.env.ENABLE_HF_RS_WORKER === 'true') try {
     const worker = await runWorkerChange(beforeImage, afterImage)
     return res.json({
       answer: worker.answer,
