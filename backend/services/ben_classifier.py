@@ -243,7 +243,7 @@ class BENClassifier:
         }
 
     def _run_model_inference(
-        self, image_bytes: bytes, top_k: int, threshold: float
+        self, image_bytes: bytes, top_k: int = 5, threshold: float = 0.25
     ) -> Dict:
         """Run real BigEarthNet v2.0 inference only on compatible 10-band Sentinel-2 input."""
         import torch
