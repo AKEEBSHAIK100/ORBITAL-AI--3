@@ -8,7 +8,7 @@ interface BENResult {
   active_labels: BENLabelScore[]
   top_label: string
   confidence: number | null
-  model_id: string
+  model_id: string | null
   available: boolean
   device: string
 }
@@ -16,8 +16,8 @@ interface BENResult {
 interface ChatMessage {
   question: string
   answer: string
-  confidenceScore: number
-  confidence_percent: number
+  confidenceScore: number | null
+  confidence_percent: number | null
   confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
@@ -135,7 +135,7 @@ export default function DashboardView({
             {benResults ? benResults.top_label : 'Awaiting analysis'}
           </div>
           <div className="text-[10px] font-mono text-cyan-400">
-            {benResults ? `${benResults.confidence.toFixed(1)}% model score` : 'Zero unverified measurements'}
+            {benResults && benResults.confidence != null ? `${benResults.confidence.toFixed(1)}% model score` : 'No calibrated score available'}
           </div>
         </div>
 
