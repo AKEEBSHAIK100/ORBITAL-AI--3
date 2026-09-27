@@ -78,8 +78,8 @@ type Analysis = {
 type ChatMessage = {
   question: string
   answer: string
-  confidenceScore: number
-  confidence_percent: number
+  confidenceScore: number | null
+  confidence_percent: number | null
   confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
@@ -959,8 +959,6 @@ export default function App() {
     if (!prompt || busy || atCap) return
     let activeSessionId = sessionId
     setQuestion(''); setError(''); setBusy(true)
-    const detectedLayer = detectHiddenLayer(prompt)
-    if (detectedLayer) { setActiveOverlay(detectedLayer); setRevealedLayers(prev => Array.from(new Set([...prev, detectedLayer]))) }
 
     try {
       setStatus('Analyzing scene…')
@@ -1351,7 +1349,7 @@ export default function App() {
           }
           setHistory(prev => [...prev, {
             question: fusionQuery, answer: remoteData.answer, confidence_percent: 0, confidenceScore: 0,
-            confidence: 'low', confidence_reason: remoteData.confidence_reason, confidence_status: 'not_calibrated',
+            confidence: 'unavailable', confidence_percent: null, confidenceScore: null, confidence_reason: remoteData.confidence_reason, confidence_status: 'not_calibrated',
             detected_features: [], label: remoteData.label,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             execution_trace: null, fusion_features: null, mode: remoteData.mode,
