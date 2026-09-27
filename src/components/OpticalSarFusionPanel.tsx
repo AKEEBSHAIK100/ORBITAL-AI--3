@@ -366,3 +366,5 @@ export default function OpticalSarFusionPanel({
         </>
       )}
     </div>
+  )
+}
