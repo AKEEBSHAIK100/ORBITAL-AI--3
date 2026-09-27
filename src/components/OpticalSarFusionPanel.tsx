@@ -316,8 +316,6 @@ export default function OpticalSarFusionPanel({
               >
                 INSPECT AGENT TRACE
               </button>
-            )}
-          </div>
           <p className="text-xs font-mono text-white/60">
             Results come from the configured remote-sensing specialist. This interface does not infer NDVI, calibrated SAR dB, or other physical measurements from JPEG pixels.
           </p>
@@ -363,7 +361,6 @@ export default function OpticalSarFusionPanel({
                 {fusionFeatures.cross_modal.fusion_confidence.toUpperCase()} FIDELITY
               </span>
             </div>
-          </div>
         </div>
       )}
     </div>
