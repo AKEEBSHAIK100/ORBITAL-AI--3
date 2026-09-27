@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     // Free Hugging Face ZeroGPU worker executes the explicitly-labelled optical-SAR baseline.
-    if (process.env.ENABLE_HF_RS_WORKER !== 'false' && opticalImage && sarImage) {
+    if (process.env.ENABLE_HF_RS_WORKER === 'true' && opticalImage && sarImage) {
       try {
         const worker = await runWorkerFusion(opticalImage, sarImage) as Record<string, any>
         if (worker?.ok) {
