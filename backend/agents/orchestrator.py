@@ -292,6 +292,15 @@ def run_orbital_analysis(
         })
         step_num += 1
 
+        if not is_avail and specialist_id == "land_cover" and plan.intent == "change_detection" and "change_detection" in plan.specialists:
+            # Land-cover evidence is supplementary for vegetation-change queries. If the
+            # classifier is unavailable, continue with the real bi-temporal specialist
+            # instead of making the whole change workflow unavailable.
+            steps_log[-1]["status"] = "unavailable"
+            steps_log[-1]["success"] = False
+            step_num += 1
+            continue
+
         if not is_avail:
             # Return SPECIALIST_UNAVAILABLE immediately without fabricating
             ev_unavail = SpecialistEvidenceObject(
