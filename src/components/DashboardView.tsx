@@ -7,7 +7,7 @@ interface BENResult {
   labels: BENLabelScore[]
   active_labels: BENLabelScore[]
   top_label: string
-  confidence: number
+  confidence: number | null
   model_id: string
   available: boolean
   device: string
@@ -18,7 +18,7 @@ interface ChatMessage {
   answer: string
   confidenceScore: number
   confidence_percent: number
-  confidence: 'high' | 'medium' | 'low'
+  confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
   detected_features: string[]
