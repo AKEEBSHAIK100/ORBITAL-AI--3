@@ -65,3 +65,12 @@ This file is the living implementation status for the remote-sensing prototype. 
 - No synthetic SAR presented as real SAR.
 - No claim of calibrated VLM confidence.
 - No deployment in the current work phase.
+
+
+## 2026-09-27 Release Hardening Update
+- The official UI now labels external Hugging Face ZeroGPU specialist output as **External specialist / Not benchmarked** rather than presenting it as calibrated ORBITAL-AI confidence.
+- The production analysis path no longer falls back to browser pixel-statistics answers when the remote specialist is unavailable; it reports the unavailable state instead.
+- Model-registry dashboard labels were changed from operational **READY** claims to **REGISTERED** / runtime-checked status.
+- Frontend release validation currently passes TypeScript typecheck and Vite production build.
+- Backend compile validation currently passes, but the release gate still has failing tests caused by missing/invalid Git LFS model/data assets and several pre-existing planner/synthesis contract regressions; this is **not marked complete** until resolved.
+- GitHub Pages build succeeds, but the deployment step is blocked because Pages is not enabled for the repository. Vercel status checks currently report an account build-rate-limit failure.
