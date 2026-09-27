@@ -165,8 +165,8 @@ export default function DashboardView({
             </svg>
             <span>MODEL PIPELINE HEALTH & STATUS</span>
           </h3>
-          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
-            ● All Specialist Engines Operational
+          <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/30">
+            ● Registry loaded · runtime availability checked per request
           </span>
         </div>
 
@@ -174,7 +174,7 @@ export default function DashboardView({
           <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/50 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">BigEarthNet v2.0</span>
-              <span className="text-[10px] text-emerald-400">READY</span>
+              <span className="text-[10px] text-cyan-400">REGISTERED</span>
             </div>
             <div className="text-slate-400 text-[11px]">ResNet-50 · 19-Class CLC</div>
             <div className="text-slate-500 text-[10px] truncate">HuggingFace / BIFOLD Weights</div>
@@ -183,7 +183,7 @@ export default function DashboardView({
           <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/50 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">YOLOv8-Seg</span>
-              <span className="text-[10px] text-emerald-400">READY</span>
+              <span className="text-[10px] text-cyan-400">REGISTERED</span>
             </div>
             <div className="text-slate-400 text-[11px]">Instance Segmentation</div>
             <div className="text-slate-500 text-[10px]">Tiling + IoU Deduplication</div>
@@ -192,7 +192,7 @@ export default function DashboardView({
           <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/50 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">Optical–SAR Fusion</span>
-              <span className="text-[10px] text-emerald-400">READY</span>
+              <span className="text-[10px] text-cyan-400">REGISTERED</span>
             </div>
             <div className="text-slate-400 text-[11px]">C-Band Backscatter + SSIM</div>
             <div className="text-slate-500 text-[10px]">Dual-Sensor Coregistration</div>
@@ -201,7 +201,7 @@ export default function DashboardView({
           <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/50 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">CDVQA Change Engine</span>
-              <span className="text-[10px] text-emerald-400">READY</span>
+              <span className="text-[10px] text-cyan-400">REGISTERED</span>
             </div>
             <div className="text-slate-400 text-[11px]">Bi-Temporal Ground Control</div>
             <div className="text-slate-500 text-[10px]">Sub-pixel alignment ≤0.3px</div>
