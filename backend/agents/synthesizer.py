@@ -198,7 +198,7 @@ def synthesize_response(
                 "Confidence is not calibrated for this workflow."
             )
         else:
-            return "SPECIALIST UNAVAILABLE: No localized grounding region was returned.", None, "unavailable", warnings
+            return "SPECIALIST UNAVAILABLE: No localized grounding region was returned because the region geometry is incomplete.", None, "unavailable", warnings
         return answer, None, "not_calibrated", warnings
 
     # Intent: change_vqa ("What changed?")
@@ -245,7 +245,7 @@ def synthesize_response(
             return answer, None, "not_calibrated", warnings
 
         if chg_pct is None:
-            return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned.", None, "unavailable", warnings
+            return "SPECIALIST UNAVAILABLE: No quantified change evidence was returned. No change result has been fabricated.", None, "unavailable", warnings
         answer = (
             f"The classical change baseline reports alterations across {chg_pct:.1f}% of the observation surface; this is an image-derived estimate, not independently validated ground truth. "
             "Confidence is not calibrated for this workflow."
