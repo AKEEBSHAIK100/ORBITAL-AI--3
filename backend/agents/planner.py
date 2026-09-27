@@ -173,12 +173,12 @@ def create_query_plan(
 
     # Natural-language scene/observation requests stay inside RS scope when an image is supplied.
     has_scene_observation_request = any(k in q for k in [
-        "what can you tell me", "what do you see", "what is visible",
+        "what can you tell me", "what can you tell me about this scene", "what can you tell me about this image", "what do you see", "what is visible",
         "what features are visible", "what features can you identify",
         "what is shown", "what does this image show", "analyze this image",
         "analyse this image", "inspect this image", "interpret this image",
         "give me an overview", "give an overview", "summarize this image",
-        "summarise this image", "what is in this image", "what's in this image",
+        "summarise this image", "describe this satellite image", "what is in this image", "what's in this image",
         "what kind of area is this", "what type of area is this",
         "is this urban", "is this rural", "is this agricultural",
         "is this residential", "is this industrial"
