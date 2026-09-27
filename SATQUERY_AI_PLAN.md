@@ -50,7 +50,7 @@ This file is the living implementation status for the remote-sensing prototype. 
 ## API/provider architecture
 - **Done:** removed the unused OpenAI SDK and paid-provider fallback paths from the Node/Vercel analysis, compare, and fusion routes.
 - **Done:** free execution paths are Python remote-sensing specialists and the public Hugging Face ZeroGPU specialist; unavailable means unavailable.
-- **Done:** free Hugging Face Gradio calls use the deployed Space `analyze` endpoint consistently in both the Vercel server helper and browser remote-analysis client.
+- **Done:** free Hugging Face Gradio calls use the deployed Space `answer` endpoint consistently in both the Vercel server helper and browser remote-analysis client.
 - **Done:** client/server runtime model labels are synchronized.
 
 ## Validation status
