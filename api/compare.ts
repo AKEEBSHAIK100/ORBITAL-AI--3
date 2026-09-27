@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Free Hugging Face ZeroGPU worker provides the classical change baseline when enabled.
-    if (process.env.ENABLE_HF_RS_WORKER !== 'false') {
+    if (process.env.ENABLE_HF_RS_WORKER === 'true') {
       try {
         const worker = await runWorkerChange(beforeImage, afterImage) as Record<string, any>
         if (worker?.ok) {
