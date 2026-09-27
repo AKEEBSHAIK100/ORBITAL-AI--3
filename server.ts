@@ -10,6 +10,7 @@ import {
   TOOL_REGISTRY, ExecutionTraceStep, FusionFeatures,
   checkToolAvailability, buildUnavailableResponse,
 } from './lib/agentController'
+import { runWorkerVqaOrCaption, runWorkerChange, runWorkerFusion } from './api/_hfWorker.js'
 // ─── Phase 4: PostgreSQL DB layer ────────────────────────────────────────────────
 import { runMigrations } from './db/migrate.js'
 import { dbPing, poolStats } from './db/pool.js'
@@ -306,7 +307,7 @@ app.post('/api/analyze', async (req, res) => {
       signal: AbortSignal.timeout(45_000),
     })
     if (pyRes.ok) {
-      const data = await pyRes.json()
+      const data = await pyRes.json() as Record<string, any>
       if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') {
         return res.json(data)
       }
@@ -454,7 +455,7 @@ app.post('/api/fuse', async (req, res) => {
         signal: AbortSignal.timeout(15_000),
       })
       if (pyRes.ok) {
-        const data = await pyRes.json()
+        const data = await pyRes.json() as Record<string, any>
         if (data && (data.answer || data.fusion_features)) {
           traceSteps.push({ step: 2, tool: 'rs_optical_sar_specialist', description: 'Configured Python remote-sensing fusion specialist', input_summary: 'Optical + SAR', output_summary: 'Specialist returned a result', duration_ms: 1, status: 'success' })
           return res.json({ ...data, execution_trace: buildExecutionTrace(taskType, traceSteps, Date.now()-startTime, validation, 'rs_optical_sar_specialist') })
@@ -501,7 +502,7 @@ app.post('/api/compare', async (req, res) => {
       signal: AbortSignal.timeout(45_000),
     })
     if (pyRes.ok) {
-      const data = await pyRes.json()
+      const data = await pyRes.json() as Record<string, any>
       if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') return res.json(data)
     }
   } catch {}
