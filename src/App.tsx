@@ -1422,7 +1422,7 @@ export default function App() {
           )
           const remoteData = {
             answer: remote.answer,
-            confidence: null,
+            confidence: 'unavailable',
             confidence_status: 'not_calibrated',
             confidence_percent: null,
             confidenceScore: null,
@@ -1435,8 +1435,8 @@ export default function App() {
             fusion_features: null,
           }
           setHistory(prev => [...prev, {
-            question: fusionQuery, answer: remoteData.answer, confidence_percent: 0, confidenceScore: 0,
-            confidence: 'low', confidence_reason: remoteData.confidence_reason, confidence_status: 'not_calibrated',
+            question: fusionQuery, answer: remoteData.answer, confidence_percent: null, confidenceScore: null,
+            confidence: 'unavailable', confidence_reason: remoteData.confidence_reason, confidence_status: 'not_calibrated',
             detected_features: [], label: remoteData.label,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             execution_trace: null, fusion_features: null, mode: remoteData.mode,
