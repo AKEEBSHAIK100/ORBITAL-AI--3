@@ -21,7 +21,7 @@ async function uploadImage(dataUrl: string, filename: string): Promise<string> {
     signal: AbortSignal.timeout(15_000),
   })
   if (!response.ok) throw new Error(`Worker upload failed: HTTP ${response.status}`)
-  const payload = await response.json()
+  const payload = await response.json() as any
   const path = Array.isArray(payload) ? payload[0] : payload?.path
   if (!path) throw new Error('Worker upload returned no file path.')
   return String(path)
@@ -35,7 +35,7 @@ async function callGradio(apiName: string, data: unknown[]): Promise<unknown> {
     signal: AbortSignal.timeout(12_000),
   })
   if (!response.ok) throw new Error(`Worker call failed: HTTP ${response.status}`)
-  const started = await response.json()
+  const started = await response.json() as any
   const eventId = started?.event_id
   if (!eventId) throw new Error('Worker call returned no event id.')
 
