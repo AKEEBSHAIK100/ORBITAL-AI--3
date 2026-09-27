@@ -31,20 +31,27 @@ async function uploadImage(blob: Blob, filename: string): Promise<string> {
   return String(path)
 }
 
-async function startJob(data: unknown[]): Promise<string> {
-  const response = await fetch(`${SPACE_URL}${ANSWER_ENDPOINT}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data }),
-  })
-  if (!response.ok) throw new Error(`Remote specialist queue request failed (HTTP ${response.status}).`)
-  const payload = await response.json()
-  if (!payload?.event_id) throw new Error('Remote specialist returned no job id.')
-  return String(payload.event_id)
+async function startJob(data: unknown[]): Promise<{ eventId: string; endpoint: string }> {
+  for (const endpoint of [ANSWER_ENDPOINT, '/gradio_api/call/analyze']) {
+    const response = await fetch(`${SPACE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data }),
+    })
+    if (response.ok) {
+      const payload = await response.json()
+      if (!payload?.event_id) throw new Error('Remote specialist returned no job id.')
+      return { eventId: String(payload.event_id), endpoint }
+    }
+    if (response.status !== 404 && response.status !== 405) {
+      throw new Error(`Remote specialist queue request failed (HTTP ${response.status}).`)
+    }
+  }
+  throw new Error('Remote specialist callback endpoint is unavailable (HTTP 404/405).')
 }
 
-async function readJob(eventId: string, onStatus?: (message: string) => void): Promise<unknown[]> {
-  const response = await fetch(`${SPACE_URL}${ANSWER_ENDPOINT}/${encodeURIComponent(eventId)}`)
+async function readJob(eventId: string, endpoint: string, onStatus?: (message: string) => void): Promise<unknown[]> {
+  const response = await fetch(`${SPACE_URL}${endpoint}/${encodeURIComponent(eventId)}`)
   if (!response.ok) throw new Error(`Remote specialist result request failed (HTTP ${response.status}).`)
 
   const text = await response.text()
@@ -104,13 +111,13 @@ export async function runBrowserRemoteAnalysis(
 
   onStatus?.('Remote specialist is waking or entering the GPU queue…')
 
-  const eventId = await startJob([
+  const job = await startJob([
     question,
     fileRef(pathA, 'orbital-image-a.jpg'),
     pathB ? fileRef(pathB, 'orbital-image-b.jpg') : null,
   ])
 
-  const data = await readJob(eventId, onStatus)
+  const data = await readJob(job.eventId, job.endpoint, onStatus)
   const answer = asText(data[0])
 
   if (!answer || /^error\s*:/i.test(answer)) {
