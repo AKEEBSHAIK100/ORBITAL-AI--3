@@ -284,7 +284,7 @@ export default function DashboardView({
                       {item.confidence_status === 'not_calibrated' ? (
                         <div className="flex flex-col">
                           <span className="text-[11px] font-mono text-amber-400 font-medium">Not calibrated</span>
-                          {(item.confidence_percent ?? item.confidenceScore) > 0 && (
+                          {(item.confidence_percent ?? item.confidenceScore ?? 0) > 0 && (
                             <span className="text-[10px] font-mono text-slate-400">Score: {item.confidence_percent ?? item.confidenceScore}%</span>
                           )}
                         </div>
@@ -299,7 +299,7 @@ export default function DashboardView({
                         <span
                           className="font-bold font-mono text-xs"
                           style={{
-                            color: (item.confidence_percent ?? item.confidenceScore) >= 85 ? '#35E0B8' : '#FF9F43',
+                            color: (item.confidence_percent ?? item.confidenceScore ?? 0) >= 85 ? '#35E0B8' : '#FF9F43',
                           }}
                         >
                           Score: {item.confidence_percent ?? item.confidenceScore}%
