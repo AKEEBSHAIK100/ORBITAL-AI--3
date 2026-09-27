@@ -75,11 +75,11 @@ type Analysis = {
   is_synthetic?: boolean
 }
 
-type ChatMessage = {
+export type ChatMessage = {
   question: string
   answer: string
-  confidenceScore: number
-  confidence_percent: number
+  confidenceScore: number | null
+  confidence_percent: number | null
   confidence: 'high' | 'medium' | 'low' | 'unavailable'
   confidence_status?: 'calibrated' | 'not_calibrated' | 'unavailable' | string
   confidence_reason?: string
@@ -125,7 +125,7 @@ export interface BuildingAnalysisResult {
 
 // BigEarthNet 19-class result
 interface BENLabelScore { name: string; short: string; score: number; active: boolean }
-interface BENResult {
+export interface BENResult {
   labels: BENLabelScore[]; active_labels: BENLabelScore[]; top_label: string
   confidence: number | null; model_id: string | null; available: boolean; device: string; note: string; citation?: string | null
   mode?: string
@@ -1027,9 +1027,6 @@ export default function App() {
     if (!prompt || busy || atCap) return
     let activeSessionId = sessionId
     setQuestion(''); setError(''); setBusy(true)
-    const detectedLayer = detectHiddenLayer(prompt)
-    if (detectedLayer) { setActiveOverlay(detectedLayer); setRevealedLayers(prev => Array.from(new Set([...prev, detectedLayer]))) }
-
     try {
       setStatus('Analyzing scene…')
       if (!activeSessionId) {
