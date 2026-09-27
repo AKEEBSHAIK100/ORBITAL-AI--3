@@ -59,6 +59,15 @@ async function callGradio(apiName: string, data: unknown[]): Promise<unknown> {
   throw new Error('Worker stream ended without a complete result.')
 }
 
+async function callVqaGradio(data: unknown[]): Promise<unknown> {
+  try {
+    return await callGradio('answer', data)
+  } catch (error) {
+    if (/HTTP (404|405)/.test(String(error))) return callGradio('analyze', data)
+    throw error
+  }
+}
+
 function fileRef(path: string, filename: string) {
   return {
     path,
@@ -69,7 +78,7 @@ function fileRef(path: string, filename: string) {
 
 export async function runWorkerVqaOrCaption(image: string, query: string) {
   const path = await uploadImage(image, 'orbital-input.jpg')
-  const raw = await callGradio('answer', [query + '\nAnswer for a non-expert: start with the direct answer, use simple words, explain technical terms briefly, and do not invent measurements or confidence.', fileRef(path, 'orbital-input.jpg'), null])
+  const raw = await callVqaGradio([query + '\nAnswer for a non-expert: start with the direct answer, use simple words, explain technical terms briefly, and do not invent measurements or confidence.', fileRef(path, 'orbital-input.jpg'), null])
   const values = Array.isArray(raw) ? raw : [raw]
   return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', task: /describe|caption|scene/i.test(query) ? 'caption' : 'vqa', model: 'external-zero-gpu-rs-vlm', adapter: 'external-space', provenance: 'External public Hugging Face ZeroGPU Space; not an ORBITAL-AI benchmark.' }
 }
