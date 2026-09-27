@@ -1,5 +1,5 @@
 const SPACE_URL = 'https://cattolatte-satquery.hf.space'
-const ANSWER_ENDPOINT = '/gradio_api/call/analyze'
+const ANSWER_ENDPOINT = '/gradio_api/call/answer'
 
 type FileRef = {
   path: string
