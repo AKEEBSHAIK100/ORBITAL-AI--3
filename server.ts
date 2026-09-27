@@ -21,6 +21,7 @@ import {
 import { registerAsset, pruneExpiredAssets, computeImageSha256 } from './db/repositories/assets.js'
 import { buildCacheKey, isCacheable, getCached, putCached, pruneExpiredCache } from './db/repositories/cache.js'
 import { listDatasets, listModels, datasetStats, modelStats } from './db/repositories/catalog.js'
+import { runWorkerVqaOrCaption, runWorkerChange, runWorkerFusion } from './api/_hfWorker.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -306,7 +307,7 @@ app.post('/api/analyze', async (req, res) => {
       signal: AbortSignal.timeout(45_000),
     })
     if (pyRes.ok) {
-      const data = await pyRes.json()
+      const data = await pyRes.json() as Record<string, any>
       if (data && data.answer && data.status !== 'SPECIALIST_UNAVAILABLE') {
         return res.json(data)
       }
