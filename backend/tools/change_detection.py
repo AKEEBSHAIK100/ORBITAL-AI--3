@@ -124,7 +124,7 @@ class ChangeDetectionTool(BaseTool):
             geospatial_note = "Geospatial co-registration is supported by matching CRS and affine geotransform metadata."
         else:
             geospatial_compatibility = "unverified"
-            geospatial_note = "Geospatial co-registration could not be fully verified from the supplied metadata; change results are image-grid comparisons only."
+            geospatial_note = "Geospatial co-registration could not be verified from the supplied metadata; full co-registration could not be fully verified, so change results are image-grid comparisons only."
 
 
         # Convert to grayscale
