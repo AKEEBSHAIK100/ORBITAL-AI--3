@@ -1,5 +1,7 @@
 import 'dotenv/config'
 
+export const MODEL = 'remote-sensing-specialists'
+
 // ─── Deployment-wide call counter ─────────────────────────────────────────────
 // In-memory; resets on process restart. Console-logged so you can monitor
 // usage during testing without opening the Anthropic dashboard.
