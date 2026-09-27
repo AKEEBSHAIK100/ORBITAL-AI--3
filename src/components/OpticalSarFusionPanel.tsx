@@ -300,28 +300,29 @@ export default function OpticalSarFusionPanel({
 
       {/* Specialist result status */}
       {fusionFeatures && (
-        <div
-          className="p-4 rounded-xl border space-y-2"
-          style={{ background: 'rgba(7,16,34,0.7)', borderColor: 'rgba(53,224,184,0.3)' }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: MNT }}>
-              SPECIALIST RESULT
-            </span>
-            {lastFusionTrace && (
-              <button
-                onClick={() => onOpenTrace(lastFusionTrace)}
-                className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer"
-                style={{ background: `${CYN}22`, color: CYN, border: `1px solid ${CYN}88` }}
-              >
-                INSPECT AGENT TRACE
-              </button>
-          <p className="text-xs font-mono text-white/60">
-            Results come from the configured remote-sensing specialist. This interface does not infer NDVI, calibrated SAR dB, or other physical measurements from JPEG pixels.
-          </p>
-        </div>
-      )}
-    </div>
+        <>
+          <div
+            className="p-4 rounded-xl border space-y-2"
+            style={{ background: 'rgba(7,16,34,0.7)', borderColor: 'rgba(53,224,184,0.3)' }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: MNT }}>
+                SPECIALIST RESULT
+              </span>
+              {lastFusionTrace && (
+                <button
+                  onClick={() => onOpenTrace(lastFusionTrace)}
+                  className="px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all cursor-pointer"
+                  style={{ background: `${CYN}22`, color: CYN, border: `1px solid ${CYN}88` }}
+                >
+                  INSPECT AGENT TRACE
+                </button>
+              )}
+            </div>
+            <p className="text-xs font-mono text-white/60">
+              Results come from the configured remote-sensing specialist. This interface does not infer NDVI, calibrated SAR dB, or other physical measurements from JPEG pixels.
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             {/* Optical NDVI */}
@@ -361,8 +362,7 @@ export default function OpticalSarFusionPanel({
                 {fusionFeatures.cross_modal.fusion_confidence.toUpperCase()} FIDELITY
               </span>
             </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
-  )
-}
