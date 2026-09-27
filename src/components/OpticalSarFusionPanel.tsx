@@ -323,9 +323,9 @@ export default function OpticalSarFusionPanel({
           </p>
         </div>
       )}
-    </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+      {fusionFeatures && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
             {/* Optical NDVI */}
             <div className="p-2.5 rounded-lg bg-black/30 border border-white/5">
               <span className="text-[10px] block text-white/40">OPTICAL NDVI PROXY</span>
