@@ -127,7 +127,7 @@ def synthesize_response(
         answer = (
             f"The primary land cover is classified as {top_label} "
             f"(supporting classes: {active_str}).{vqa_note} "
-            "Confidence is not calibrated for this workflow."
+            + "Confidence is not calibrated for this workflow."
         )
         return answer, None, "not_calibrated", warnings
 
@@ -274,7 +274,7 @@ def synthesize_response(
         answer = (
             f"Optical–SAR cross-modal analysis reports complementary image-derived sensor telemetry. "
             f"{alignment_text} "
-            (f"SAR mean signal level reported by the specialist is {signal_db:.1f} dB; it is not treated as calibrated sigma-nought backscatter. " if signal_db is not None else "No SAR signal-level metric was provided. ")
+            + (f"SAR mean signal level reported by the specialist is {signal_db:.1f} dB; it is not treated as calibrated sigma-nought backscatter. " if signal_db is not None else "No SAR signal-level metric was provided. ")
             + (f"Optical telemetry reports {veg * 100:.1f}% vegetative surface fraction. " if veg is not None else "No optical vegetation-fraction metric was provided. ")
             + "Any structural interpretation is limited to evidence returned by the fusion specialist. "
             "Confidence is not calibrated for this workflow."
