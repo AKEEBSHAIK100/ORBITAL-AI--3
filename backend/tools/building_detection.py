@@ -193,7 +193,7 @@ class BuildingDetectionTool(BaseTool):
             "low_confidence_count": low_c,
             "partial_count": partial_c,
             "partial_detections": partial_c,
-            "confidence": round(avg_conf, 3),
+            "confidence": round(avg_conf, 3) if avg_conf is not None else None,
             "confidence_level": conf_level,
             "validation_status": accuracy_eval.get("status"),
             "validation": accuracy_eval,
