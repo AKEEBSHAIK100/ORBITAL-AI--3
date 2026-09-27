@@ -1,6 +1,6 @@
 # ORBITAL-AI — Implementation Status
 
-Updated: 2026-09-26
+Updated: 2026-09-27
 
 This file is the living implementation status for the remote-sensing prototype. A capability is marked **done** only when the repository contains the implementation and its runtime contract is explicit. A model artifact on disk is not treated as executable availability until its runtime can be verified.
 
@@ -50,6 +50,7 @@ This file is the living implementation status for the remote-sensing prototype. 
 ## API/provider architecture
 - **Done:** removed the unused OpenAI SDK and paid-provider fallback paths from the Node/Vercel analysis, compare, and fusion routes.
 - **Done:** free execution paths are Python remote-sensing specialists and the public Hugging Face ZeroGPU specialist; unavailable means unavailable.
+- **Done:** free Hugging Face Gradio calls use the deployed Space `analyze` endpoint consistently in both the Vercel server helper and browser remote-analysis client.
 - **Done:** client/server runtime model labels are synchronized.
 
 ## Validation status
