@@ -465,7 +465,7 @@ app.post('/api/fuse', async (req, res) => {
     } catch {}
 
     // Free external specialist fallback. It must not fabricate calibration/registration.
-    try {
+    if (process.env.ENABLE_HF_RS_WORKER === 'true') try {
       const worker = await runWorkerFusion(opticalImage, sarImage)
       traceSteps.push({ step: 2, tool: 'external_rs_fusion', description: 'External public Hugging Face ZeroGPU remote-sensing specialist', input_summary: 'Optical + SAR', output_summary: 'External specialist returned a semantic result', duration_ms: 1, status: 'success', parameters: { confidence_status: 'not_calibrated' } })
       return res.json({
