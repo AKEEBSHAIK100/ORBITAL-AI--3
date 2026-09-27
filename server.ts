@@ -315,7 +315,8 @@ app.post('/api/analyze', async (req, res) => {
   } catch {}
 
   try {
-    const worker = await runWorkerVqaOrCaption(image, prompt)
+    if (process.env.ENABLE_HF_RS_WORKER !== 'true') throw new Error('Server-side ZeroGPU worker disabled; browser fallback is preferred.')
+     const worker = await runWorkerVqaOrCaption(image, prompt)
     return res.json({
       answer: worker.answer,
       confidence: null, confidence_percent: null, confidenceScore: null,
