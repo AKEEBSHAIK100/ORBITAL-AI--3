@@ -328,12 +328,17 @@ function ConfidenceBadge({
   const [tip, setTip] = useState(false)
   const isCalibrated = confidence_status === 'calibrated'
   const isUnavailable = confidence_status === 'unavailable' || confidence === 'unavailable' || (percent === 0 && !isCalibrated)
+  const isExternalSpecialist = mode === 'external_hf_zero_gpu'
 
   let badgeColor: string = C.cyan
   let mainLabel = 'Confidence: Not calibrated'
   let subLabel = ''
 
-  if (isUnavailable) {
+  if (isExternalSpecialist) {
+    badgeColor = C.orange
+    mainLabel = 'External specialist'
+    subLabel = 'Not benchmarked'
+  } else if (isUnavailable) {
     badgeColor = C.danger
     mainLabel = 'Confidence: Unavailable'
   } else if (isCalibrated && percent != null) {
@@ -374,10 +379,12 @@ function ConfidenceBadge({
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 rounded-lg text-[10px] leading-snug z-50 pointer-events-none"
             style={{ background: '#071022F5', border: `1px solid ${C.borderHover}`, color: '#D8F6FF', boxShadow: '0 4px 20px rgba(0,0,0,0.6)' }}>
             <div className="font-semibold text-white mb-0.5">
-              {isCalibrated ? 'Calibrated Empirical Confidence' : isUnavailable ? 'Service Unavailable' : 'Uncalibrated Model Output'}
+              {isExternalSpecialist ? 'External Remote-Sensing Specialist' : isCalibrated ? 'Calibrated Empirical Confidence' : isUnavailable ? 'Service Unavailable' : 'Uncalibrated Model Output'}
             </div>
             <div>
-              {isCalibrated
+              {isExternalSpecialist
+                ? 'Public Hugging Face ZeroGPU specialist output. It is explicitly external and is not presented as an ORBITAL-AI benchmark result.'
+                : isCalibrated
                 ? 'Only displayed when a specialist explicitly reports calibrated confidence backed by empirical validation.'
                 : isUnavailable
                 ? 'Specialist model service is currently offline or unreachable.'
@@ -1152,37 +1159,17 @@ export default function App() {
                 execution_trace: payload.execution_trace || null,
               }
             } catch (remoteErr: any) {
-              // Honest last-resort path: deterministic image statistics. This does not
-              // fabricate a VLM answer and does not claim calibrated confidence.
-              try {
-                const classical = await runClassicalBrowserAnalysis(prompt, imagePreview || '')
-                result = {
-                  answer: classical.answer,
-                  confidence: 'low',
-                  confidence_percent: null,
-                  confidenceScore: null,
-                  confidence_status: 'not_calibrated',
-                  confidence_reason: 'Remote specialist unavailable; result comes from deterministic browser pixel statistics, not a trained remote-sensing model.',
-                  detected_features: classical.features,
-                  label: 'Classical Image Analysis Fallback',
-                  suggested_followups: ['Retry the specialist analysis when the GPU service is available', 'Upload a second date for change analysis'],
-                  mode: 'browser_classical_fallback',
-                  is_synthetic: false,
-                  execution_trace: payload.execution_trace || null,
-                }
-              } catch (fallbackErr: any) {
-                result = {
-                  answer: `Remote sensing analysis unavailable: ${errorMsg}`,
-                  confidence: 'unavailable',
-                  confidence_percent: null,
-                  confidenceScore: null,
-                  confidence_status: 'unavailable',
-                  confidence_reason: remoteErr?.message || fallbackErr?.message || errorMsg,
-                  detected_features: ['Analysis Unavailable'],
-                  label: 'Analysis Error',
-                  suggested_followups: ['Retry when the remote specialist is available'],
-                  execution_trace: payload.execution_trace || null,
-                }
+              result = {
+                answer: `Remote sensing analysis unavailable: ${errorMsg}`,
+                confidence: 'unavailable',
+                confidence_percent: null,
+                confidenceScore: null,
+                confidence_status: 'unavailable',
+                confidence_reason: remoteErr?.message || errorMsg,
+                detected_features: ['Analysis Unavailable'],
+                label: 'Analysis Unavailable',
+                suggested_followups: ['Retry when the remote specialist is available', 'Use a supported GeoTIFF/TIFF input when applicable'],
+                execution_trace: payload.execution_trace || null,
               }
             }
           }
