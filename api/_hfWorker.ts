@@ -69,7 +69,7 @@ function fileRef(path: string, filename: string) {
 
 export async function runWorkerVqaOrCaption(image: string, query: string) {
   const path = await uploadImage(image, 'orbital-input.jpg')
-  const raw = await callGradio('answer', [query + '\nAnswer for a non-expert: start with the direct answer, use simple words, explain technical terms briefly, and do not invent measurements or confidence.', fileRef(path, 'orbital-input.jpg'), null])
+  const raw = await callGradio('analyze', [query + '\nAnswer for a non-expert: start with the direct answer, use simple words, explain technical terms briefly, and do not invent measurements or confidence.', fileRef(path, 'orbital-input.jpg'), null])
   const values = Array.isArray(raw) ? raw : [raw]
   return { ok: true, answer: String(values[0] ?? ''), evidence: values[1] ?? '', trace: values[2] ?? '', task: /describe|caption|scene/i.test(query) ? 'caption' : 'vqa', model: 'external-zero-gpu-rs-vlm', adapter: 'external-space', provenance: 'External public Hugging Face ZeroGPU Space; not an ORBITAL-AI benchmark.' }
 }
