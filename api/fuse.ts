@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { classifyError } from './_lib.js'
+import { classifyError, systemPrompt } from './_lib.js'
 import {
   classifyTask, validateInputs, buildExecutionTrace,
   type ExecutionTraceStep, type FusionFeatures,
