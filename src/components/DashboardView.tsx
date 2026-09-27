@@ -275,7 +275,7 @@ export default function DashboardView({
                         <span
                           className="font-bold font-mono text-xs"
                           style={{
-                            color: (item.confidence_percent ?? item.confidenceScore) >= 85 ? '#35E0B8' : '#FF9F43',
+                            color: (((item.confidence_percent ?? item.confidenceScore) ?? 0) >= 85) ? '#35E0B8' : '#FF9F43',
                           }}
                         >
                           Score: {item.confidence_percent ?? item.confidenceScore}%
