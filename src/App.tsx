@@ -1428,6 +1428,7 @@ export default function App() {
             confidenceScore: null,
             confidence_reason: 'External public Hugging Face ZeroGPU specialist; no calibrated ORBITAL-AI confidence is claimed.',
             detected_features: [],
+            suggested_followups: ['Retry the remote specialist when the GPU service is available.'],
             label: 'External Optical–SAR VLM',
             mode: 'external_hf_zero_gpu',
             is_synthetic: false,
