@@ -277,7 +277,7 @@ def synthesize_response(
             + (f"SAR mean signal level reported by the specialist is {signal_db:.1f} dB; it is not treated as calibrated sigma-nought backscatter. " if signal_db is not None else "No SAR signal-level metric was provided. ")
             + (f"Optical telemetry reports {veg * 100:.1f}% vegetative surface fraction. " if veg is not None else "No optical vegetation-fraction metric was provided. ")
             + "Any structural interpretation is limited to evidence returned by the fusion specialist. "
-            "Confidence is not calibrated for this workflow."
+            + "Confidence is not calibrated for this workflow."
         )
         return answer, None, "not_calibrated", warnings
 
