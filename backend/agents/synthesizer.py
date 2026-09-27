@@ -371,7 +371,7 @@ def synthesize_response(
             if b_cnt > 0:
                 answer = (
                     f"Yes, structural footprints are present. The building footprint detector identified {b_cnt} structures "
-                    (f"({hi} specialist score-tiered detections). " if hi is not None else "") + f"{vqa_part} Confidence is not calibrated unless the specialist provides validation evidence."
+                    + (f"({hi} specialist score-tiered detections). " if hi is not None else "") + f"{vqa_part} Confidence is not calibrated unless the specialist provides validation evidence."
                 )
                 return answer, bldg_ev.confidence, "not_calibrated", warnings
             else:
