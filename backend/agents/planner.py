@@ -486,15 +486,15 @@ def create_query_plan(
                 intent="change_detection",
                 required_images=2,
                 required_modalities=["optical"],
-                required_tasks=["change_detection", "land_cover"],
-                specialists=["change_detection", "land_cover"],
-                execution_order=["change_detection", "land_cover"],
+                required_tasks=["change_detection"],
+                specialists=["change_detection"],
+                execution_order=["change_detection"],
                 evidence_requirements=[
                     "Bi-temporal change detection surface alteration metrics",
-                    "Land cover vegetation fraction and canopy change evidence"
+                    "Image-derived vegetation proxy change evidence"
                 ],
                 planner_disposition=DISPOSITION_KNOWN_SPECIALIST,
-                task_category="COMPLEX_KNOWN_TASK",
+                task_category="KNOWN_TASK",
             )
 
         if "what changed" in q or "?" in q:
